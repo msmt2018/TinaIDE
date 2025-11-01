@@ -22,10 +22,18 @@ import com.google.android.material.navigation.NavigationView
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import com.wuxianggujun.tinaide.core.ServiceLocator
+import com.wuxianggujun.tinaide.core.config.ConfigManager
+import com.wuxianggujun.tinaide.core.config.IConfigManager
+import com.wuxianggujun.tinaide.core.register
+import com.wuxianggujun.tinaide.ui.IUIManager
+import com.wuxianggujun.tinaide.ui.PanelType
+import com.wuxianggujun.tinaide.ui.UIManager
 
 class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var toolbar: Toolbar
+    private lateinit var uiManager: IUIManager
     private var terminalSession: TerminalSession? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,6 +41,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
+        // 初始化服务
+        initializeServices()
+        
         // 初始化 Toolbar
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -49,8 +60,27 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         
+        // 恢复 UI 布局状态
+        uiManager.restoreLayoutState()
+        
         // 初始化终端（延迟加载）
         initializeTerminal()
+    }
+    
+    private fun initializeServices() {
+        // 注册 ConfigManager
+        val configManager = ConfigManager(this)
+        ServiceLocator.register<IConfigManager>(configManager)
+        
+        // 注册 UIManager
+        uiManager = UIManager(this)
+        ServiceLocator.register<IUIManager>(uiManager)
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // 清理服务
+        ServiceLocator.clear()
     }
     
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -81,21 +111,18 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun toggleTerminal() {
-        val terminalContainer = findViewById<View>(R.id.terminal_container)
-        if (terminalContainer.visibility == View.VISIBLE) {
-            terminalContainer.visibility = View.GONE
-        } else {
-            terminalContainer.visibility = View.VISIBLE
-            // 如果终端还没初始化，现在初始化
-            if (terminalSession == null) {
-                setupTerminalSession()
-            }
+        // 使用 UIManager 切换终端面板
+        uiManager.togglePanel(PanelType.TERMINAL)
+        
+        // 如果终端变为可见且还没初始化，现在初始化
+        if (uiManager.isPanelVisible(PanelType.TERMINAL) && terminalSession == null) {
+            setupTerminalSession()
         }
     }
     
     private fun initializeTerminal() {
-        // 终端默认隐藏，只在需要时显示
-        findViewById<View>(R.id.terminal_container).visibility = View.GONE
+        // 终端默认隐藏，由 UIManager 管理
+        // 不需要手动设置 visibility
     }
     
     private fun setupTerminalSession() {
