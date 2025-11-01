@@ -1,0 +1,31 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+**/.gradle/
+.vscode/
+out/
+*.log
+*.jks
+*.keystore
+keystore.properties
+# Ignore large offline bootstrap archives by default; keep README
+app/src/main/assets/bootstrap/**/*.zip
+# Sora editor upstream debug keystore
+external/sora-editor/debug.jks
+# IntelliJ/AS project files (broader)
+/.idea/
