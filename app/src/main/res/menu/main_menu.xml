@@ -6,19 +6,19 @@
         android:id="@+id/action_new_project"
         android:title="新建项目"
         android:icon="@android:drawable/ic_menu_add"
-        app:showAsAction="never" />
+        app:showAsAction="ifRoom|withText" />
 
     <item
         android:id="@+id/action_open_project"
         android:title="打开项目"
         android:icon="@android:drawable/ic_menu_view"
-        app:showAsAction="never" />
+        app:showAsAction="ifRoom|withText" />
 
     <item
         android:id="@+id/action_toggle_terminal"
         android:title="终端"
         android:icon="@android:drawable/ic_menu_manage"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_build"
