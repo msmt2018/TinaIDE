@@ -75,6 +75,14 @@ class MainActivity : AppCompatActivity() {
         // 注册 UIManager
         uiManager = UIManager(this)
         ServiceLocator.register<IUIManager>(uiManager)
+        
+        // 注册 FileManager
+        val fileManager = com.wuxianggujun.tinaide.file.FileManager(this)
+        ServiceLocator.register<com.wuxianggujun.tinaide.file.IFileManager>(fileManager)
+        
+        // 注册 EditorManager
+        val editorManager = com.wuxianggujun.tinaide.editor.EditorManager(this, supportFragmentManager)
+        ServiceLocator.register<com.wuxianggujun.tinaide.editor.IEditorManager>(editorManager)
     }
     
     override fun onDestroy() {
