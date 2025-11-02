@@ -38,11 +38,14 @@ import com.wuxianggujun.tinaide.file.FileManager
 import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.EditorManager
 
+
 class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var toolbar: Toolbar
     private lateinit var uiManager: IUIManager
     private var terminalSession: TerminalSession? = null
+    @Volatile private var termLogTailStop: Boolean = false
+    private var termLogTailThread: Thread? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,10 +109,13 @@ class MainActivity : AppCompatActivity() {
         val editorManager = EditorManager(this, supportFragmentManager)
         ServiceLocator.register<IEditorManager>(editorManager)
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
-        // 清理服务
+        // 停止终端日志尾随
+        termLogTailStop = true
+        try { termLogTailThread?.join(500) } catch (_: Exception) {}
+// 清理服务
         ServiceLocator.clear()
     }
     
@@ -372,7 +378,11 @@ class MainActivity : AppCompatActivity() {
                 terminalView.invalidate()
             }
             override fun onTitleChanged(changedSession: TerminalSession) {}
-            override fun onSessionFinished(finishedSession: TerminalSession) {}
+            override fun onSessionFinished(finishedSession: TerminalSession) {
+                android.util.Log.d("MainActivity", "Terminal session finished")
+                termLogTailStop = true
+                try { termLogTailThread?.join(500) } catch (_: Exception) {}
+            }
             override fun onCopyTextToClipboard(session: TerminalSession, text: String) {}
             override fun onPasteTextFromClipboard(session: TerminalSession?) {}
             override fun onBell(session: TerminalSession) {}
@@ -493,7 +503,7 @@ class MainActivity : AppCompatActivity() {
         
         // 使用 Termux 环境变量
         val env = TermuxBootstrap.buildEnv(this)
-        
+
         // 根据 shell 类型选择合适的参数
         val args: Array<String> = when {
             shellPath.endsWith("/login") -> {
@@ -507,21 +517,85 @@ class MainActivity : AppCompatActivity() {
             else -> emptyArray()
         }
 
+        // 终端输出日志路径（文件 + Logcat）
+        val logsDir = File(filesDir, "terminal_logs").apply { if (!exists()) mkdirs() }
+        val termLogFile = File(logsDir, "session-${System.currentTimeMillis()}.log").absolutePath
+        android.util.Log.d("MainActivity", "Terminal output log file: $termLogFile")
+        try { val lf = File(termLogFile); lf.parentFile?.mkdirs(); if (!lf.exists()) lf.createNewFile() } catch (_: Exception) {}
+
+        // 如非 login，则用 tee 包装输出，便于记录终端所有输出
+        var effectiveShellPath = shellPath
+        var effectiveArgs = args
+        // 检测 tee 是否存在，仅在存在时启用文件日志包装
+        val prefixDirForBin = File(filesDir, "usr")
+        val teeCandidates = listOf(
+            File(prefixDirForBin, "bin/tee"),
+            File(prefixDirForBin, "bin/applets/tee")
+        )
+        val teePathLocal = teeCandidates.firstOrNull { it.exists() && it.canExecute() }?.absolutePath
+        // 系统 toybox/busybox 兜底
+        val systemToybox = File("/system/bin/toybox").takeIf { it.exists() && it.canExecute() }?.absolutePath
+        val systemBusybox = File("/system/bin/busybox").takeIf { it.exists() && it.canExecute() }?.absolutePath
+        val teeCmd: String? = when {
+            teePathLocal != null -> "\"$teePathLocal\""
+            systemToybox != null -> "\"$systemToybox\" tee"
+            systemBusybox != null -> "\"$systemBusybox\" tee"
+            else -> null
+        }
+        if (teeCmd != null && !shellPath.endsWith("/login")) {
+            val shWrap = "/system/bin/sh"
+            val argStr = if (args.isNotEmpty()) args.joinToString(" ") else ""
+            val cmd = "\"$shellPath\" $argStr 2>&1 | $teeCmd -a \"$termLogFile\""
+            effectiveShellPath = shWrap
+            effectiveArgs = arrayOf("-c", cmd)
+        } else if (teeCmd == null) {
+            android.util.Log.w("MainActivity", "tee not found in $prefixDirForBin and no system toybox/busybox; skip file logging wrapper")
+        }
+
+
         try {
             android.util.Log.d("MainActivity", "Creating terminal session...")
-            android.util.Log.d("MainActivity", "  Shell: $shellPath")
+            android.util.Log.d("MainActivity", "  Shell: $shellPath -> $effectiveShellPath")
             android.util.Log.d("MainActivity", "  CWD: $cwd")
-            android.util.Log.d("MainActivity", "  Args: ${args.joinToString()}")
+            android.util.Log.d("MainActivity", "  Args: ${args.joinToString()} -> ${effectiveArgs.joinToString()}")
             
             terminalSession = TerminalSession(
-                shellPath,
+                effectiveShellPath,
                 cwd,
-                args,
+                effectiveArgs,
                 env,
                 /* transcriptRows = */ 10000,
                 sessionClient
             )
             android.util.Log.d("MainActivity", "Terminal session created successfully")
+
+            // 启动日志尾随线程，将终端输出同步写入 Logcat
+            termLogTailStop = false
+            termLogTailThread?.interrupt()
+            termLogTailThread = Thread {
+                try {
+                    val f = java.io.File(termLogFile)
+                    var waited = 0
+                    while (!f.exists() && waited < 200) { Thread.sleep(50); waited++ }
+                    val raf = java.io.RandomAccessFile(f, "r")
+                    var pos = raf.length()
+                    raf.seek(pos)
+                    val buf = ByteArray(4096)
+                    while (!termLogTailStop) {
+                        val len = raf.read(buf)
+                        if (len > 0) {
+                            val out = String(buf, 0, len)
+                            android.util.Log.d("TermSession", out)
+                        } else {
+                            Thread.sleep(200)
+                        }
+                    }
+                    raf.close()
+                } catch (e: Exception) {
+                    android.util.Log.e("TermSession", "Tail thread error", e)
+                }
+            }.apply { isDaemon = true }
+            termLogTailThread?.start()
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to create terminal session", e)
             
