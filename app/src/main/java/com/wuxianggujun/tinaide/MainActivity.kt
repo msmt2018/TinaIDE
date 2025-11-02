@@ -8,7 +8,7 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
-import com.wuxianggujun.tinaide.termux.BootstrapInstaller
+import com.wuxianggujun.tinaide.termux.TermuxBootstrap
 import java.io.File
 import android.widget.Toast
 import android.graphics.Color
@@ -154,7 +154,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage("这将删除现有的 Termux 环境并重新安装。\n\n确定要继续吗？")
             .setPositiveButton("确定") { _, _ ->
                 Thread {
-                    val result = BootstrapInstaller.installIfNeeded(this, forceReinstall = true)
+                    val result = TermuxBootstrap.installIfNeeded(this, forceReinstall = true)
                     runOnUiThread {
                         if (result.installed) {
                             Toast.makeText(this, "终端环境重新安装成功", Toast.LENGTH_SHORT).show()
@@ -301,7 +301,7 @@ class MainActivity : AppCompatActivity() {
         var fontSize = 18
 
         // 提前声明用于回调访问的状态（避免未解析引用）
-        var installResult: BootstrapInstaller.Result? = null
+        var installResult: TermuxBootstrap.Result? = null
         var currentShellPath: String = "/system/bin/sh"
         terminalView.setTerminalViewClient(object : TerminalViewClient {
             override fun onScale(scale: Float): Float {
@@ -392,14 +392,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 安装/检测 Termux 环境
-        val install = BootstrapInstaller.installIfNeeded(this)
+        val install = TermuxBootstrap.installIfNeeded(this)
         installResult = install
         
         android.util.Log.d("MainActivity", "Bootstrap install result: installed=${install.installed}, arch=${install.arch}")
         
         // 验证环境完整性
         if (install.installed) {
-            val isValid = BootstrapInstaller.verifyEnvironment(this)
+            val isValid = TermuxBootstrap.verifyEnvironment(this)
             android.util.Log.d("MainActivity", "Environment verification: $isValid")
             if (!isValid) {
                 android.util.Log.w("MainActivity", "Environment incomplete, some files may be missing")
@@ -444,7 +444,7 @@ class MainActivity : AppCompatActivity() {
         android.util.Log.d("MainActivity", "Termux environment ready at: ${install.prefixPath}")
         
         // 获取 Termux shell 路径
-        val shellPath = BootstrapInstaller.resolveShell(this)
+        val shellPath = TermuxBootstrap.resolveShell(this)
         if (shellPath == null) {
             android.util.Log.e("MainActivity", "No Termux shell found")
             
@@ -492,7 +492,7 @@ class MainActivity : AppCompatActivity() {
         val cwd = homeDir.absolutePath
         
         // 使用 Termux 环境变量
-        val env = BootstrapInstaller.buildEnv(this)
+        val env = TermuxBootstrap.buildEnv(this)
         
         // 根据 shell 类型选择合适的参数
         val args: Array<String> = when {
