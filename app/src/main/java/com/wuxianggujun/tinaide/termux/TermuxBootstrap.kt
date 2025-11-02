@@ -73,7 +73,9 @@ object TermuxBootstrap {
             if (!home.exists()) home.mkdirs()
             fixExecBits(prefix)
             patchShebangs(prefix)
+            // 先从版本号推导补齐一轮，再按 SYMLINKS.txt 精确恢复
             ensureLibrarySymlinks(prefix)
+            restoreSymlinksFromFile(prefix)
             ensureShFallback(prefix)
             Result(true, "Termux 环境安装成功 ($arch)", arch, prefix.absolutePath)
         } catch (e: Exception) {
@@ -158,21 +160,89 @@ object TermuxBootstrap {
         }
     }
 
+    /**
+     * 解析 $PREFIX/SYMLINKS.txt 并按声明创建符号链接。
+     * 该文件来自官方 bootstrap，内容形如：
+     *   libbz2.so.1.0.8 -> /lib/libbz2.so.1.0
+     * 或使用 Unicode 箭头/其他分隔符。这里做兼容解析。
+     */
+    internal fun restoreSymlinksFromFile(prefix: File) {
+        val file = File(prefix, "SYMLINKS.txt")
+        if (!file.exists()) return
+        val lines = try { file.readLines(Charsets.UTF_8) } catch (_: Exception) { return }
+        for (raw in lines) {
+            val line = raw.trim()
+            if (line.isEmpty() || line.startsWith("#")) continue
+
+            // 尝试多种分隔符
+            var src: String? = null
+            var dst: String? = null
+            val arrowIdx = line.indexOf("->")
+            val uniArrowIdx = if (arrowIdx < 0) line.indexOf('→') else -1
+            if (arrowIdx >= 0) {
+                src = line.substring(0, arrowIdx).trim()
+                dst = line.substring(arrowIdx + 2).trim()
+            } else if (uniArrowIdx >= 0) {
+                src = line.substring(0, uniArrowIdx).trim()
+                dst = line.substring(uniArrowIdx + 1).trim()
+            } else {
+                // 退化：以“/lib/”作为目标起点
+                val libPos = line.indexOf("/lib/")
+                if (libPos > 0) {
+                    src = line.substring(0, libPos).trim().trimEnd('?', '�')
+                    dst = line.substring(libPos).trim()
+                }
+            }
+            if (src.isNullOrEmpty() || dst.isNullOrEmpty()) continue
+
+            // 计算源与目标的实际文件路径
+            val linkRel = dst.removePrefix("/")
+            val linkFile = File(prefix, linkRel)
+
+            // 源可能是相对名（如 libbz2.so.1.0.8），也可能是带路径的相对/绝对
+            var srcRel = src.removePrefix("/")
+            var srcFile = File(prefix, if (srcRel.contains("/")) srcRel else "lib/${srcRel}")
+            if (!srcFile.exists() && !srcRel.startsWith("lib/")) {
+                srcFile = File(prefix, "lib/${srcRel}")
+            }
+            if (!srcFile.exists()) continue
+
+            // 创建链接
+            try {
+                linkFile.parentFile?.mkdirs()
+                if (!linkFile.exists()) {
+                    Os.symlink(srcFile.absolutePath, linkFile.absolutePath)
+                    android.util.Log.d(TAG, "SYMLINK: ${linkFile.name} -> ${srcFile.name}")
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
     internal fun ensureLibrarySymlinks(prefix: File) {
         val libDir = File(prefix, "lib")
         if (!libDir.exists()) return
         val files = libDir.listFiles() ?: return
-        val soRegex = Regex("^(lib.+)\\.so\\.(\\d+)(\\..*)?")
         for (f in files) {
-            val m = soRegex.matchEntire(f.name) ?: continue
-            val base = m.groupValues[1]
-            val major = m.groupValues[2]
-            val majorLink = File(libDir, "$base.so.$major")
+            val name = f.name
+            if (!name.startsWith("lib")) continue
+            val soIdx = name.indexOf(".so")
+            if (soIdx <= 0) continue
+            val base = name.substring(0, soIdx)
+            val tail = name.substring(soIdx + 3) // after ".so"
             val noVerLink = File(libDir, "$base.so")
-            try { if (!majorLink.exists()) Os.symlink(f.name, majorLink.absolutePath) } catch (_: Exception) {}
-            try { if (!noVerLink.exists()) Os.symlink(f.name, noVerLink.absolutePath) } catch (_: Exception) {}
-        }
+            try { if (!noVerLink.exists()) Os.symlink(name, noVerLink.absolutePath) } catch (_: Exception) {}
+            val verTail = if (tail.startsWith(".")) tail.substring(1) else ""
+            if (verTail.isEmpty()) continue
+            val parts = verTail.split('.')
+            if (parts.any { it.isEmpty() || it.any { ch -> !ch.isDigit() } }) continue
+            var acc = ""
+            for ((i, part) in parts.withIndex()) {
+                acc = if (i == 0) part else "$acc.$part"
+                val link = File(libDir, "$base.so.$acc")
+                try { if (!link.exists()) Os.symlink(name, link.absolutePath) } catch (_: Exception) {}
+            }
     }
+        }
 
     internal fun ensureShFallback(prefix: File) {
         val binDir = File(prefix, "bin")
@@ -202,7 +272,12 @@ exec /system/bin/sh "${'$'}@"
 
     fun buildEnv(ctx: Context): Array<String> {
         val filesDir = ctx.filesDir
-        val prefix = File(filesDir, "usr").absolutePath
+        val prefixDir = File(filesDir, "usr")
+        // 运行前再次从 SYMLINKS.txt 恢复（兜底），避免 apt 初次运行缺别名
+        restoreSymlinksFromFile(prefixDir)
+        ensureLibrarySymlinks(prefixDir)
+
+        val prefix = prefixDir.absolutePath
         val home = File(filesDir, "home").apply { if (!exists()) mkdirs() }.absolutePath
         val tmp = File(filesDir, "tmp").apply { if (!exists()) mkdirs() }.absolutePath
         val path = "$prefix/bin:$prefix/bin/applets:/system/bin:/system/xbin"
