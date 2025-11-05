@@ -19,11 +19,11 @@ public final class PrefixAdaptationConfig {
      * 检查是否启用 ELF Hook
      * 
      * @param context 上下文
-     * @return true 启用，false 禁用（默认）
+     * @return true 启用，false 禁用（默认启用）
      */
     public static boolean isElfHookEnabled(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean(KEY_ENABLE_ELF_HOOK, false); // 默认禁用
+        return prefs.getBoolean(KEY_ENABLE_ELF_HOOK, true); // 默认启用
     }
     
     /**
