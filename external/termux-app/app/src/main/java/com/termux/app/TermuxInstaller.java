@@ -44,6 +44,17 @@ final class TermuxInstaller {
                 ZipEntry entry;
                 while ((entry = zipInput.getNextEntry()) != null) {
                     String name = entry.getName();
+                    // Normalize entry name: unify separators, strip leading ./, usr/ and any leading '/'
+                    if (name != null) {
+                        name = name.replace('\\\', '/');
+                        while (name.startsWith("./")) name = name.substring(2);
+                        if (name.startsWith("usr/")) name = name.substring(4);
+                        if (name.startsWith("/")) name = name.substring(1);
+                    }
+                    if (name == null || name.isEmpty()) continue;
+                    // Skip meta entries if present
+                    if (name.startsWith("META-INF/")) continue;
+
                     if (name.equals("SYMLINKS.txt")) {
                         BufferedReader br = new BufferedReader(new InputStreamReader(zipInput));
                         String line;
@@ -70,10 +81,27 @@ final class TermuxInstaller {
                     if (entry.isDirectory()) {
                         ensureDir(out);
                     } else {
+                        // Ensure parent dir exists and is a directory
                         ensureDir(out.getParentFile());
-                        try (FileOutputStream fos = new FileOutputStream(out)) {
-                            int r;
-                            while ((r = zipInput.read(buffer)) != -1) fos.write(buffer, 0, r);
+                        try {
+                            try (FileOutputStream fos = new FileOutputStream(out)) {
+                                int r;
+                                while ((r = zipInput.read(buffer)) != -1) fos.write(buffer, 0, r);
+                            }
+                        } catch (java.io.FileNotFoundException fnfe) {
+                            // Parent may have existed as a file/symlink or was not created properly. Fix and retry once.
+                            File parent = out.getParentFile();
+                            if (parent != null) {
+                                if (parent.exists() && !parent.isDirectory()) {
+                                    //noinspection ResultOfMethodCallIgnored
+                                    parent.delete();
+                                }
+                                ensureDir(parent);
+                            }
+                            try (FileOutputStream fos = new FileOutputStream(out)) {
+                                int r;
+                                while ((r = zipInput.read(buffer)) != -1) fos.write(buffer, 0, r);
+                            }
                         }
                         // Exec bits for common locations
                         if (name.startsWith("bin/") || name.startsWith("libexec/") ||
@@ -120,7 +148,18 @@ final class TermuxInstaller {
 
     private static void ensureDir(File dir) {
         if (dir == null) return;
-        if (!dir.exists()) dir.mkdirs();
+        if (dir.exists()) {
+            if (dir.isDirectory()) return;
+            // If a non-directory exists where a directory is required, remove it first.
+            //noinspection ResultOfMethodCallIgnored
+            dir.delete();
+        }
+        File parent = dir.getParentFile();
+        if (parent != null && !parent.exists()) {
+            ensureDir(parent);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
     }
 
     /**
