@@ -36,6 +36,9 @@ import java.nio.charset.StandardCharsets;
  */
 public final class PrefixAdaptationManager {
 
+    // Global kill-switch: disable all custom injection artifacts (wrappers, profile.d snippet, repair script, apt hooks)
+    private static final boolean DISABLE_CUSTOM_INJECTION = true;
+
     private PrefixAdaptationManager() {}
 
     public static void ensure(Context context) {
@@ -44,6 +47,12 @@ public final class PrefixAdaptationManager {
         final String prefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH;
         final File prefixDir = new File(prefix);
         if (!prefixDir.exists()) return; // Bootstrap may not be installed yet
+
+        if (DISABLE_CUSTOM_INJECTION) {
+            // Remove any artifacts we may have created previously, then exit.
+            try { disableAllCustomInjection(context, prefixDir); } catch (Throwable ignored) {}
+            return;
+        }
 
         // 1) Ensure $PREFIX/bin/prefix-repair
         final File binDir = new File(prefixDir, "bin");
@@ -199,6 +208,55 @@ public final class PrefixAdaptationManager {
             //noinspection ResultOfMethodCallIgnored
             file.setExecutable(true, false);
         }
+    }
+    private static void disableAllCustomInjection(Context context, File prefixDir) {
+        try {
+            // 1) Remove our profile.d snippet
+            File profileDir = new File(prefixDir, "etc/profile.d");
+            File termuxExecSh = new File(profileDir, "termux-exec.sh");
+            if (termuxExecSh.exists()) termuxExecSh.delete();
+            cleanupLegacyProfileSnippets(prefixDir);
+
+            // 2) Remove apt hooks/options we created
+            File aptConfDir = new File(prefixDir, "etc/apt/apt.conf.d");
+            File aptHook = new File(aptConfDir, "99-prefix-repair");
+            if (aptHook.exists()) aptHook.delete();
+            File aptDpkgOpts = new File(aptConfDir, "97-dpkg-options");
+            if (aptDpkgOpts.exists()) aptDpkgOpts.delete();
+
+            // 3) Remove prefix-repair script
+            File binDir = new File(prefixDir, "bin");
+            File repairScript = new File(binDir, "prefix-repair");
+            if (repairScript.exists()) repairScript.delete();
+
+            // 4) Restore dpkg/dpkg-deb originals and remove wrappers
+            restoreAndRemoveWrapper(binDir, "dpkg");
+            restoreAndRemoveWrapper(binDir, "dpkg-deb");
+
+            // 5) Remove symlink PREFIX/data/data/com.termux if we created it
+            File dataDir = new File(prefixDir, "data");
+            File dataDataDir = new File(dataDir, "data");
+            File comTermuxLink = new File(dataDataDir, "com.termux");
+            try {
+                if (comTermuxLink.exists()) comTermuxLink.delete();
+            } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {}
+    }
+
+    private static void restoreAndRemoveWrapper(File binDir, String prog) {
+        try {
+            File wrapper = new File(binDir, prog);
+            File real = new File(binDir, prog + "-real");
+            if (wrapper.exists() && real.exists()) {
+                // Put back original
+                //noinspection ResultOfMethodCallIgnored
+                real.renameTo(wrapper);
+            } else if (wrapper.exists() && !real.exists()) {
+                // Just remove stray wrapper
+                //noinspection ResultOfMethodCallIgnored
+                wrapper.delete();
+            }
+        } catch (Throwable ignored) {}
     }
 
     private static void writeBytes(File file, byte[] data) {
