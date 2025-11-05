@@ -22,6 +22,17 @@ import java.nio.charset.StandardCharsets;
  * - Optionally copy libtermux-exec.so from bundled assets to $PREFIX/lib
  *
  * This class avoids heavy logic and only manages text artifacts (KISS/YAGNI).
+ * 
+ * Note: This is the PRIMARY and STABLE method for path adaptation.
+ * It works by running a shell script after each apt operation to fix:
+ * - Shebang lines in scripts
+ * - Text references to paths
+ * - Symbolic links
+ * - pkgconfig files
+ * 
+ * An optional EXPERIMENTAL binary-level hook (PrefixHook) can complement this
+ * by patching ELF files at write time, but the script-based approach remains
+ * the primary and most reliable method.
  */
 public final class PrefixAdaptationManager {
 
