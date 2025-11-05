@@ -59,8 +59,58 @@ public final class PrefixAdaptationManager {
         final File aptHook = new File(aptConfDir, "99-prefix-repair");
         String hook = "DPkg::Post-Invoke-Success { \"sh -c '$PREFIX/bin/prefix-repair || true'\"; };\n";
         writeTextIfDifferent(aptHook, hook, false);
+        
+        // 2.1) 设置 dpkg 选项，强制使用 PREFIX 作为根目录
+        final File aptDpkgOpts = new File(aptConfDir, "97-dpkg-options");
+        String dpkgOpts = "# Force dpkg to extract relative to PREFIX\n" +
+                "DPkg::Options { \"--force-not-root\"; };\n" +
+                "DPkg::Options { \"--force-bad-path\"; };\n" +
+                "DPkg::Options { \"--log=$PREFIX/var/log/dpkg.log\"; };\n";
+        writeTextIfDifferent(aptDpkgOpts, dpkgOpts, false);
+        
+        // 2.1) 创建符号链接来处理 dpkg 解压时的路径问题
+        // dpkg 会尝试创建 ./data/data/com.termux，我们让它指向正确的位置
+        final File dataDir = new File(prefixDir, "data");
+        final File dataDataDir = new File(dataDir, "data");
+        final File comTermuxLink = new File(dataDataDir, "com.termux");
+        
+        try {
+            if (!dataDir.exists()) dataDir.mkdirs();
+            if (!dataDataDir.exists()) dataDataDir.mkdirs();
+            
+            // 如果 com.termux 是目录，删除它
+            if (comTermuxLink.exists() && comTermuxLink.isDirectory() && !isSymlink(comTermuxLink)) {
+                deleteRecursive(comTermuxLink);
+            }
+            
+            // 创建符号链接：$PREFIX/data/data/com.termux -> $PREFIX
+            // 这样 dpkg 解压到 ./data/data/com.termux/files/usr/bin/xxx 时
+            // 实际会解压到 $PREFIX/files/usr/bin/xxx
+            if (!comTermuxLink.exists()) {
+                try {
+                    // 使用相对路径创建符号链接
+                    java.nio.file.Files.createSymbolicLink(
+                        comTermuxLink.toPath(),
+                        java.nio.file.Paths.get("../../..")  // 从 data/data/com.termux 回到 PREFIX
+                    );
+                } catch (Exception e) {
+                    // 如果符号链接失败，尝试使用 ln 命令
+                    try {
+                        Runtime.getRuntime().exec(new String[]{
+                            "ln", "-sf", "../../..", comTermuxLink.getAbsolutePath()
+                        }).waitFor();
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {
+            // 符号链接创建失败不是致命错误
+        }
 
-        // 3) Ensure profile.d snippet for termux-exec
+        // 3) Create wrappers for dpkg and dpkg-deb to load path-rewrite library
+        createDpkgWrapper(binDir, "dpkg");
+        createDpkgWrapper(binDir, "dpkg-deb");
+        
+        // 3.1) Ensure profile.d snippet for termux-exec
         final File profileDir = new File(prefixDir, "etc/profile.d");
         //noinspection ResultOfMethodCallIgnored
         profileDir.mkdirs();
@@ -71,13 +121,36 @@ public final class PrefixAdaptationManager {
                 "fi\n";
         writeTextIfDifferent(termuxExecSh, profile, false);
 
-        // 4) Optionally copy libtermux-exec.so from assets if present
+        // 4) Copy path-rewrite library from app's native libs
         final File libDir = new File(prefixDir, "lib");
         //noinspection ResultOfMethodCallIgnored
         libDir.mkdirs();
+        
+        // Copy termux-path-rewrite.so
+        maybeCopyNativeLib(context, "termux-path-rewrite", new File(libDir, "libtermux-path-rewrite.so"));
+        
+        // Optionally copy libtermux-exec.so from assets if present
         maybeCopyTermuxExecFromAssets(context, new File(libDir, "libtermux-exec.so"));
     }
 
+    private static void maybeCopyNativeLib(Context context, String libName, File out) {
+        try {
+            // 从 app 的 native 库目录复制
+            String libPath = context.getApplicationInfo().nativeLibraryDir + "/lib" + libName + ".so";
+            File srcFile = new File(libPath);
+            if (srcFile.exists()) {
+                java.nio.file.Files.copy(srcFile.toPath(), out.toPath(), 
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                //noinspection ResultOfMethodCallIgnored
+                out.setReadable(true, false);
+                //noinspection ResultOfMethodCallIgnored
+                out.setExecutable(true, false);
+            }
+        } catch (Exception ignored) {
+            // Library not available
+        }
+    }
+    
     private static void maybeCopyTermuxExecFromAssets(Context context, File out) {
         AssetManager am = context.getAssets();
         String arch = detectArch();
@@ -117,6 +190,21 @@ public final class PrefixAdaptationManager {
                 "\n" +
                 ": \"${PREFIX:?PREFIX is not set. Run inside Termux shell.}\"\n" +
                 "log() { printf '[prefix-repair] %s\\n' \"$*\" >&2; }\n" +
+                "\n" +
+                "# 清理 dpkg 解压时可能创建的错误目录\n" +
+                "if [ -d \"$PREFIX/data/data/com.termux\" ]; then\n" +
+                "  log 'Cleaning up misplaced com.termux directory...'\n" +
+                "  rm -rf \"$PREFIX/data\" 2>/dev/null || true\n" +
+                "fi\n" +
+                "\n" +
+                "# 清理临时目录中的错误目录\n" +
+                "for tmpdir in $PREFIX/tmp/apt-dpkg-install-* 2>/dev/null; do\n" +
+                "  if [ -d \"$tmpdir/data/data/com.termux\" ]; then\n" +
+                "    log 'Moving files from misplaced directory...'\n" +
+                "    rsync -a \"$tmpdir/data/data/com.termux/files/usr/\" \"$PREFIX/\" 2>/dev/null || true\n" +
+                "    rm -rf \"$tmpdir/data\" 2>/dev/null || true\n" +
+                "  fi\n" +
+                "done\n" +
                 "\n" +
                 "log 'Fixing shebang paths...'\n" +
                 "grep -RIl '^#!/data/data/com\\.termux/files/usr/bin/' \"$PREFIX\" 2>/dev/null \\\n" +
@@ -184,5 +272,55 @@ public final class PrefixAdaptationManager {
             while ((r = in.read(buf)) != -1) baos.write(buf, 0, r);
             return baos.toByteArray();
         }
+    }
+    
+    private static boolean isSymlink(File file) {
+        try {
+            return java.nio.file.Files.isSymbolicLink(file.toPath());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private static void deleteRecursive(File file) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursive(child);
+                }
+            }
+        }
+        //noinspection ResultOfMethodCallIgnored
+        file.delete();
+    }
+    
+    private static void createDpkgWrapper(File binDir, String progName) {
+        File wrapper = new File(binDir, progName + "-real");
+        File original = new File(binDir, progName);
+        
+        // Only create wrapper if program exists and wrapper doesn't
+        if (!original.exists() || wrapper.exists()) {
+            return;
+        }
+        
+        try {
+            // Rename original to progName-real
+            if (!original.renameTo(wrapper)) {
+                return;
+            }
+            
+            // Create wrapper script
+            String wrapperScript = "#!/bin/sh\n" +
+                    "# Wrapper to load path-rewrite library\n" +
+                    "# This hooks mkdir/open to rewrite com.termux paths\n" +
+                    "if [ -f \"$PREFIX/lib/libtermux-path-rewrite.so\" ]; then\n" +
+                    "  export LD_PRELOAD=\"$PREFIX/lib/libtermux-path-rewrite.so${LD_PRELOAD:+:$LD_PRELOAD}\"\n" +
+                    "fi\n" +
+                    "# Ensure we're in PREFIX directory\n" +
+                    "cd \"$PREFIX\" 2>/dev/null || true\n" +
+                    "exec \"$PREFIX/bin/" + progName + "-real\" \"$@\"\n";
+            writeExecutableIfDifferent(original, wrapperScript);
+        } catch (Exception ignored) {}
     }
 }

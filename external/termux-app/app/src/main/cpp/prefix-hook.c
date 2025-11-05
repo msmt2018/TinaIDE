@@ -14,7 +14,11 @@
 #include <dlfcn.h>
 #include <android/log.h>
 #include <jni.h>
+#include <syscall.h>
 #include "elf-patcher.h"
+
+// 直接使用系统调用作为备用
+#define __close(fd) syscall(__NR_close, fd)
 
 #define TAG "TermuxPrefixHook"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -97,9 +101,16 @@ static int contains_old_prefix(const char* path) {
  * Hook 的 close 函数
  */
 int close(int fd) {
+    // 如果 hook 未初始化，不应该被调用（理论上不会发生）
+    if (!original_close) {
+        LOGE("Hook not initialized but close() was called!");
+        // 直接使用系统调用作为紧急备用
+        return __close(fd);
+    }
+    
     // 如果 hook 未启用或 fd 无效，直接调用原始函数
-    if (!g_hook_enabled || fd < 0 || !original_close) {
-        return original_close ? original_close(fd) : __close(fd);
+    if (!g_hook_enabled || fd < 0) {
+        return original_close(fd);
     }
     
     // 获取文件路径
@@ -165,20 +176,17 @@ static void init_prefix_hook(const char* target_prefix) {
     LOGI("Hook is DISABLED by default. Call setEnabled(true) to activate.");
     
     // 获取原始 close 函数
-    // 注意：这里使用 RTLD_NEXT，在 Android 上可能需要使用 PLT hook 库
-    original_close = dlsym(RTLD_NEXT, "close");
+    // 使用 RTLD_NEXT 获取下一个 close 符号（即真正的 libc close）
+    original_close = (int (*)(int))dlsym(RTLD_NEXT, "close");
+    
     if (!original_close) {
-        LOGD("RTLD_NEXT not available, trying RTLD_DEFAULT");
-        // 备用方案：直接使用系统调用
-        original_close = (int (*)(int))dlsym(RTLD_DEFAULT, "__close");
+        LOGE("Failed to get original close function via RTLD_NEXT");
+        LOGE("Hook cannot be initialized - this is critical!");
+        return;
     }
     
-    if (original_close) {
-        g_hook_initialized = 1;
-        LOGI("Hook ready (disabled by default, complements script-based repair)");
-    } else {
-        LOGE("Failed to get original close function");
-    }
+    g_hook_initialized = 1;
+    LOGI("Hook ready (disabled by default, complements script-based repair)");
 }
 
 /**
@@ -197,7 +205,7 @@ static void set_hook_enabled(int enabled) {
 
 JNIEXPORT void JNICALL
 Java_com_wuxianggujun_tinaide_PrefixHook_nativeInit(
-    JNIEnv* env, jclass clazz, jstring targetPrefix) {
+    JNIEnv* env, jclass clazz __attribute__((unused)), jstring targetPrefix) {
     
     const char* prefix = (*env)->GetStringUTFChars(env, targetPrefix, NULL);
     if (prefix) {
@@ -208,12 +216,12 @@ Java_com_wuxianggujun_tinaide_PrefixHook_nativeInit(
 
 JNIEXPORT void JNICALL
 Java_com_wuxianggujun_tinaide_PrefixHook_nativeSetEnabled(
-    JNIEnv* env, jclass clazz, jboolean enabled) {
+    JNIEnv* env __attribute__((unused)), jclass clazz __attribute__((unused)), jboolean enabled) {
     set_hook_enabled(enabled ? 1 : 0);
 }
 
 JNIEXPORT jboolean JNICALL
 Java_com_wuxianggujun_tinaide_PrefixHook_nativeIsEnabled(
-    JNIEnv* env, jclass clazz) {
+    JNIEnv* env __attribute__((unused)), jclass clazz __attribute__((unused))) {
     return g_hook_enabled ? JNI_TRUE : JNI_FALSE;
 }
