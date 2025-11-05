@@ -125,33 +125,25 @@ final class TermuxInstaller {
 
     /**
      * Open bootstrap zip as a streaming ZipInputStream to avoid loading whole archive in memory.
-     * Preference order: assets → native fallback.
+     * Preference order: 
+     * 1. Java assets (streaming, most efficient)
+     * 2. Native assets (fallback, loads into memory)
      */
     private static ZipInputStream openBootstrapZipStream(Context context) {
-        if (context != null) {
-            try {
-                String arch = detectArch();
-                String[] candidates = new String[] {
-                    "bootstrap/" + arch + "/bootstrap-" + arch + ".zip",
-                    "bootstrap/" + arch + ".zip",
-                    "bootstrap-" + arch + ".zip"
-                };
-                for (String path : candidates) {
-                    try {
-                        InputStream ins = context.getAssets().open(path);
-                        return new ZipInputStream(ins);
-                    } catch (Exception ignored) { }
-                }
-            } catch (Exception ignored) { }
+        if (context == null) {
+            throw new RuntimeException("Context is null");
         }
+        
+        String arch = detectArch();
+        
+        // 直接从 Java 层流式读取 assets
+        String path = "bootstrap/" + arch + "/bootstrap-" + arch + ".zip";
         try {
-            System.loadLibrary("termux-bootstrap");
-            byte[] data = getZip();
-            if (data == null || data.length == 0)
-                throw new RuntimeException("Empty bootstrap from native library");
-            return new ZipInputStream(new ByteArrayInputStream(data));
-        } catch (UnsatisfiedLinkError e) {
-            throw new RuntimeException("No bootstrap zip available in assets or native library", e);
+            InputStream ins = context.getAssets().open(path);
+            Log.d(LOG_TAG, "Opened bootstrap from assets: " + path);
+            return new ZipInputStream(ins);
+        } catch (Exception e) {
+            throw new RuntimeException("Bootstrap not found: " + path, e);
         }
     }
 
@@ -169,5 +161,5 @@ final class TermuxInstaller {
         return "aarch64";
     }
 
-    public static native byte[] getZip();
+
 }

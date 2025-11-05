@@ -78,6 +78,13 @@ android {
         }
     }
 
+    // 启用 NDK 构建以编译 prefix-hook
+    externalNativeBuild {
+        ndkBuild {
+            path = file("../external/termux-app/app/src/main/cpp/Android.mk")
+        }
+    }
+
     // Termux 库要求提取 native 库（其 Manifest 设置了 extractNativeLibs=true）
     packagingOptions {
         jniLibs {

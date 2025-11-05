@@ -18,6 +18,7 @@ import com.termux.shared.termux.shell.TermuxShellManager;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.wuxianggujun.tinaide.PrefixAdaptationManager;
 import com.wuxianggujun.tinaide.PrefixHook;
+import com.wuxianggujun.tinaide.PrefixAdaptationConfig;
 
 public class TermuxApplication extends Application {
 
@@ -73,19 +74,30 @@ public class TermuxApplication extends Application {
         if (isTermuxFilesDirectoryAccessible) {
             TermuxShellEnvironment.writeEnvironmentToFile(this);
             
-            // Initialize prefix hook (optional, experimental)
-            // This provides binary-level path fixing as an alternative to script-based repair
-            String targetPrefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH;
-            boolean hookEnabled = PrefixHook.initialize(this, targetPrefix);
-            if (hookEnabled) {
-                Logger.logInfo(LOG_TAG, "Prefix hook enabled (experimental)");
-            } else {
-                Logger.logInfo(LOG_TAG, "Prefix hook disabled, using script-based repair");
-            }
-            
             // Ensure prefix adaptation artifacts exist (idempotent)
-            // This provides script-based path fixing as the primary/fallback method
+            // This provides script-based path fixing as the primary method
             PrefixAdaptationManager.ensure(this);
+            
+            // Initialize prefix hook (optional, experimental)
+            // This provides binary-level path fixing to complement the script-based repair
+            // If the native library is not available, it will gracefully fall back to script-only mode
+            String targetPrefix = TermuxConstants.TERMUX_PREFIX_DIR_PATH;
+            try {
+                boolean hookInitialized = PrefixHook.initialize(this, targetPrefix);
+                if (hookInitialized) {
+                    // Check if user wants to enable the experimental hook
+                    boolean shouldEnable = PrefixAdaptationConfig.isElfHookEnabled(this);
+                    if (shouldEnable) {
+                        PrefixHook.setEnabled(true);
+                        Logger.logInfo(LOG_TAG, "Prefix ELF hook ENABLED (experimental)");
+                    } else {
+                        Logger.logInfo(LOG_TAG, "Prefix ELF hook available but DISABLED (using script-based repair only)");
+                    }
+                }
+            } catch (Throwable t) {
+                // Hook is optional, don't crash if it fails
+                Logger.logDebug(LOG_TAG, "Prefix hook not available, using script-based repair only");
+            }
         }
     }
 
