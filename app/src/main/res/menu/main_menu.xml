@@ -23,14 +23,8 @@
         android:icon="@android:drawable/ic_media_play"
         app:showAsAction="ifRoom" />
 
-    <item
-        android:id="@+id/action_reinstall_termux"
-        android:title="重新安装终端环境"
-        app:showAsAction="never" />
 
-    <item
-        android:id="@+id/action_open_terminal"
-        android:title="打开终端"
-        app:showAsAction="never" />
+
+
 
 </menu>

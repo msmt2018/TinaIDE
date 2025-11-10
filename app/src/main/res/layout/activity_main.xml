@@ -47,19 +47,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
-            <!-- 终端区域（可折叠） -->
-            <FrameLayout
-                android:id="@+id/terminal_container"
-                android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:visibility="gone">
-
-                <com.termux.view.TerminalView
-                    android:id="@+id/terminal_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-
-            </FrameLayout>
+            <!-- 终端区域已移除 -->
 
         </LinearLayout>
 
