@@ -18,6 +18,12 @@ android {
     namespace = "com.wuxianggujun.tinaide"
     compileSdk = 36
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.wuxianggujun.tinaide"
         minSdk = 24
@@ -26,6 +32,17 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 传递 STL 选择（与 jniLibs 中的 libc++_shared.so 对齐）
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=c++_shared")
+                cppFlags += listOf("-std=c++17", "-fexceptions", "-frtti")
+            }
+        }
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     // Define signing config before buildTypes so it can be referenced below
@@ -76,6 +93,14 @@ android {
             keepDebugSymbols += setOf("**/libproot.so")
         }
     }
+
+    // Ensure AAPT does not ignore libc++ private headers under c++/v1/__ios
+    // Some default ignore patterns may exclude double-underscore directories in assets.
+    @Suppress("UnstableApiUsage")
+    aaptOptions {
+        // Do not ignore any assets to ensure libc++ internals like c++/v1/__ios are packaged
+        ignoreAssetsPattern = ""
+    }
 }
 
 dependencies {
@@ -85,11 +110,11 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     
-    // AIDE-Termux components（已扁平化路径）
-    implementation(project(":termux-app"))
-    implementation(project(":terminal-view"))
-    implementation(project(":terminal-emulator"))
-    implementation(project(":termux-shared"))
+    // AIDE-Termux components removed
+    // implementation(project(":termux-app"))
+    // implementation(project(":terminal-view"))
+    // implementation(project(":terminal-emulator"))
+    // implementation(project(":termux-shared"))
     
     // SoraEditor components
     implementation(project(":sora-editor:editor"))
@@ -106,8 +131,8 @@ dependencies {
     // Permissions library by 轮子哥（XXPermissions）
     implementation("com.github.getActivity:XXPermissions:21.3")
 
-    // Avoid Guava vs listenablefuture duplicate classes
-    implementation("com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava")
+    // Fix crash: Missing androidx.concurrent + ListenableFuture at runtime
+    implementation("androidx.concurrent:concurrent-futures:1.1.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

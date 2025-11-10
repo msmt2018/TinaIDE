@@ -186,10 +186,18 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
                 override fun onEvent(event: Int, child: String?) {
                     val base = File(path)
                     val file = if (child != null) File(base, child) else base
-                    when (event and ALL_EVENTS) {
-                        CREATE -> notifyFileCreated(file)
-                        MODIFY -> notifyFileModified(file)
-                        DELETE, DELETE_SELF -> notifyFileDeleted(file)
+                    try {
+                        if ((event and CREATE) != 0 || (event and MOVED_TO) != 0) {
+                            notifyFileCreated(file)
+                        }
+                        if ((event and MODIFY) != 0 || (event and CLOSE_WRITE) != 0) {
+                            notifyFileModified(file)
+                        }
+                        if ((event and DELETE) != 0 || (event and DELETE_SELF) != 0 || (event and MOVED_FROM) != 0) {
+                            notifyFileDeleted(file)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error handling file event: $event for $file", e)
                     }
                 }
             }
@@ -273,4 +281,3 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
         }
     }
 }
-

@@ -73,3 +73,16 @@ UI 与系统栏
 
 ——
 如需切换为其它终端集成方案或禁用 `proot` 路径，请在 issue/PR 中说明目标与约束，我方可评估最小改动路径（遵循 KISS/YAGNI/DRY/SOLID 原则）。
+
+---
+
+嵌入式 Clang/LLVM（库模式）快速开始（可选）
+- 目标：不依赖 Termux/proot，直接在应用进程内用 `libclang-cpp.so` + `libLLVM-17.so` 编译 C/C++ 源码。
+- 推荐流程：
+  1) 构建 `.so` + sysroot（默认 API=24）：
+     - `pwsh ./docker/embedded-ndk/build-local.ps1 -Mode libs -Abi arm64-v8a`
+  2) 同步到 App：
+     - `pwsh ./tools/sync-embedded-ndk.ps1 -Abi arm64-v8a -ApiLevel 24`
+  3) 安装运行：
+     - `./gradlew installDebug`
+- 文档：`docs/EMBEDDED_CLANG_STATUS.md`、`docs/EMBEDDED_NDK_TOOLS.md`、`docs/EMBEDDED_NDK_TOOLS_DOCKER.md`

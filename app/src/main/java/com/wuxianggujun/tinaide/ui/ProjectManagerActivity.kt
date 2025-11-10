@@ -41,6 +41,8 @@ class ProjectManagerActivity : AppCompatActivity() {
     private lateinit var adapter: ProjectListAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 强制使用深色主题，确保主题一致性
+        setTheme(R.style.Theme_TinaIDE)
         super.onCreate(savedInstanceState)
         // 防止标题栏侵入系统状态栏
         WindowCompat.setDecorFitsSystemWindows(window, true)
@@ -63,6 +65,11 @@ class ProjectManagerActivity : AppCompatActivity() {
         reloadProjects()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 从其他Activity返回时，刷新项目列表
+        reloadProjects()
+    }
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.project_manager_menu, menu)
         return true
@@ -109,12 +116,22 @@ class ProjectManagerActivity : AppCompatActivity() {
         if (!root.exists()) root.mkdirs()
         val dirs = root.listFiles()?.filter { it.isDirectory }?.sortedBy { it.name.lowercase() } ?: emptyList()
         adapter.submitList(dirs)
+        val emptyView = findViewById<android.widget.TextView>(R.id.tv_empty)
+        if (dirs.isEmpty()) {
+            emptyView?.visibility = android.view.View.VISIBLE
+            recycler.visibility = android.view.View.GONE
+        } else {
+            emptyView?.visibility = android.view.View.GONE
+            recycler.visibility = android.view.View.VISIBLE
+        }
     }
 
-    private fun openProject(projectDir: File) {
+    private fun openProject(dir: java.io.File) {
         try {
-            ServiceLocator.get<IFileManager>().openProject(projectDir.absolutePath)
-            startActivity(Intent(this, com.wuxianggujun.tinaide.MainActivity::class.java))
+            val fm = ServiceLocator.get<IFileManager>()
+            fm.openProject(dir.absolutePath)
+            val intent = android.content.Intent(this, com.wuxianggujun.tinaide.MainActivity::class.java)
+            startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, "打开失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
@@ -229,3 +246,6 @@ class ProjectManagerActivity : AppCompatActivity() {
         }
     }
 }
+
+
+

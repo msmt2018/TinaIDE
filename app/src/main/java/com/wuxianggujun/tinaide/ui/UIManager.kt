@@ -146,14 +146,13 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
      */
     private fun updatePanelView(panel: PanelType, visible: Boolean) {
         try {
-            val viewId = when (panel) {
-                PanelType.EDITOR -> R.id.editor_container
-                PanelType.FILE_TREE -> R.id.file_tree_container
-                PanelType.TERMINAL -> R.id.terminal_container
-                PanelType.TOOLBAR -> R.id.toolbar
+            val view = when (panel) {
+                PanelType.EDITOR -> activity.findViewById<View>(R.id.editor_container)
+                PanelType.FILE_TREE -> activity.findViewById<View>(R.id.file_tree_container)
+                // 终端面板已移除布局，这里直接忽略
+                PanelType.TERMINAL -> null
+                PanelType.TOOLBAR -> activity.findViewById<View>(R.id.toolbar)
             }
-            
-            val view = activity.findViewById<View>(viewId)
             view?.visibility = if (visible) View.VISIBLE else View.GONE
         } catch (e: Exception) {
             Log.e(TAG, "Error updating panel view: $panel", e)
