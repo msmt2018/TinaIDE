@@ -211,8 +211,9 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_emitObj(
     push("-cc1");
     push2("-triple", target.empty()? llvm::sys::getDefaultTargetTriple(): target);
     push("-emit-obj"); push("-O2"); push("-nobuiltininc");
-    // Android 要求：.o 必须 -fPIC (Position Independent Code)
-    push("-fPIC");
+    // Android 要求：.o 必须 PIC (Position Independent Code)
+    // 注意：-cc1 模式下使用 -mrelocation-model pic 而不是 -fPIC
+    push("-mrelocation-model"); push("pic");
     push2("-isysroot", sysroot);
     // Provide Clang resource-dir so builtin headers like <stdarg.h> are found under -nobuiltininc
     push2("-resource-dir", sysroot+"/lib/clang/17");
