@@ -211,6 +211,8 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_emitObj(
     push("-cc1");
     push2("-triple", target.empty()? llvm::sys::getDefaultTargetTriple(): target);
     push("-emit-obj"); push("-O2"); push("-nobuiltininc");
+    // Android 要求：.o 必须 -fPIC (Position Independent Code)
+    push("-fPIC");
     push2("-isysroot", sysroot);
     // Provide Clang resource-dir so builtin headers like <stdarg.h> are found under -nobuiltininc
     push2("-resource-dir", sysroot+"/lib/clang/17");
