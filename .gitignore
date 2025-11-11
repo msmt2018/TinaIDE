@@ -34,9 +34,14 @@ external/sora-editor/debug.jks
 /.serena/
 /.claude/
 # Docker dev workdir (mounted cache and build artifacts) - do not commit
-docker/embedded-ndk/dev-work/
-docker/embedded-ndk/dev-work/**
+docker/llvm-build/dev-work/
+docker/llvm-build/build-output/
 
-# Embedded NDK build artifacts (构建产物，不提交到 git)
-external/embedded-ndk/
-external/embedded-ndk-libs/
+# App 集成的 LLVM 库（由同步脚本生成，不提交）
+app/src/main/jniLibs/**/libLLVM*.so
+app/src/main/jniLibs/**/libclang*.so
+app/src/main/jniLibs/**/liblld*.so
+app/src/main/jniLibs/**/libc++_shared.so
+
+# Sysroot（由同步脚本生成，不提交）
+app/src/main/assets/sysroot/
