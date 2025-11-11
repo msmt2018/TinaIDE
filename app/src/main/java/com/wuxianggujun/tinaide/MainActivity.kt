@@ -270,7 +270,8 @@ class MainActivity : AppCompatActivity() {
                     ok++
                     log("成功: ${src.name}")
                     // 尝试链接为可执行文件并运行，输出到面板
-                    val exe = java.io.File(buildRoot, src.nameWithoutExtension + ".exe")
+                    // Android 可执行文件不需要 .exe 后缀
+                    val exe = java.io.File(buildRoot, src.nameWithoutExtension)
                     val linkErr = try {
                         com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExe(
                             sysrootDir.absolutePath,
