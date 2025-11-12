@@ -54,6 +54,58 @@ if (Test-Path $srcLibDir) {
     }
   }
   Write-Host "Copied .so libraries → $dstLibDir" -ForegroundColor Green
+
+  # Ensure libc++_shared.so is present in jniLibs when requested, even if not provided by prebuilt libs
+  if ($CopyLibcxxToJni) {
+    $dstLibCxx = Join-Path $dstLibDir 'libc++_shared.so'
+    if (-not (Test-Path $dstLibCxx)) {
+      Write-Host "[i] libc++_shared.so not found under $dstLibDir — attempting to copy from local NDK" -ForegroundColor Yellow
+      # Discover Android SDK/NDK roots
+      $repoRoot = (Resolve-Path '.').Path
+      $localPropsPath = Join-Path $repoRoot 'local.properties'
+      $SdkDir = $null; $NdkDir = $null
+      if (Test-Path $localPropsPath) {
+        Get-Content $localPropsPath | ForEach-Object {
+          if ($_ -match '^(sdk.dir)=(.*)$') { $SdkDir = $Matches[2].Trim() }
+          if ($_ -match '^(ndk.dir)=(.*)$') { $NdkDir = $Matches[2].Trim() }
+        }
+      }
+      if (-not $SdkDir) { $SdkDir = $env:ANDROID_SDK_ROOT }
+      if (-not $SdkDir) { $SdkDir = $env:ANDROID_HOME }
+      if (-not $NdkDir -and $SdkDir) {
+        $ndkParent = Join-Path $SdkDir 'ndk'
+        if (Test-Path $ndkParent) {
+          $cand = Get-ChildItem -Path $ndkParent -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+          if ($cand) { $NdkDir = $cand.FullName }
+        }
+      }
+      $copied = $false
+      if ($NdkDir) {
+        # Primary location (NDK r21+): sources/cxx-stl/llvm-libc++/libs/<abi>/libc++_shared.so
+        $srcCxx = Join-Path (Join-Path $NdkDir 'sources/cxx-stl/llvm-libc++/libs') (Join-Path $Abi 'libc++_shared.so')
+        if (Test-Path $srcCxx) {
+          Copy-Item $srcCxx -Destination $dstLibCxx -Force
+          Write-Host "[i] Copied libc++_shared.so from $srcCxx → $dstLibCxx" -ForegroundColor Green
+          $copied = $true
+        } else {
+          # Fallback (some layouts): toolchains/llvm/prebuilt/*/sysroot/usr/lib/<triple>/libc++_shared.so
+          $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
+          $preb = Get-ChildItem -Path (Join-Path $NdkDir 'toolchains/llvm/prebuilt') -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($preb) {
+            $cand1 = Join-Path $preb.FullName ("sysroot/usr/lib/$triple/libc++_shared.so")
+            if (Test-Path $cand1) {
+              Copy-Item $cand1 -Destination $dstLibCxx -Force
+              Write-Host "[i] Copied libc++_shared.so from $cand1 → $dstLibCxx" -ForegroundColor Green
+              $copied = $true
+            }
+          }
+        }
+      }
+      if (-not $copied) {
+        Write-Host "[!] Unable to locate libc++_shared.so in prebuilt libs or local NDK. Ensure NDK installed and ANDROID_SDK_ROOT/ndk.dir set." -ForegroundColor Red
+      }
+    }
+  }
 } else {
   Write-Host "Skip libs: $srcLibDir not found" -ForegroundColor DarkYellow
 }
@@ -68,7 +120,7 @@ if ($SysrootMode -eq 'none') {
   Write-Host "[i] Sysroot packaging disabled (mode=none). Cleaned assets sysroot." -ForegroundColor Yellow
   return
 }
-if (Test-Path $srcSysroot) {
+if ($srcSysroot -and (Test-Path $srcSysroot)) {
   if ($SysrootMode -eq 'zip') {
     $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
     # Optionally inject tool binaries (cmake/ninja) into sysroot/usr/bin before packaging
