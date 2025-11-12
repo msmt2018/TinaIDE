@@ -716,7 +716,11 @@ static void tina_install_handlers_once() {
         const char* name = t ? t->name() : nullptr;
         int status = 0;
         char* dem = name ? abi::__cxa_demangle(name, nullptr, nullptr, &status) : nullptr;
-        LOGE("std::terminate: uncaught exception: %s", dem ? dem : (name ? name : "<unknown>"));
+        const char* typeName = dem ? dem : (name ? name : "<unknown>");
+        // Logcat for developer visibility
+        LOGE("std::terminate: uncaught exception: %s", typeName);
+        // Also write to stderr so runSharedIsolated can capture it for UI
+        fprintf(stderr, "std::terminate: uncaught exception: %s\n", typeName);
         if (dem) free(dem);
         _Exit(134);
     };
@@ -829,6 +833,10 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runSharedIsolated
         int rc = -1;
         try {
             rc = reinterpret_cast<EntryNoArg>(fp)();
+        } catch (const std::bad_cast& e) {
+            // Provide a clearer hint for common RTTI/any_cast/dynamic_cast issues
+            fprintf(stderr, "unhandled std::bad_cast: %s\n", e.what());
+            rc = 101;
         } catch (const std::exception& e) {
             fprintf(stderr, "unhandled std::exception: %s\n", e.what());
             rc = 102;
