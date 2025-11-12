@@ -244,15 +244,15 @@ class MainActivity : BaseActivity() {
                 if (d.exists()) includeDirs += d.absolutePath
             }
 
-            // Compute entry symbol: projectName + _main (e.g., myproj_main)
-            val entrySymbol = "${'$'}{project.name}_main"
+            // Fixed entry symbol (configurable later): rename user main to a stable name
+            val entrySymbol = "tina_ide_use_main"
 
             val flags = mutableListOf<String>()
             flags += listOf("-Wall", "-Wextra")
             // 启用 C++ 异常（防止 dynamic_cast 引用失败等直接触发 terminate）
             flags += listOf("-fexceptions", "-fcxx-exceptions")
             // Rename user's main to the project-scoped entry to avoid symbol conflicts
-            flags += listOf("-Dmain=${'$'}entrySymbol")
+            flags += listOf("-Dmain=$entrySymbol")
 
             var ok = 0
             var syntaxOk = 0
