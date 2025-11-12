@@ -37,6 +37,11 @@ external/sora-editor/debug.jks
 docker/llvm-build/dev-work/
 docker/llvm-build/build-output/
 
+# Local LLVM source trees (do not commit huge upstream repos)
+llvm_projects/
+llvm-project/
+llvm-projects/
+
 # App 集成的 LLVM 库（由同步脚本生成，不提交）
 app/src/main/jniLibs/**/libLLVM*.so
 app/src/main/jniLibs/**/libclang*.so
