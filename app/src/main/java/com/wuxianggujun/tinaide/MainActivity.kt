@@ -300,7 +300,7 @@ class MainActivity : BaseActivity() {
                                 launcherObj.absolutePath,
                                 target,
                                 isCxx,
-                                arrayOf("-DTINA_ENTRY=${entrySym}"),
+                                arrayOf("-fexceptions", "-DTINA_ENTRY=${entrySym}"),
                                 arrayOf(java.io.File(sysrootDir, "usr/include").absolutePath)
                             )
                         } catch (t: Throwable) { "launcher JNI error: ${t.message}" }
@@ -380,7 +380,7 @@ class MainActivity : BaseActivity() {
                         launcherObj.absolutePath,
                         target,
                         /*isCxx*/ true,
-                        arrayOf("-DTINA_ENTRY=${entrySym}"),
+                        arrayOf("-fexceptions", "-DTINA_ENTRY=${entrySym}"),
                         arrayOf(java.io.File(sysrootDir, "usr/include").absolutePath)
                     )
                 } catch (t: Throwable) { "launcher JNI error: ${t.message}" }
