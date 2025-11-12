@@ -719,10 +719,14 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
         return -127; // signal error
     }
     using EntryNoArg = int (*)();
+    using EntryWithArgs = int (*)(int, char**);
+
     void* fp = dlsym(handle, sym.empty()? "run_main" : sym.c_str());
+    bool isNoArg = true;
     if (!fp) {
-        // Fallback to plain C/C++ main when run_main is not provided
+        // Fallback to plain C/C++ main(int,char**)
         fp = dlsym(handle, "main");
+        isNoArg = false;
     }
     if (!fp) {
         const char* e = dlerror();
@@ -731,7 +735,24 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
         dlclose(handle);
         return -126;
     }
-    int rc = reinterpret_cast<EntryNoArg>(fp)();
+
+    int rc = -125;
+    try {
+        if (isNoArg) {
+            rc = reinterpret_cast<EntryNoArg>(fp)();
+        } else {
+            rc = reinterpret_cast<EntryWithArgs>(fp)(0, nullptr);
+        }
+    } catch (const std::bad_cast& e) {
+        LOGW("unhandled std::bad_cast: %s", e.what());
+        rc = -101;
+    } catch (const std::exception& e) {
+        LOGW("unhandled std::exception: %s", e.what());
+        rc = -102;
+    } catch (...) {
+        LOGW("unhandled non-std exception");
+        rc = -103;
+    }
     dlclose(handle);
     return rc;
 }
