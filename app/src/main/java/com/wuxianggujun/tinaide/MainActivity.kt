@@ -279,50 +279,24 @@ class MainActivity : BaseActivity() {
                     log("成功: ${src.name}")
                     if (sources.size == 1) {
                         // 单文件工程：直接链接并运行
-                        val exe = java.io.File(buildRoot, src.nameWithoutExtension)
+                        val soFile = java.io.File(buildRoot, "lib${src.nameWithoutExtension}.so")
                         val linkErr = try {
-                            com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExe(
+                            com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkSo(
                                 sysrootDir.absolutePath,
                                 objFile.absolutePath,
-                                exe.absolutePath,
+                                soFile.absolutePath,
                                 target,
                                 isCxx
                             )
                         } catch (t: Throwable) { "link JNI error: ${t.message}" }
                         if (linkErr.isEmpty()) {
-                            exe.setExecutable(true)
                             try {
-                                try {
-                                    val libDir = applicationInfo.nativeLibraryDir
-                                    val libcxx = java.io.File(libDir, "libc++_shared.so")
-                                    if (libcxx.exists()) {
-                                        libcxx.copyTo(java.io.File(exe.parentFile, "libc++_shared.so"), overwrite = true)
-                                    }
-                                } catch (_: Throwable) { }
-                                log("[运行] ${exe.name}")
-                                val pb = java.lang.ProcessBuilder(exe.absolutePath)
-                                    .redirectErrorStream(true)
-                                try {
-                                    val env = pb.environment()
-                                    val tripleBase = target.dropLastWhile { it.isDigit() }
-                                    val apiStr = target.takeLastWhile { it.isDigit() }.ifEmpty { "26" }
-                                    val sysLibApi = java.io.File(sysrootDir, "usr/lib/$tripleBase/$apiStr").absolutePath
-                                    val sysLibRoot = java.io.File(sysrootDir, "usr/lib/$tripleBase").absolutePath
-                                    val sysRuntime = java.io.File(sysrootDir, "usr/lib/$tripleBase/runtime").absolutePath
-                                    val merged = listOf(
-                                        exe.parentFile.absolutePath,
-                                        applicationInfo.nativeLibraryDir,
-                                        sysLibApi,
-                                        sysLibRoot,
-                                        sysRuntime
-                                    ).joinToString(":")
-                                    env["LD_LIBRARY_PATH"] = merged
-                                } catch (_: Throwable) { }
-                                val p = pb.start()
-                                val out = p.inputStream.bufferedReader().use { it.readText() }
-                                val code = p.waitFor()
-                                log("[退出码] $code")
-                                if (out.isNotEmpty()) log(out.trimEnd())
+                                log("[运行] ${soFile.name}")
+                                val rc = com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.runShared(
+                                    soFile.absolutePath,
+                                    "run_main"
+                                )
+                                log("[退出码] $rc")
                             } catch (t: Throwable) {
                                 log("运行失败: ${t.message}")
                             }
@@ -353,14 +327,14 @@ class MainActivity : BaseActivity() {
                 }
             }
 
-            // 多文件工程：编译完成后统一链接一次
+            // 多文件工程：编译完成后统一链接一次（以共享库方式运行）
             if (compiledObjs.isNotEmpty() && sources.size > 1) {
-                val exe = java.io.File(buildRoot, project.name)
+                val soFile = java.io.File(buildRoot, "lib${project.name}.so")
                 val linkErr = try {
-                    com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExeMany(
+                    com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkSoMany(
                         sysrootDir.absolutePath,
                         compiledObjs.toTypedArray(),
-                        exe.absolutePath,
+                        soFile.absolutePath,
                         target,
                         /*isCxx*/ true,
                         emptyArray(),
@@ -368,31 +342,13 @@ class MainActivity : BaseActivity() {
                     )
                 } catch (t: Throwable) { "link JNI error: ${t.message}" }
                 if (linkErr.isEmpty()) {
-                    exe.setExecutable(true)
                     try {
-                        val pb = java.lang.ProcessBuilder(exe.absolutePath).redirectErrorStream(true)
-                        try {
-                            val env = pb.environment()
-                            val tripleBase = target.dropLastWhile { it.isDigit() }
-                            val apiStr = target.takeLastWhile { it.isDigit() }.ifEmpty { "26" }
-                            val sysLibApi = java.io.File(sysrootDir, "usr/lib/$tripleBase/$apiStr").absolutePath
-                            val sysLibRoot = java.io.File(sysrootDir, "usr/lib/$tripleBase").absolutePath
-                            val sysRuntime = java.io.File(sysrootDir, "usr/lib/$tripleBase/runtime").absolutePath
-                            val merged = listOf(
-                                exe.parentFile.absolutePath,
-                                applicationInfo.nativeLibraryDir,
-                                sysLibApi,
-                                sysLibRoot,
-                                sysRuntime
-                            ).joinToString(":")
-                            env["LD_LIBRARY_PATH"] = merged
-                        } catch (_: Throwable) { }
-                        log("[运行] ${exe.name}")
-                        val p = pb.start()
-                        val out = p.inputStream.bufferedReader().use { it.readText() }
-                        val code = p.waitFor()
-                        log("[退出码] $code")
-                        if (out.isNotEmpty()) log(out.trimEnd())
+                        log("[运行] ${soFile.name}")
+                        val rc = com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.runShared(
+                            soFile.absolutePath,
+                            "run_main"
+                        )
+                        log("[退出码] $rc")
                     } catch (t: Throwable) {
                         log("运行失败: ${t.message}")
                     }

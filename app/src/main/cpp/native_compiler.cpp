@@ -721,6 +721,10 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
     using EntryNoArg = int (*)();
     void* fp = dlsym(handle, sym.empty()? "run_main" : sym.c_str());
     if (!fp) {
+        // Fallback to plain C/C++ main when run_main is not provided
+        fp = dlsym(handle, "main");
+    }
+    if (!fp) {
         const char* e = dlerror();
         std::string err = std::string("dlsym failed: ") + (e?e:"unknown");
         LOGW("%s", err.c_str());
