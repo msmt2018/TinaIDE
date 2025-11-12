@@ -7,7 +7,8 @@ Param(
   [string]$CMakeTag = 'v3.31.4',
   # New: build shared-object runners instead of relying on exec() (SELinux blocks exec in app sandbox)
   [bool]$BuildNinjaSo = $true,
-  [bool]$BuildCMakeSo = $false
+  # Default to also produce a CMake runner .so (best‑effort); keeps cmake executable build intact
+  [bool]$BuildCMakeSo = $true
 )
 
 $ErrorActionPreference = 'Stop'
