@@ -45,4 +45,29 @@ object NativeCompiler {
         libDirs: Array<String>,
         libs: Array<String>
     ): String
+
+    // New: link shared objects for in-process loading
+    external fun linkSo(
+        sysroot: String,
+        objPath: String,
+        outSo: String,
+        target: String,
+        isCxx: Boolean
+    ): String
+
+    external fun linkSoMany(
+        sysroot: String,
+        objPaths: Array<String>,
+        outSo: String,
+        target: String,
+        isCxx: Boolean,
+        libDirs: Array<String>,
+        libs: Array<String>
+    ): String
+
+    // New: dlopen a shared library and call an entry symbol (default: "run_main")
+    external fun runShared(
+        soPath: String,
+        symbol: String
+    ): Int
 }

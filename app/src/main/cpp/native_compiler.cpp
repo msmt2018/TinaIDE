@@ -535,3 +535,199 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkExeMany(
     #endif
 #endif
 }
+
+// Link a single object into a shared library (.so) for in-process loading
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkSo(
+        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jstring jObj, jstring jOutSo,
+        jstring jTarget, jboolean jIsCxx) {
+#if !LLVM_HEADERS_AVAILABLE
+    const char* msg = "UNAVAILABLE: LLD not available";
+    return env->NewStringUTF(msg);
+#elif !defined(LLD_LINK_ENABLED)
+    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
+    return env->NewStringUTF(msg);
+#else
+    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
+    const std::string sysroot = toStr(jSysroot);
+    const std::string objPath = toStr(jObj);
+    const std::string outSo   = toStr(jOutSo);
+    const std::string target  = toStr(jTarget);
+    const bool isCxx = jIsCxx == JNI_TRUE;
+
+    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
+    const std::string tripleBase = deriveTripleBase(target);
+    auto deriveApi = [&](const std::string& t){ std::string digits; for (auto it=t.rbegin(); it!=t.rend(); ++it){ if(!isdigit((unsigned char)*it)) break; digits.push_back(*it);} std::reverse(digits.begin(), digits.end()); return digits.empty()? std::string("24"):digits; };
+    const std::string api = deriveApi(target);
+
+    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
+    struct stat st; if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+        std::string err = "[TinaIDE] Sysroot library directory missing: "+libDir;
+        return env->NewStringUTF(err.c_str());
+    }
+    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
+    const std::string crtBegin = libDir + "/crtbegin_so.o";
+    const std::string crtEnd   = libDir + "/crtend_so.o";
+    if (!exists(crtBegin) || !exists(crtEnd)) {
+        std::string err = "[TinaIDE] Missing shared CRT objects: crtbegin_so.o/crtend_so.o in "+libDir;
+        return env->NewStringUTF(err.c_str());
+    }
+
+    std::vector<std::string> keep; keep.reserve(32);
+    keep.push_back("ld.lld");
+    keep.push_back("-shared");
+    // Library search paths
+    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
+    keep.push_back("-L"); keep.push_back(libDir);
+    keep.push_back("-L"); keep.push_back(libDirRoot);
+    // Optional runpaths for transitive deps when loaded via dlopen(System.load)
+    const std::string runtimeDir = sysroot+"/usr/lib/"+tripleBase+"/runtime";
+    keep.push_back(std::string("-rpath=")+runtimeDir);
+    keep.push_back("-rpath=$ORIGIN");
+    // Inputs/outputs
+    keep.push_back(crtBegin);
+    keep.push_back(objPath);
+    keep.push_back("-o"); keep.push_back(outSo);
+    // Basic libs
+    if (isCxx) keep.push_back("-lc++");
+    keep.push_back("-lc"); keep.push_back("-lm"); keep.push_back("-llog"); keep.push_back("-landroid");
+
+    std::vector<const char*> args; args.reserve(keep.size());
+    for (const auto& s : keep) args.push_back(s.c_str());
+
+    std::string diag; llvm::raw_string_ostream os(diag);
+    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
+    os.flush(); if (!ok) return env->NewStringUTF(diag.c_str());
+    // For .so not strictly necessary, but keep consistent perms
+    chmod(outSo.c_str(), 0755);
+    return env->NewStringUTF("");
+#endif
+}
+
+// Link multiple objects into a shared library (.so)
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkSoMany(
+        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jobjectArray jObjs, jstring jOutSo,
+        jstring jTarget, jboolean jIsCxx, jobjectArray jLibDirs, jobjectArray jLibs) {
+#if !LLVM_HEADERS_AVAILABLE
+    const char* msg = "UNAVAILABLE: LLD not available";
+    return env->NewStringUTF(msg);
+#elif !defined(LLD_LINK_ENABLED)
+    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
+    return env->NewStringUTF(msg);
+#else
+    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
+    const std::string sysroot = toStr(jSysroot);
+    const std::string outSo   = toStr(jOutSo);
+    const std::string target  = toStr(jTarget);
+    const bool isCxx = jIsCxx == JNI_TRUE;
+
+    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
+    const std::string tripleBase = deriveTripleBase(target);
+    auto deriveApi = [&](const std::string& t){ std::string digits; for (auto it=t.rbegin(); it!=t.rend(); ++it){ if(!isdigit((unsigned char)*it)) break; digits.push_back(*it);} std::reverse(digits.begin(), digits.end()); return digits.empty()? std::string("24"):digits; };
+    const std::string api = deriveApi(target);
+    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
+
+    struct stat st; if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+        std::string err = "[TinaIDE] Sysroot library directory missing: "+libDir;
+        return env->NewStringUTF(err.c_str());
+    }
+    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
+    const std::string crtBegin = libDir + "/crtbegin_so.o";
+    const std::string crtEnd   = libDir + "/crtend_so.o";
+    if (!exists(crtBegin) || !exists(crtEnd)) {
+        std::string err = "[TinaIDE] Missing shared CRT objects: crtbegin_so.o/crtend_so.o in "+libDir;
+        return env->NewStringUTF(err.c_str());
+    }
+
+    std::vector<std::string> keep; keep.reserve(48);
+    keep.push_back("ld.lld");
+    keep.push_back("-shared");
+    // Search paths
+    keep.push_back("-L"); keep.push_back(libDir);
+    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
+    keep.push_back("-L"); keep.push_back(libDirRoot);
+    const std::string runtimeDir = sysroot+"/usr/lib/"+tripleBase+"/runtime";
+    keep.push_back(std::string("-rpath=")+runtimeDir);
+    keep.push_back("-rpath=$ORIGIN");
+
+    keep.push_back(crtBegin);
+
+    // Append objects
+    if (jObjs != nullptr) {
+        jsize n = env->GetArrayLength(jObjs);
+        for (jsize i=0;i<n;++i) {
+            jstring s = (jstring)env->GetObjectArrayElement(jObjs, i);
+            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
+            if (c) { keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
+            if (s) env->DeleteLocalRef(s);
+        }
+    }
+
+    // Output and basic libs
+    keep.push_back("-o"); keep.push_back(outSo);
+    if (isCxx) keep.push_back("-lc++");
+    keep.push_back("-lc"); keep.push_back("-lm"); keep.push_back("-llog"); keep.push_back("-landroid");
+
+    // Extra lib search dirs
+    if (jLibDirs != nullptr) {
+        jsize n = env->GetArrayLength(jLibDirs);
+        for (jsize i=0;i<n;++i){
+            jstring s=(jstring)env->GetObjectArrayElement(jLibDirs,i);
+            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
+            if (c) { keep.push_back("-L"); keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
+            if (s) env->DeleteLocalRef(s);
+        }
+    }
+    // Extra libs
+    if (jLibs != nullptr) {
+        jsize n = env->GetArrayLength(jLibs);
+        for (jsize i=0;i<n;++i){
+            jstring s=(jstring)env->GetObjectArrayElement(jLibs,i);
+            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
+            if (c) { keep.emplace_back(std::string("-l")+c); env->ReleaseStringUTFChars(s,c); }
+            if (s) env->DeleteLocalRef(s);
+        }
+    }
+
+    keep.push_back(crtEnd);
+
+    std::vector<const char*> args; args.reserve(keep.size());
+    for (const auto& s : keep) args.push_back(s.c_str());
+
+    std::string diag; llvm::raw_string_ostream os(diag);
+    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
+    os.flush(); if (!ok) return env->NewStringUTF(diag.c_str());
+    chmod(outSo.c_str(), 0755);
+    return env->NewStringUTF("");
+#endif
+}
+
+// Load a shared library and call a no-arg entry symbol (e.g., run_main)
+extern "C" JNIEXPORT jint JNICALL
+Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
+        JNIEnv* env, jclass /*clazz*/, jstring jSoPath, jstring jSym) {
+    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
+    const std::string soPath = toStr(jSoPath);
+    const std::string sym    = toStr(jSym);
+
+    void* handle = dlopen(soPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!handle) {
+        const char* e = dlerror();
+        std::string err = std::string("dlopen failed: ") + (e?e:"unknown");
+        LOGW("%s", err.c_str());
+        return -127; // signal error
+    }
+    using EntryNoArg = int (*)();
+    void* fp = dlsym(handle, sym.empty()? "run_main" : sym.c_str());
+    if (!fp) {
+        const char* e = dlerror();
+        std::string err = std::string("dlsym failed: ") + (e?e:"unknown");
+        LOGW("%s", err.c_str());
+        dlclose(handle);
+        return -126;
+    }
+    int rc = reinterpret_cast<EntryNoArg>(fp)();
+    dlclose(handle);
+    return rc;
+}
