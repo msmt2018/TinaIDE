@@ -246,6 +246,8 @@ class MainActivity : BaseActivity() {
 
             val flags = mutableListOf<String>()
             flags += listOf("-Wall", "-Wextra")
+            // 启用 C++ 异常（防止 dynamic_cast 引用失败等直接触发 terminate）
+            flags += listOf("-fexceptions", "-fcxx-exceptions")
             // 将用户 main 重命名为 tina_user_main，便于注入的 launcher 调用
             flags += listOf("-Dmain=tina_user_main")
 
@@ -300,7 +302,7 @@ class MainActivity : BaseActivity() {
                                 launcherObj.absolutePath,
                                 target,
                                 isCxx,
-                                arrayOf("-fexceptions", "-DTINA_ENTRY=${entrySym}"),
+                                arrayOf("-fexceptions", "-fcxx-exceptions", "-DTINA_ENTRY=${entrySym}"),
                                 arrayOf(java.io.File(sysrootDir, "usr/include").absolutePath)
                             )
                         } catch (t: Throwable) { "launcher JNI error: ${t.message}" }
@@ -380,7 +382,7 @@ class MainActivity : BaseActivity() {
                         launcherObj.absolutePath,
                         target,
                         /*isCxx*/ true,
-                        arrayOf("-fexceptions", "-DTINA_ENTRY=${entrySym}"),
+                        arrayOf("-fexceptions", "-fcxx-exceptions", "-DTINA_ENTRY=${entrySym}"),
                         arrayOf(java.io.File(sysrootDir, "usr/include").absolutePath)
                     )
                 } catch (t: Throwable) { "launcher JNI error: ${t.message}" }
