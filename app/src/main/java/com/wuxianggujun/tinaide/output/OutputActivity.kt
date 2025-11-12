@@ -71,8 +71,8 @@ class OutputActivity : BaseActivity(), IOutputManager.OutputListener {
             // 设置文字大小
             textSizePx = 36f
             
-            // 禁用自动补全
-            isAutoCompletionEnabled = false
+            // 禁用自动补全（Sora Editor 新版本可能不需要此属性）
+            // isAutoCompletionEnabled = false
         }
     }
     
@@ -102,12 +102,16 @@ class OutputActivity : BaseActivity(), IOutputManager.OutputListener {
     
     override fun onOutputAppended(text: String) {
         runOnUiThread {
-            outputEditor.text.append(text)
+            // 使用 insert 方法追加到末尾
+            val content = outputEditor.text
+            val lastLine = content.lineCount - 1  // 0-based 行号
+            val lastColumn = content.getColumnCount(lastLine)  // 最后一行的列数
+            content.insert(lastLine, lastColumn, text)
             // 滚动到底部
             outputEditor.post {
-                val lineCount = outputEditor.text.lineCount
+                val lineCount = content.lineCount
                 if (lineCount > 0) {
-                    outputEditor.setSelection(lineCount, 0)
+                    outputEditor.setSelection(lineCount - 1, content.getColumnCount(lineCount - 1))
                 }
             }
         }

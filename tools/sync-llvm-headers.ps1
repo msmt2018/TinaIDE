@@ -2,7 +2,7 @@ Param(
   [string]$DockerRoot = "docker/llvm-build/dev-work",
   [string]$DestRoot = "docker/llvm-build/build-output/common-headers",
   [ValidateSet('arm64-v8a','x86_64')][string]$Abi = 'x86_64',
-  [int]$ApiLevel = 26
+  [int]$ApiLevel = 28
 )
 
 $srcLlvm      = Join-Path $DockerRoot "src/llvm-project/llvm/include"

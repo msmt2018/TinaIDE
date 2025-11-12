@@ -12,6 +12,7 @@ import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.get
 import com.wuxianggujun.tinaide.file.IFileManager
+import com.wuxianggujun.tinaide.extensions.toastError
 import com.wuxianggujun.tinaide.ui.adapter.FileTreeAdapter
 import com.wuxianggujun.tinaide.ui.dialog.FileContextMenuDialog
 import java.io.File
@@ -25,9 +26,9 @@ class FileTreeFragment : Fragment() {
     private lateinit var emptyView: TextView
     private lateinit var adapter: FileTreeAdapter
     
-    private val fileManager: IFileManager by lazy {
-        ServiceLocator.get<IFileManager>()
-    }
+    private fun fileManagerOrNull(): IFileManager? = try {
+        ServiceLocator.get(IFileManager::class.java)
+    } catch (_: IllegalStateException) { null }
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,7 +63,13 @@ class FileTreeFragment : Fragment() {
     }
     
     private fun loadProject() {
-        val project = fileManager.getCurrentProject()
+        val fm = fileManagerOrNull()
+        if (fm == null) {
+            try { requireContext().toastError("Service IFileManager 未注册") } catch (_: Throwable) {}
+            showEmptyView()
+            return
+        }
+        val project = fm.getCurrentProject()
         
         if (project == null) {
             showEmptyView()
@@ -110,7 +117,8 @@ class FileTreeFragment : Fragment() {
     }
     
     private fun showFileContextMenu(file: File) {
-        val dialog = FileContextMenuDialog(file, fileManager) {
+        val fm = fileManagerOrNull() ?: return
+        val dialog = FileContextMenuDialog(file, fm) {
             // 刷新文件树
             refresh()
         }

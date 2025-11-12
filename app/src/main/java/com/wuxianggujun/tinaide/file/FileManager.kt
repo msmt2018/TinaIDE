@@ -44,7 +44,8 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
 
         closeProject()
 
-        val files = collectFiles(projectDir)
+        // 避免在主线程递归扫描整个项目目录，先仅加载顶层文件，文件树按需懒加载
+        val files = projectDir.listFiles()?.toList() ?: emptyList()
         val project = Project(
             name = projectDir.name,
             rootPath = projectDir.absolutePath,
@@ -78,8 +79,9 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
                 if (lastPath.isNotEmpty()) {
                     val dir = File(lastPath)
                     if (dir.exists() && dir.isDirectory) {
-                        val files = collectFiles(dir)
-                        currentProject = Project(dir.name, dir.absolutePath, files)
+                        // 恢复时同样避免深度遍历
+                        val top = dir.listFiles()?.toList() ?: emptyList()
+                        currentProject = Project(dir.name, dir.absolutePath, top)
                         if (!fileWatchers.containsKey(dir.absolutePath)) {
                             addFileWatcher(dir.absolutePath, object : FileChangeListener {
                                 override fun onFileCreated(file: File) { Log.d(TAG, "File created: ${file.absolutePath}") }

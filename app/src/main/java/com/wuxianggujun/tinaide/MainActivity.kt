@@ -13,6 +13,9 @@ import com.wuxianggujun.tinaide.base.BaseActivity
 import com.wuxianggujun.tinaide.extensions.toast
 import com.wuxianggujun.tinaide.extensions.toastSuccess
 import com.wuxianggujun.tinaide.extensions.toastError
+import com.wuxianggujun.tinaide.extensions.toastInfo
+import com.wuxianggujun.tinaide.extensions.toastWarning
+import com.wuxianggujun.tinaide.extensions.handleErrorWithToast
 import com.wuxianggujun.tinaide.ui.dialog.MaterialDialogBuilder
 import com.wuxianggujun.tinaide.utils.FileUtils
 import com.wuxianggujun.tinaide.utils.Logger
@@ -52,19 +55,17 @@ class MainActivity : BaseActivity() {
         setContentView(R.layout.activity_main)
 
         initializeServices()
-        
-        // 点击输出按钮或工具栏打开输出界面
-        findViewById<ImageButton>(R.id.btn_output_info)?.setOnClickListener {
-            outputManager.showOutput()
-        }
-        findViewById<android.widget.LinearLayout>(R.id.output_toolbar)?.setOnClickListener {
-            outputManager.showOutput()
-        }
 
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_sort_by_size)
+
+        // 直接在 Toolbar 上填充菜单，无需等待系统回调
+        toolbar.inflateMenu(R.menu.main_menu)
+        toolbar.setOnMenuItemClickListener { item ->
+            onOptionsItemSelected(item)
+        }
 
         drawerLayout = findViewById(R.id.drawer_layout)
         setupFileTreeHeader()
@@ -201,9 +202,9 @@ class MainActivity : BaseActivity() {
 
             val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
             val target = when {
-                abi.contains("arm64", ignoreCase = true) -> "aarch64-linux-android26"
-                abi.contains("x86_64", ignoreCase = true) -> "x86_64-linux-android26"
-                else -> "aarch64-linux-android26"
+                abi.contains("arm64", ignoreCase = true) -> "aarch64-linux-android28"
+                abi.contains("x86_64", ignoreCase = true) -> "x86_64-linux-android28"
+                else -> "aarch64-linux-android28"
             }
 
             val root = java.io.File(project.rootPath)
@@ -249,6 +250,7 @@ class MainActivity : BaseActivity() {
             var ok = 0
             var syntaxOk = 0
             val failed = mutableListOf<String>()
+            val compiledObjs = mutableListOf<String>()
 
             for (src in sources) {
                 val isCxx = !src.extension.equals("c", true)
@@ -273,35 +275,60 @@ class MainActivity : BaseActivity() {
 
                 if (err.isEmpty()) {
                     ok++
+                    compiledObjs += objFile.absolutePath
                     log("成功: ${src.name}")
-                    // 尝试链接为可执行文件并运行，输出到面板
-                    // Android 可执行文件不需要 .exe 后缀
-                    val exe = java.io.File(buildRoot, src.nameWithoutExtension)
-                    val linkErr = try {
-                        com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExe(
-                            sysrootDir.absolutePath,
-                            objFile.absolutePath,
-                            exe.absolutePath,
-                            target,
-                            isCxx
-                        )
-                    } catch (t: Throwable) { "link JNI error: ${t.message}" }
-                    if (linkErr.isEmpty()) {
-                        exe.setExecutable(true)
-                        try {
-                            log("[运行] ${exe.name}")
-                            val pb = java.lang.ProcessBuilder(exe.absolutePath)
-                                .redirectErrorStream(true)
-                            val p = pb.start()
-                            val out = p.inputStream.bufferedReader().use { it.readText() }
-                            val code = p.waitFor()
-                            log("[退出码] $code")
-                            if (out.isNotEmpty()) log(out.trimEnd())
-                        } catch (t: Throwable) {
-                            log("运行失败: ${t.message}")
+                    if (sources.size == 1) {
+                        // 单文件工程：直接链接并运行
+                        val exe = java.io.File(buildRoot, src.nameWithoutExtension)
+                        val linkErr = try {
+                            com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExe(
+                                sysrootDir.absolutePath,
+                                objFile.absolutePath,
+                                exe.absolutePath,
+                                target,
+                                isCxx
+                            )
+                        } catch (t: Throwable) { "link JNI error: ${t.message}" }
+                        if (linkErr.isEmpty()) {
+                            exe.setExecutable(true)
+                            try {
+                                try {
+                                    val libDir = applicationInfo.nativeLibraryDir
+                                    val libcxx = java.io.File(libDir, "libc++_shared.so")
+                                    if (libcxx.exists()) {
+                                        libcxx.copyTo(java.io.File(exe.parentFile, "libc++_shared.so"), overwrite = true)
+                                    }
+                                } catch (_: Throwable) { }
+                                log("[运行] ${exe.name}")
+                                val pb = java.lang.ProcessBuilder(exe.absolutePath)
+                                    .redirectErrorStream(true)
+                                try {
+                                    val env = pb.environment()
+                                    val tripleBase = target.dropLastWhile { it.isDigit() }
+                                    val apiStr = target.takeLastWhile { it.isDigit() }.ifEmpty { "26" }
+                                    val sysLibApi = java.io.File(sysrootDir, "usr/lib/$tripleBase/$apiStr").absolutePath
+                                    val sysLibRoot = java.io.File(sysrootDir, "usr/lib/$tripleBase").absolutePath
+                                    val sysRuntime = java.io.File(sysrootDir, "usr/lib/$tripleBase/runtime").absolutePath
+                                    val merged = listOf(
+                                        exe.parentFile.absolutePath,
+                                        applicationInfo.nativeLibraryDir,
+                                        sysLibApi,
+                                        sysLibRoot,
+                                        sysRuntime
+                                    ).joinToString(":")
+                                    env["LD_LIBRARY_PATH"] = merged
+                                } catch (_: Throwable) { }
+                                val p = pb.start()
+                                val out = p.inputStream.bufferedReader().use { it.readText() }
+                                val code = p.waitFor()
+                                log("[退出码] $code")
+                                if (out.isNotEmpty()) log(out.trimEnd())
+                            } catch (t: Throwable) {
+                                log("运行失败: ${t.message}")
+                            }
+                        } else {
+                            log("链接失败: $linkErr")
                         }
-                    } else {
-                        log("链接失败: $linkErr")
                     }
                 } else {
                     // fallback: syntax-only
@@ -326,6 +353,54 @@ class MainActivity : BaseActivity() {
                 }
             }
 
+            // 多文件工程：编译完成后统一链接一次
+            if (compiledObjs.isNotEmpty() && sources.size > 1) {
+                val exe = java.io.File(buildRoot, project.name)
+                val linkErr = try {
+                    com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler.linkExeMany(
+                        sysrootDir.absolutePath,
+                        compiledObjs.toTypedArray(),
+                        exe.absolutePath,
+                        target,
+                        /*isCxx*/ true,
+                        emptyArray(),
+                        emptyArray()
+                    )
+                } catch (t: Throwable) { "link JNI error: ${t.message}" }
+                if (linkErr.isEmpty()) {
+                    exe.setExecutable(true)
+                    try {
+                        val pb = java.lang.ProcessBuilder(exe.absolutePath).redirectErrorStream(true)
+                        try {
+                            val env = pb.environment()
+                            val tripleBase = target.dropLastWhile { it.isDigit() }
+                            val apiStr = target.takeLastWhile { it.isDigit() }.ifEmpty { "26" }
+                            val sysLibApi = java.io.File(sysrootDir, "usr/lib/$tripleBase/$apiStr").absolutePath
+                            val sysLibRoot = java.io.File(sysrootDir, "usr/lib/$tripleBase").absolutePath
+                            val sysRuntime = java.io.File(sysrootDir, "usr/lib/$tripleBase/runtime").absolutePath
+                            val merged = listOf(
+                                exe.parentFile.absolutePath,
+                                applicationInfo.nativeLibraryDir,
+                                sysLibApi,
+                                sysLibRoot,
+                                sysRuntime
+                            ).joinToString(":")
+                            env["LD_LIBRARY_PATH"] = merged
+                        } catch (_: Throwable) { }
+                        log("[运行] ${exe.name}")
+                        val p = pb.start()
+                        val out = p.inputStream.bufferedReader().use { it.readText() }
+                        val code = p.waitFor()
+                        log("[退出码] $code")
+                        if (out.isNotEmpty()) log(out.trimEnd())
+                    } catch (t: Throwable) {
+                        log("运行失败: ${t.message}")
+                    }
+                } else {
+                    log("链接失败: $linkErr")
+                }
+            }
+
             val msg = buildString {
                 appendLine("目标: $target")
                 appendLine("sysroot: ${sysrootDir.absolutePath}")
@@ -345,6 +420,8 @@ class MainActivity : BaseActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        // 菜单已经通过 toolbar.inflateMenu 设置
+        // 这里也需要填充菜单，避免系统回调时清空已有菜单
         menuInflater.inflate(R.menu.main_menu, menu)
         return true
     }

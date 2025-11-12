@@ -134,8 +134,8 @@ dependencies {
     implementation("com.github.getActivity:XXPermissions:20.0")
     
     // 沉浸式状态栏和导航栏（ImmersionBar - OCNYang fork，支持 Android 15/16）
-    implementation("com.github.OCNYang:ImmersionBar:3.2.3")
-    implementation("com.github.OCNYang:ImmersionBar-ktx:3.2.3")
+    implementation("com.github.OCNYang.ImmersionBar:immersionbar:3.4.0")
+    implementation("com.github.OCNYang.ImmersionBar:immersionbar-ktx:3.4.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

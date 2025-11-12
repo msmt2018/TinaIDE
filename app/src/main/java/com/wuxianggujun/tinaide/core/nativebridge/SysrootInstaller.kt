@@ -1,11 +1,11 @@
 package com.wuxianggujun.tinaide.core.nativebridge
 
 import android.content.Context
-import android.content.res.AssetManager
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.zip.ZipInputStream
 
 object SysrootInstaller {
     private const val TAG = "SysrootInstaller"
@@ -23,39 +23,64 @@ object SysrootInstaller {
         if (!needInstall) return dst
         // Remove stale/incomplete sysroot then copy from assets
         try { dst.deleteRecursively() } catch (_: Throwable) {}
-        copyAssetsDir(context.assets, "sysroot", dst)
+        // 仅从压缩包安装（assets/sysroot.zip）；不再支持目录回退，减小 APK 体积
+        try {
+            context.assets.open("sysroot.zip").use { input ->
+                extractZip(input, dst)
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to install sysroot from assets/sysroot.zip: ${t.message}")
+            throw IllegalStateException("sysroot.zip missing or invalid", t)
+        }
+        // 修正可执行权限：usr/bin 下的工具（如 cmake/ninja）需要 +x
+        try { fixExecPermissions(dst) } catch (_: Throwable) { }
         Log.i(TAG, "sysroot installed/refreshed at ${dst.absolutePath}")
         return dst
     }
 
-    private fun copyAssetsDir(assets: AssetManager, assetDir: String, dstDir: File) {
-        if (!dstDir.exists()) dstDir.mkdirs()
-        val entries = try { assets.list(assetDir) ?: emptyArray() } catch (_: Throwable) { emptyArray() }
-        for (name in entries) {
-            val assetPath = if (assetDir.isEmpty()) name else "$assetDir/$name"
-            val children = try { assets.list(assetPath) ?: emptyArray() } catch (_: Throwable) { emptyArray() }
-            val out = File(dstDir, name)
-            if (children.isEmpty()) {
-                // file
-                assets.open(assetPath).use { input ->
-                    writeFile(out, input)
-                }
-            } else {
-                // dir
-                copyAssetsDir(assets, assetPath, out)
+    private fun fixExecPermissions(root: File) {
+        val binDir = File(root, "usr/bin")
+        if (binDir.isDirectory) {
+            binDir.listFiles()?.forEach { f ->
+                if (f.isFile) { try { f.setExecutable(true, false) } catch (_: Throwable) {} }
             }
         }
     }
 
-    private fun writeFile(outFile: File, input: InputStream) {
-        outFile.parentFile?.mkdirs()
-        FileOutputStream(outFile).use { output ->
-            val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                output.write(buf, 0, n)
+
+    private fun extractZip(zipStream: InputStream, dstDir: File) {
+        ZipInputStream(zipStream).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                val name = sanitizeZipEntry(entry.name)
+                if (name.isNotEmpty()) {
+                    val outPath = File(dstDir, name)
+                    if (entry.isDirectory) {
+                        outPath.mkdirs()
+                    } else {
+                        outPath.parentFile?.mkdirs()
+                        FileOutputStream(outPath).use { out ->
+                            val buf = ByteArray(DEFAULT_BUFFER_SIZE)
+                            while (true) {
+                                val read = zis.read(buf)
+                                if (read <= 0) break
+                                out.write(buf, 0, read)
+                            }
+                        }
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
             }
         }
+    }
+
+    private fun sanitizeZipEntry(name: String): String {
+        // 防止路径穿越，忽略非法条目
+        if (name.isEmpty()) return ""
+        var n = name.replace('\\', '/')
+        if (n.startsWith("/")) n = n.substring(1)
+        if (n.contains("..")) return ""
+        return n
     }
 }

@@ -1,10 +1,11 @@
 Param(
   [ValidateSet('arm64-v8a','x86_64')][string]$Abi = 'arm64-v8a',
-  [int]$ApiLevel = 26,
+  [int]$ApiLevel = 28,
   [string]$NdkVersion = 'r26d',
   [string]$LlvmTag = 'llvmorg-17.0.6',
   [string]$ContainerName = 'tina-llvm-build',
-  [string]$OutputPath
+  [string]$OutputPath,
+  [ValidateSet('incremental','reconfigure','clean')][string]$Mode = 'incremental'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,7 +51,7 @@ Ensure-DevContainer -containerName $ContainerName -ndkVersion $NdkVersion
 
 $outDirHost = Join-Path $OutputPath "${Abi}"
 New-Item -ItemType Directory -Force -Path $outDirHost | Out-Null
-$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel'; LLVM_TAG='$LlvmTag'; NDK_VERSION='$NdkVersion';"
+$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel'; LLVM_TAG='$LlvmTag'; NDK_VERSION='$NdkVersion'; MODE='$Mode';"
 $sessionScript = @'
 set -eux
 case "${ABI}" in
@@ -67,6 +68,14 @@ if [ ! -x /work/build/host/bin/llvm-tblgen ]; then
     -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_TARGETS_TO_BUILD="AArch64;X86" -DCMAKE_BUILD_TYPE=Release
   ninja -C /work/build/host -j$(nproc) llvm-tblgen clang-tblgen
 fi
+# Configure control via MODE: incremental | reconfigure | clean
+if [ "${MODE}" = "clean" ]; then
+  rm -rf /work/build/android/${ABI}-api${API_LEVEL} || true
+fi
+if [ "${MODE}" = "reconfigure" ] || [ "${MODE}" = "clean" ]; then
+  rm -f /work/build/android/${ABI}-api${API_LEVEL}/CMakeCache.txt || true
+  rm -rf /work/build/android/${ABI}-api${API_LEVEL}/CMakeFiles || true
+fi
 cmake -S /work/src/llvm-project/llvm -B /work/build/android/${ABI}-api${API_LEVEL} -G Ninja \
   -DLLVM_ENABLE_PROJECTS="clang;lld" -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGET}" -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME} -DCMAKE_ANDROID_ARCH_ABI=${ABI} -DCMAKE_ANDROID_API=${API_LEVEL} \
@@ -76,15 +85,31 @@ cmake -S /work/src/llvm-project/llvm -B /work/build/android/${ABI}-api${API_LEVE
   -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF \
   -DCLANG_ENABLE_ARCMT=OFF -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
   -DLLVM_BUILD_TOOLS=OFF -DLLVM_BUILD_LLVM_DYLIB=ON -DLLVM_LINK_LLVM_DYLIB=ON -DCLANG_LINK_CLANG_DYLIB=ON \
-  -DLLVM_ENABLE_ASSERTIONS=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
-ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j$(nproc) clang-cpp lld
+  -DLLVM_ENABLE_THREADS=OFF \
+  -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_FLAGS="-femulated-tls" -DCMAKE_CXX_FLAGS="-femulated-tls" \
+  -DLLVM_ENABLE_ASSERTIONS=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF
+ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j$(nproc) clang-cpp lld lldELF lldCommon
 
 # Clean destination to avoid duplicate/readonly collisions on host mounts
 rm -rf /hostout/${ABI}/libs/${ABI} /hostout/${ABI}/sysroot /hostout/${ABI}/include || true
 mkdir -p /hostout/${ABI}/libs/${ABI} /hostout/${ABI}/sysroot/usr/include /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/${API_LEVEL}
 mkdir -p /hostout/${ABI}/include/clang-c /hostout/${ABI}/include/clang /hostout/${ABI}/include/llvm /hostout/${ABI}/include/lld
+mkdir -p /hostout/${ABI}/tools/bin || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang-cpp.so* /hostout/${ABI}/libs/${ABI}/ || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libLLVM*.so*    /hostout/${ABI}/libs/${ABI}/ || true
+# Export LLD static libraries for in-process linking (build-time only)
+if [ -f /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldCommon.a ]; then
+  cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldCommon.a /hostout/${ABI}/libs/${ABI}/ || true
+fi
+if [ -f /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldELF.a ]; then
+  cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldELF.a /hostout/${ABI}/libs/${ABI}/ || true
+fi
+# (Dynamic-only mode) Do not export LLD static libraries to keep artifacts small; we will use external ld.lld for linking.
+# Not exporting ld.lld executable (no external fallback needed)
+# Also place runtime copies under sysroot for on-device loading (avoid jniLibs dependency)
+mkdir -p /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime || true
+cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang-cpp.so* /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
+cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libLLVM*.so*    /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
 if compgen -G "/work/build/android/${ABI}-api${API_LEVEL}/lib/liblld*.so*" > /dev/null; then
   cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/liblld*.so* /hostout/${ABI}/libs/${ABI}/
 fi
@@ -95,8 +120,21 @@ if [ -x "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-stri
     [ -f "$so" ] && $STRIP_BIN -S "$so" || true
   done
 fi
-if [ -d "${ANDROID_NDK_HOME}/sources/cxx-stl/llvm-libc++/libs/${ABI}" ]; then
-  cp -af ${ANDROID_NDK_HOME}/sources/cxx-stl/llvm-libc++/libs/${ABI}/libc++_shared.so /hostout/${ABI}/libs/${ABI}/ || true
+# Ensure libc++_shared.so is available for dynamic C++ runtime
+# Prefer the prebuilt sysroot location (NDK r23+), fallback to legacy sources path
+LIBCXX_SHARED_SRC=""
+if [ -f "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${TRIPLE}/libc++_shared.so" ]; then
+  LIBCXX_SHARED_SRC="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${TRIPLE}/libc++_shared.so"
+elif [ -f "${ANDROID_NDK_HOME}/sources/cxx-stl/llvm-libc++/libs/${ABI}/libc++_shared.so" ]; then
+  LIBCXX_SHARED_SRC="${ANDROID_NDK_HOME}/sources/cxx-stl/llvm-libc++/libs/${ABI}/libc++_shared.so"
+fi
+if [ -n "$LIBCXX_SHARED_SRC" ]; then
+  cp -af "$LIBCXX_SHARED_SRC" "/hostout/${ABI}/libs/${ABI}/" || true
+  # Also place a copy into the sysroot API directory so LLD can find it via -L <...>/<TRIPLE>/<API_LEVEL>
+  mkdir -p "/hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/${API_LEVEL}" || true
+  cp -af "$LIBCXX_SHARED_SRC" "/hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/${API_LEVEL}/" || true
+else
+  echo "[w] libc++_shared.so not found in NDK (checked sysroot and sources paths)" >&2
 fi
 cp -af ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/. /hostout/${ABI}/sysroot/usr/include/ || true
 # Ensure libc++ headers are present under sysroot/usr/include/c++/v1 (NDK layout varies by version)
@@ -205,6 +243,11 @@ printf "MODE=shared-libs\nNDK=%s\nLLVM_TAG=%s\nABI=%s\nAPI_LEVEL=%s\nTRIPLE=%s\n
 (cd /hostout/${ABI} && zip -qr llvm-build-${ABI}-api${API_LEVEL}.zip .)
 '@
 Exec-In-Dev "$assign`n$sessionScript"
+$rc = $LASTEXITCODE
+if ($rc -ne 0) {
+  Write-Err "Build failed inside container (exit $rc)"
+  exit $rc
+}
 Write-Info "Build completed!"
 Write-Info "Artifacts ready at: $outDirHost"
 

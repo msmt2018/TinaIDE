@@ -3,7 +3,7 @@ package com.wuxianggujun.tinaide.base
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.geyifeng.immersionbar.ktx.immersionBar
+import com.gyf.immersionbar.ktx.immersionBar
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.ui.dialog.MaterialDialogBuilder
 import com.wuxianggujun.tinaide.utils.Logger
@@ -33,26 +33,79 @@ abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
         // 设置主题
         setTheme(R.style.Theme_TinaIDE)
         super.onCreate(savedInstanceState)
-        
+
         // 设置沉浸式状态栏
         setupImmersionBar()
-        
+
         Logger.d("${this::class.simpleName} created", tag = "Lifecycle")
     }
-    
+
+    /**
+     * setContentView 之后调用，自动为根视图设置 fitsSystemWindows
+     */
+    override fun setContentView(layoutResID: Int) {
+        super.setContentView(layoutResID)
+        setupFitsSystemWindows()
+    }
+
     /**
      * 设置沉浸式状态栏
      * 子类可以重写自定义
+     *
+     * 注意：
+     * 1. 状态栏颜色为深色，系统图标使用浅色（白色）以确保可见性
+     * 2. fitsSystemWindows 由 setupFitsSystemWindows() 统一处理
      */
     protected open fun setupImmersionBar() {
         immersionBar {
-            statusBarColorInt(getColor(R.color.dark_primary))
+            statusBarColor(R.color.dark_primary)
+            // 使用浅色图标（白色）在深色状态栏上显示
             statusBarDarkFont(false)
-            navigationBarColorInt(getColor(R.color.dark_background))
-            fitsSystemWindows(true)
-            autoStatusBarDarkModeEnable(true)
-            init()
+            navigationBarColor(R.color.dark_background)
+            // fitsSystemWindows 在 setupFitsSystemWindows() 中统一处理
+            fitsSystemWindows(false)
+            // 移除 autoStatusBarDarkModeEnable，避免与 statusBarDarkFont 冲突
         }
+    }
+
+    /**
+     * 自动为根视图设置 fitsSystemWindows
+     * 避免在每个 XML 布局中重复添加
+     *
+     * 注意：如果子视图或其子节点已经设置了 fitsSystemWindows，则跳过自动设置
+     */
+    private fun setupFitsSystemWindows() {
+        window?.decorView?.findViewById<android.view.View>(android.R.id.content)?.let { content ->
+            if (content is android.view.ViewGroup && content.childCount > 0) {
+                val rootView = content.getChildAt(0)
+
+                // 检查根视图或其直接子视图是否已经设置了 fitsSystemWindows
+                if (rootView != null && !hasFitsSystemWindows(rootView)) {
+                    rootView.fitsSystemWindows = true
+                }
+            }
+        }
+    }
+
+    /**
+     * 检查视图或其直接子视图是否已设置 fitsSystemWindows
+     */
+    private fun hasFitsSystemWindows(view: android.view.View): Boolean {
+        // 检查当前视图
+        if (view.fitsSystemWindows) {
+            return true
+        }
+
+        // 检查直接子视图（一层深度）
+        if (view is android.view.ViewGroup) {
+            for (i in 0 until view.childCount) {
+                if (view.getChildAt(i)?.fitsSystemWindows == true) {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
     
     /**
@@ -114,7 +167,7 @@ abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
     /**
      * 默认错误处理
      */
-    protected open fun handleDefaultError(error: Throwable) {
+    open fun handleDefaultError(error: Throwable) {
         hideLoading()
         MaterialDialogBuilder.showError(
             context = this,
