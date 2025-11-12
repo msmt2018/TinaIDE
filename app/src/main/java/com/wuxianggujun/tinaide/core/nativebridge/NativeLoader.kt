@@ -6,6 +6,50 @@ import com.wuxianggujun.tinaide.TinaApplication
 object NativeLoader {
     @Volatile
     private var loaded = false
+    // Track loaded libraries to avoid duplicate loads across calls
+    private val loadedLibNames: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
+    private val loadedLibPaths: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
+
+    private fun isAlreadyLoadedError(t: Throwable): Boolean {
+        val msg = t.message ?: return false
+        // Android/JVM typical messages when a native lib is already loaded
+        return msg.contains("already loaded", ignoreCase = true) ||
+               msg.contains("library \"", ignoreCase = true) && msg.contains("needed or already loaded", ignoreCase = true)
+    }
+
+    private fun loadLibraryOnce(name: String) {
+        if (loadedLibNames.contains(name)) return
+        try {
+            System.loadLibrary(name)
+            loadedLibNames.add(name)
+            android.util.Log.i("NativeLoader", "Loaded by name: $name")
+        } catch (t: Throwable) {
+            if (isAlreadyLoadedError(t)) {
+                loadedLibNames.add(name)
+                android.util.Log.i("NativeLoader", "Already loaded (name): $name")
+            } else {
+                throw t
+            }
+        }
+    }
+
+    private fun loadAbsoluteOnce(path: String) {
+        val file = java.io.File(path)
+        val canon = try { file.canonicalPath } catch (_: Throwable) { file.absolutePath }
+        if (loadedLibPaths.contains(canon)) return
+        try {
+            System.load(canon)
+            loadedLibPaths.add(canon)
+            android.util.Log.i("NativeLoader", "Loaded by path: $canon")
+        } catch (t: Throwable) {
+            if (isAlreadyLoadedError(t)) {
+                loadedLibPaths.add(canon)
+                android.util.Log.i("NativeLoader", "Already loaded (path): $canon")
+            } else {
+                throw t
+            }
+        }
+    }
 
     private fun preloadLibcxxOnce() {
         // 仅允许使用 APK/jniLibs 的 libc++_shared，彻底关闭 sysroot 回退，确保进程内始终只有一份 C++ 运行时。
@@ -21,6 +65,8 @@ object NativeLoader {
 
     fun loadIfNeeded() {
         if (loaded) return
+        synchronized(this) {
+            if (loaded) return
         // 先预加载 libc++_shared（优先 jniLibs，失败再回退 sysroot），确保全局唯一运行时
         preloadLibcxxOnce()
         // 加载 LLVM 主库（仅 sysroot runtime），再加载 clang-cpp
@@ -35,7 +81,7 @@ object NativeLoader {
                 else -> "aarch64-linux-android"
             }
             val llvmPath = java.io.File(base, "usr/lib/$triple/runtime/libLLVM-17.so")
-            if (llvmPath.exists()) { System.load(llvmPath.absolutePath); llvmLoaded = true }
+            if (llvmPath.exists()) { loadAbsoluteOnce(llvmPath.absolutePath); llvmLoaded = true }
         } catch (_: Throwable) { }
         try {
             val ctx = TinaApplication.instance
@@ -48,7 +94,7 @@ object NativeLoader {
             }
             val clangPath = java.io.File(base, "usr/lib/$triple/runtime/libclang-cpp.so")
             if (clangPath.exists()) {
-                System.load(clangPath.absolutePath)
+                loadAbsoluteOnce(clangPath.absolutePath)
                 Log.i("NativeLoader", "Loaded clang-cpp from sysroot runtime")
             } else {
                 throw UnsatisfiedLinkError("clang-cpp not found in sysroot runtime: ${clangPath.absolutePath}")
@@ -57,11 +103,12 @@ object NativeLoader {
             Log.w("NativeLoader", "Failed to load clang-cpp: ${t.message}")
         }
         try {
-            System.loadLibrary("native_compiler")
+            loadLibraryOnce("native_compiler")
             loaded = true
             Log.i("NativeLoader", "Loaded native_compiler successfully")
         } catch (t: Throwable) {
             Log.w("NativeLoader", "Failed to load native_compiler: ${t.message}")
+        }
         }
     }
 
@@ -110,7 +157,7 @@ object NativeLoader {
             for (f in candidates) {
                 if (f.exists()) {
                     try {
-                        System.load(f.absolutePath)
+                        loadAbsoluteOnce(f.absolutePath)
                         Log.i("NativeLoader", "Preloaded from sysroot: ${f.absolutePath}")
                         loadedOne = true
                         break
