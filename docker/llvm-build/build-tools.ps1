@@ -4,7 +4,10 @@ Param(
   [string]$ContainerName = 'tina-llvm-build',
   [string]$OutputPath,
   # Default to a recent stable CMake tag; override with -CMakeTag 'v3.31.x' when needed
-  [string]$CMakeTag = 'v3.31.4'
+  [string]$CMakeTag = 'v3.31.4',
+  # New: build shared-object runners instead of relying on exec() (SELinux blocks exec in app sandbox)
+  [bool]$BuildNinjaSo = $true,
+  [bool]$BuildCMakeSo = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,7 +34,7 @@ if (-not $running) {
 
 function Exec-In-Dev { param([string]$cmd) & docker exec $ContainerName bash -lc $cmd }
 
-$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel';"
+$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel'; BUILD_NINJA_SO='$BuildNinjaSo'; BUILD_CMAKE_SO='$BuildCMakeSo';"
 $session = @'
 set -eux
 case "${ABI}" in
@@ -49,7 +52,9 @@ cmake -S /work/src/ninja -B /work/build/tools/ninja-${ABI}-api${API_LEVEL} -G Ni
   -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME} \
   -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
   -DCMAKE_ANDROID_ARCH_ABI=${ABI} -DCMAKE_ANDROID_API=${API_LEVEL} \
-  -DCMAKE_BUILD_TYPE=MinSizeRel
+  -DCMAKE_BUILD_TYPE=MinSizeRel \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DCMAKE_CXX_FLAGS="-fPIC -Dmain=ninja_main"
 ninja -C /work/build/tools/ninja-${ABI}-api${API_LEVEL} -j$(nproc) ninja
 
 mkdir -p /hostout/${ABI}/tools/bin
@@ -60,6 +65,30 @@ if [ -x "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-stri
   ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip -S /hostout/${ABI}/tools/bin/ninja || true
 fi
 chmod 0755 /hostout/${ABI}/tools/bin/ninja
+
+# Optionally build libninja_runner.so (in-process runner)
+if [ "${BUILD_NINJA_SO}" = "True" ] || [ "${BUILD_NINJA_SO}" = "true" ] || [ "${BUILD_NINJA_SO}" = "1" ]; then
+  case "${ABI}" in
+    arm64-v8a) TRIPLE=aarch64-linux-android;;
+    x86_64)    TRIPLE=x86_64-linux-android;;
+  esac
+  NDK_CLANGXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/${TRIPLE}${API_LEVEL}-clang++"
+  mkdir -p /work/build/tools/ninja-runner
+  cat > /work/build/tools/ninja-runner/ninja_runner.cpp <<'EOF'
+extern "C" int ninja_main(int, char**);
+extern "C" int ninja_run(int argc, char** argv) { return ninja_main(argc, argv); }
+EOF
+  # Collect object files from the ninja target and link into a shared object together with the small wrapper
+  ninja_objs=$(find /work/build/tools/ninja-${ABI}-api${API_LEVEL}/CMakeFiles/ninja.dir -name '*.o' | xargs echo)
+  if [ -n "${ninja_objs}" ] && [ -x "${NDK_CLANGXX}" ]; then
+    ${NDK_CLANGXX} -shared -fPIC -Wl,-z,now -Wl,-z,relro \
+      -o /hostout/${ABI}/tools/bin/libninja_runner.so \
+      ${ninja_objs} /work/build/tools/ninja-runner/ninja_runner.cpp -llog -landroid || \
+      echo "[w] libninja_runner.so link failed; continuing"
+  else
+    echo "[w] Could not locate ninja objects or NDK clang++ for runner build; skipping"
+  fi
+fi
 
 # Build CMake (minimal) for Android
 if [ ! -d /work/src/cmake/.git ]; then
@@ -194,8 +223,9 @@ cmake -S /work/src/cmake -B /work/build/tools/cmake-${ABI}-api${API_LEVEL} -G Ni
   -DBUILD_TESTING=OFF -DBUILD_CursesDialog=OFF \
   -DCMAKE_USE_OPENSSL=OFF -DCMAKE_USE_SYSTEM_CURL=OFF \
   -DBUILD_SHARED_LIBS=OFF \
-  -DCMAKE_C_FLAGS="-D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" \
-  -DCMAKE_CXX_FLAGS="-D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h"
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DCMAKE_C_FLAGS="-fPIC -D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" \
+  -DCMAKE_CXX_FLAGS="-fPIC -D_GNU_SOURCE -Dmain=cmake_main -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h"
 ninja -C /work/build/tools/cmake-${ABI}-api${API_LEVEL} -j$(nproc) cmake || true
 if [ -f /work/build/tools/cmake-${ABI}-api${API_LEVEL}/bin/cmake ]; then
   cp -af /work/build/tools/cmake-${ABI}-api${API_LEVEL}/bin/cmake /hostout/${ABI}/tools/bin/
@@ -205,6 +235,29 @@ if [ -f /work/build/tools/cmake-${ABI}-api${API_LEVEL}/bin/cmake ]; then
   chmod 0755 /hostout/${ABI}/tools/bin/cmake
 else
   echo "[w] cmake binary not produced; consider relaxing options or building dependencies" >&2
+fi
+
+# Optionally attempt libcmake_runner.so (best-effort; can fail due to missing libs)
+if [ "${BUILD_CMAKE_SO}" = "True" ] || [ "${BUILD_CMAKE_SO}" = "true" ] || [ "${BUILD_CMAKE_SO}" = "1" ]; then
+  case "${ABI}" in
+    arm64-v8a) TRIPLE=aarch64-linux-android;;
+    x86_64)    TRIPLE=x86_64-linux-android;;
+  esac
+  NDK_CLANGXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/${TRIPLE}${API_LEVEL}-clang++"
+  mkdir -p /work/build/tools/cmake-runner
+  cat > /work/build/tools/cmake-runner/cmake_runner.cpp <<'EOF'
+extern "C" int cmake_main(int, char**);
+extern "C" int cmake_run(int argc, char** argv) { return cmake_main(argc, argv); }
+EOF
+  cmake_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL} -path '*/Source/CMakeFiles/cmake.dir/*' -name '*.o' | xargs echo)
+  if [ -n "${cmake_objs}" ] && [ -x "${NDK_CLANGXX}" ]; then
+    ${NDK_CLANGXX} -shared -fPIC -Wl,-z,now -Wl,-z,relro \
+      -o /hostout/${ABI}/tools/bin/libcmake_runner.so \
+      ${cmake_objs} /work/build/tools/cmake-runner/cmake_runner.cpp -llog -landroid || \
+      echo "[w] libcmake_runner.so link failed; continuing"
+  else
+    echo "[w] Could not locate cmake objects or NDK clang++ for runner build; skipping"
+  fi
 fi
 '@
 
