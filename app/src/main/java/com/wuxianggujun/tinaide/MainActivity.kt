@@ -203,9 +203,11 @@ class MainActivity : BaseActivity() {
             // Experimental: probe sysroot CMake/Ninja before compile to verify exec availability
             try {
                 val probe = com.wuxianggujun.tinaide.core.nativebridge.SysrootCMakeRunner.probe()
-                log(probe)
+                android.util.Log.i("CMakeProbe", probe)
+                outputManager.appendOutput(probe + "\n")
             } catch (t: Throwable) {
-                log("Sysroot CMake/Ninja probe failed: ${t.message}")
+                android.util.Log.w("CMakeProbe", "probe failed: ${t.message}")
+                outputManager.appendOutput("Sysroot CMake/Ninja probe failed: ${t.message}\n")
             }
 
             val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
