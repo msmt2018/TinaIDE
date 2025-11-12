@@ -750,11 +750,31 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
 
     void* fp = dlsym(handle, sym.c_str());
     if (!fp) {
-        const char* e = dlerror();
-        std::string err = std::string("dlsym failed: ") + (e?e:"unknown");
-        LOGW("%s", err.c_str());
-        dlclose(handle);
-        return -126;
+        // Try simple Itanium C++ mangling for global function names: _Z{len}{name}v and _Z{len}{name}iPPc
+        if (!sym.empty()) {
+            auto isSimpleIdent = [](const std::string& s){
+                for (char c : s) {
+                    if (!(std::isalnum((unsigned char)c) || c=='_' )) return false;
+                }
+                return true;
+            };
+            if (isSimpleIdent(sym)) {
+                std::string len = std::to_string(sym.size());
+                std::string m1 = std::string("_Z") + len + sym + "v";     // int f()
+                dlerror(); fp = dlsym(handle, m1.c_str());
+                if (!fp) {
+                    std::string m2 = std::string("_Z") + len + sym + "iPPc"; // int f(int,char**)
+                    dlerror(); fp = dlsym(handle, m2.c_str());
+                }
+            }
+        }
+        if (!fp) {
+            const char* e = dlerror();
+            std::string err = std::string("dlsym failed: ") + (e?e:"unknown");
+            LOGW("%s", err.c_str());
+            dlclose(handle);
+            return -126;
+        }
     }
 
     int rc = -125;
@@ -814,23 +834,27 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runSharedIsolated
         }
         void* fp = dlsym(handle, sym.c_str());
         
-        // If symbol not found and it's "main", try common C++ mangled names
-        if (!fp && sym == "main") {
-            // Try C++ mangled names for main()
-            const char* mangled_names[] = {
-                "_Z4mainv",           // int main()
-                "_Z4mainiPPc",        // int main(int, char**)
-                "main",               // C linkage fallback
-                nullptr
+        // If not found, try a generic C++ Itanium mangling for simple identifiers
+        if (!fp && !sym.empty()) {
+            auto isSimpleIdent = [](const std::string& s){
+                for (char c : s) {
+                    if (!(std::isalnum((unsigned char)c) || c=='_' )) return false;
+                }
+                return true;
             };
-            for (int i = 0; mangled_names[i] && !fp; ++i) {
-                dlerror(); // clear error
-                fp = dlsym(handle, mangled_names[i]);
+            if (isSimpleIdent(sym)) {
+                std::string len = std::to_string(sym.size());
+                std::string m1 = std::string("_Z") + len + sym + "v";     // int f()
+                dlerror(); fp = dlsym(handle, m1.c_str());
                 if (fp) {
-                    fprintf(stderr, "[tina] found main as: %s\n", mangled_names[i]);
-                    break;
+                    fprintf(stderr, "[tina] found as C++: %s\n", m1.c_str());
+                } else {
+                    std::string m2 = std::string("_Z") + len + sym + "iPPc"; // int f(int,char**)
+                    dlerror(); fp = dlsym(handle, m2.c_str());
+                    if (fp) fprintf(stderr, "[tina] found as C++: %s\n", m2.c_str());
                 }
             }
+            // No legacy main() fallbacks: enforce explicit, unique entry symbols (e.g., tina_ide_use_main)
         }
         
         if (!fp) {
