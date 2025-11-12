@@ -54,16 +54,28 @@ class MainActivity : BaseActivity() {
 
         setContentView(R.layout.activity_main)
 
-        // Adjust drawer/header for status bar insets to prevent overlap (headerView case)
+        // Adjust drawer/header for status bar insets to prevent overlap (NavigationView headerView)
         try {
-            val headerRoot = findViewById<android.view.View>(R.id.drawer_header_root)
-            if (headerRoot != null) {
-                androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(headerRoot) { v, insets ->
+            val nav = findViewById<com.google.android.material.navigation.NavigationView>(R.id.nav_view)
+            if (nav != null) {
+                val headerView = if (nav.headerCount > 0) nav.getHeaderView(0) else null
+                val headerRoot = headerView?.findViewById<android.view.View>(R.id.drawer_header_root) ?: headerView
+                if (headerRoot != null) {
+                    androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(headerRoot) { v, insets ->
+                        val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                        v.setPadding(v.paddingLeft, status.top, v.paddingRight, v.paddingBottom)
+                        insets
+                    }
+                    androidx.core.view.ViewCompat.requestApplyInsets(headerRoot)
+                }
+                // Ensure NavigationView itself doesn't add unexpected top padding; status bar handled by headerRoot
+                androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(nav) { v, insets ->
                     val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                    v.setPadding(v.paddingLeft, status.top, v.paddingRight, v.paddingBottom)
+                    // Keep nav top padding zero; headerRoot receives inset
+                    v.setPadding(v.paddingLeft, 0, v.paddingRight, v.paddingBottom)
                     insets
                 }
-                androidx.core.view.ViewCompat.requestApplyInsets(headerRoot)
+                androidx.core.view.ViewCompat.requestApplyInsets(nav)
             }
         } catch (_: Throwable) { }
 
