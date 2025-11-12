@@ -36,8 +36,8 @@ class LogView @JvmOverloads constructor(
         // 不显示行号
         isLineNumberEnabled = false
         
-        // 禁用自动补全
-        isAutoCompletionEnabled = false
+        // 禁用自动补全（Sora Editor 新版本可能不需要此属性）
+        // isAutoCompletionEnabled = false
         
         // 禁用代码块线
         isBlockLineEnabled = false
@@ -87,12 +87,14 @@ class LogView @JvmOverloads constructor(
      * 追加日志
      */
     fun appendLog(text: String) {
-        this.text.append(text)
+        val content = this.text
+        // insert 方法需要 (line, column, text) 三个参数
+        content.insert(content.lineCount, 0, text)
         // 滚动到底部
         post {
-            val lineCount = this.text.lineCount
+            val lineCount = content.lineCount
             if (lineCount > 0) {
-                setSelection(lineCount, 0)
+                setSelection(lineCount - 1, 0)
             }
         }
     }

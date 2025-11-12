@@ -29,8 +29,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TinaIDE"
         android:largeHeap="true"
-        android:requestLegacyExternalStorage="true"
-        tools:replace="android:allowBackup,android:label,android:supportsRtl,android:theme,android:largeHeap">
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".ui.ProjectManagerActivity"
             android:exported="true">
@@ -42,7 +41,8 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="true" />
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
         <activity
             android:name=".output.OutputActivity"
             android:exported="false"

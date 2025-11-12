@@ -78,10 +78,32 @@ if (-not $DryRun) {
   New-Item -ItemType Directory -Force -Path $dstSys | Out-Null
   robocopy $srcSys $dstSys /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 }
+# 若构建产物中包含工具二进制（cmake/ninja），一并打包到 sysroot/usr/bin
+$srcTools = Join-Path $root "docker/llvm-build/build-output/$abi/tools/bin"
+if (Test-Path $srcTools) {
+  $dstBin = Join-Path $dstSys 'usr/bin'
+  $tools = @('cmake','ninja')
+  $found = @()
+  foreach ($t in $tools) {
+    $p = Join-Path $srcTools $t
+    if (Test-Path $p) { $found += $p }
+  }
+  if ($found.Count -gt 0) {
+    Info "Sync tools to sysroot: $($found | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object -Unique -Join ', ') -> $dstBin"
+    if (-not $DryRun) {
+      New-Item -ItemType Directory -Force -Path $dstBin | Out-Null
+      foreach ($f in $found) { Copy-Item $f -Destination $dstBin -Force }
+    }
+  } else {
+    Warn "未发现可打包的工具二进制于: $srcTools"
+  }
+} else {
+  Warn "缺少工具目录: $srcTools（跳过 cmake/ninja 打包）"
+}
 # 校验 sysroot 中 triple/api 目录是否存在
 $triple = Get-Triple $abi
 if ($triple) {
   $tripleDir = Join-Path $dstSys ("usr/lib/$triple/$ApiLevel")
   if (-not (Test-Path $tripleDir)) { Warn "sysroot 缺少 $triple/$ApiLevel 目录：$tripleDir" }
 }
-Info "Done: 已同步 .so 到 $dstSo，sysroot 到 $dstSys"
+Info "Done: 已同步 .so 到 $dstSo，sysroot 到 $dstSys（含可用的 cmake/ninja）"

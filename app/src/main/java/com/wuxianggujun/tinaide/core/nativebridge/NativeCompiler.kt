@@ -29,4 +29,20 @@ object NativeCompiler {
         target: String,
         isCxx: Boolean
     ): String
+
+    /**
+     * 使用 LLD 在进程内把多个 .o 链接为可执行文件（PIE）。
+     * - objPaths: 所有目标文件路径
+     * - libDirs: 额外库搜索路径（可为空）
+     * - libs:    额外库名（不含 -l 前缀，例如 "log"）
+     */
+    external fun linkExeMany(
+        sysroot: String,
+        objPaths: Array<String>,
+        outExe: String,
+        target: String,
+        isCxx: Boolean,
+        libDirs: Array<String>,
+        libs: Array<String>
+    ): String
 }

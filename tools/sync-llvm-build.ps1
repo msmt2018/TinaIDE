@@ -1,10 +1,15 @@
 Param(
   [ValidateSet('arm64-v8a','x86_64')]
   [string]$Abi = 'x86_64',
-  [int]$ApiLevel = 26,
+  [int]$ApiLevel = 28,
   [string]$BuildOutputRoot = 'docker/llvm-build/build-output',
   [string]$AppJniLibs = 'app/src/main/jniLibs',
-  [string]$AppAssetsSysroot = 'app/src/main/assets/sysroot'
+  [string]$AppAssetsSysroot = 'app/src/main/assets/sysroot',
+  [ValidateSet('none','zip','mirror')]
+  [string]$SysrootMode = 'zip',
+  [bool]$CopyLibcxxToJni = $false,
+  [bool]$CopyLlvmToJni   = $false,
+  [string]$ToolBinSource = ''
 )
 
 Write-Host "== Sync LLVM build artifacts (ABI=$Abi) ==" -ForegroundColor Cyan
@@ -17,7 +22,7 @@ $srcLibDir = Join-Path (Join-Path $BuildOutputRoot $Abi) (Join-Path 'libs' $Abi)
 $dstLibDir = Join-Path $AppJniLibs $Abi
 if (Test-Path $srcLibDir) {
   New-Item -ItemType Directory -Force -Path $dstLibDir | Out-Null
-  # Pre-clean only our managed libraries to avoid leftovers; do not touch other libs
+  # Pre-clean only our managed libraries to avoid leftovers; remove stale static archives as well
   $patterns = @('libclang-cpp*.so','libLLVM*.so','liblld*.so','libc++_shared.so')
   foreach($pat in $patterns){
     Get-ChildItem -Path $dstLibDir -Filter $pat -File -ErrorAction SilentlyContinue | ForEach-Object {
@@ -25,16 +30,103 @@ if (Test-Path $srcLibDir) {
       Remove-Item -Force $_.FullName
     }
   }
+  # Remove any static archives (*.a) accidentally present under jniLibs (APK 不需要 .a，且会膨胀体积)
+  Get-ChildItem -Path $dstLibDir -Filter *.a -File -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "Remove static archive: $($_.FullName)" -ForegroundColor DarkYellow
+    Remove-Item -Force $_.FullName
+  }
+  # Only copy shared objects into jniLibs
   robocopy $srcLibDir $dstLibDir *.so /NFL /NDL /NJH /NJS /NP | Out-Null
+  # Optionally remove libc++_shared.so (we rely on sysroot-side dynamic runtime)
+  if (-not $CopyLibcxxToJni) {
+    Get-ChildItem -Path $dstLibDir -Filter libc++_shared.so -File -ErrorAction SilentlyContinue | ForEach-Object {
+      Write-Host "Remove libc++_shared from jniLibs (using sysroot version): $($_.FullName)" -ForegroundColor DarkYellow
+      Remove-Item -Force $_.FullName
+    }
+  }
+  # Optionally remove LLVM/Clang runtime from jniLibs (we will load from sysroot runtime path)
+  if (-not $CopyLlvmToJni) {
+    foreach($pat in @('libLLVM*.so','libclang-cpp*.so')){
+      Get-ChildItem -Path $dstLibDir -Filter $pat -File -ErrorAction SilentlyContinue | ForEach-Object {
+        Write-Host "Remove LLVM runtime from jniLibs (using sysroot version): $($_.FullName)" -ForegroundColor DarkYellow
+        Remove-Item -Force $_.FullName
+      }
+    }
+  }
   Write-Host "Copied .so libraries → $dstLibDir" -ForegroundColor Green
 } else {
   Write-Host "Skip libs: $srcLibDir not found" -ForegroundColor DarkYellow
 }
 
-# 3) Sysroot to assets
+# 3) Sysroot to assets（可选）。当 SysrootMode=none 时，不打包也不镜像，并清理已存在的资产。
 $srcSysroot = Join-Path (Join-Path $BuildOutputRoot $Abi) 'sysroot'
+$assetsRoot = Split-Path -Parent $AppAssetsSysroot
+$zipPath = Join-Path $assetsRoot 'sysroot.zip'
+if ($SysrootMode -eq 'none') {
+  if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+  if (Test-Path $AppAssetsSysroot) { Remove-Item -Recurse -Force $AppAssetsSysroot }
+  Write-Host "[i] Sysroot packaging disabled (mode=none). Cleaned assets sysroot." -ForegroundColor Yellow
+  return
+}
 if (Test-Path $srcSysroot) {
-  New-Item -ItemType Directory -Force -Path $AppAssetsSysroot | Out-Null
+  if ($SysrootMode -eq 'zip') {
+    $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
+    # Optionally inject tool binaries (cmake/ninja) into sysroot/usr/bin before packaging
+    if (-not $ToolBinSource -or -not (Test-Path $ToolBinSource)) {
+      $auto = Join-Path (Join-Path $BuildOutputRoot $Abi) 'tools/bin'
+      if (Test-Path $auto) { $ToolBinSource = $auto }
+    }
+    if ($ToolBinSource -and (Test-Path $ToolBinSource)) {
+      $dstBin = Join-Path $srcSysroot 'usr/bin'
+      New-Item -ItemType Directory -Force -Path $dstBin | Out-Null
+      Get-ChildItem -LiteralPath $ToolBinSource -File | ForEach-Object {
+        Copy-Item $_.FullName -Destination (Join-Path $dstBin $_.Name) -Force
+      }
+      Write-Host "[i] Injected tool binaries → $dstBin" -ForegroundColor Green
+    }
+    # 注入运行时 clang/LLVM 共享库到 sysroot（运行期从此处 System.load）。
+    $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
+    $dstRuntime = Join-Path $srcSysroot ("usr/lib/$triple/runtime")
+    $prebuiltLibs = Join-Path (Join-Path $BuildOutputRoot $Abi) ("libs/$Abi")
+    if (Test-Path $prebuiltLibs) {
+      New-Item -ItemType Directory -Force -Path $dstRuntime | Out-Null
+      $need = @('libclang-cpp.so')
+      $llvmSo = Get-ChildItem -LiteralPath $prebuiltLibs -Filter 'libLLVM-*.so' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+      if ($llvmSo) { $need += $llvmSo.Name } else { Write-Host "[w] libLLVM-*.so not found under $prebuiltLibs" -ForegroundColor Yellow }
+      # Do NOT include any LLD shared libs in sysroot runtime (LLD linked statically at build time)
+      foreach($n in $need){
+        $src = Join-Path $prebuiltLibs $n
+        if (Test-Path $src) {
+          Copy-Item $src -Destination (Join-Path $dstRuntime $n) -Force
+        }
+      }
+      Write-Host "[i] Injected runtime libs → $dstRuntime" -ForegroundColor Green
+    } else {
+      Write-Host "[w] Prebuilt libs not found at $prebuiltLibs; skip runtime injection" -ForegroundColor Yellow
+    }
+    $srcTripleApiDir = Join-Path $srcSysroot ("usr/lib/$triple/$ApiLevel")
+    $required = @('crtbegin_dynamic.o','crtend_android.o','libc.so','libm.so','liblog.so','libandroid.so','libc++_shared.so')
+    $missing = @(); foreach($f in $required){ if (-not (Test-Path (Join-Path $srcTripleApiDir $f))) { $missing += $f } }
+    if ($missing.Count -gt 0) { Write-Host "[!] source sysroot incomplete at: $srcTripleApiDir" -ForegroundColor Red; Write-Host ("    missing: " + ($missing -join ', ')) -ForegroundColor Red; throw "Source sysroot incomplete" }
+    $assetsRoot = Split-Path -Parent $AppAssetsSysroot
+    $zipPath = Join-Path $assetsRoot 'sysroot.zip'
+    if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+    try { Add-Type -AssemblyName System.IO.Compression.FileSystem } catch { }
+    $fs = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::CreateNew)
+    try {
+      $zip = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create, $false)
+      $root = (Resolve-Path $srcSysroot).Path
+      $rootLen = $root.Length
+      Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
+        if ($_.Extension -ieq '.a') { return }
+        $rel = $_.FullName.Substring($rootLen).TrimStart([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+        $relZip = $rel -replace '\\','/'
+        $null = [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $relZip, [System.IO.Compression.CompressionLevel]::Optimal)
+      }
+    } finally { if ($zip) { $zip.Dispose() }; if ($fs) { $fs.Dispose() } }
+    Write-Host "[i] Packaged sysroot.zip → $zipPath" -ForegroundColor Green
+  } else {
+    New-Item -ItemType Directory -Force -Path $AppAssetsSysroot | Out-Null
   robocopy $srcSysroot $AppAssetsSysroot /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
   # Warn if target triple directory for selected API is missing
   $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
@@ -136,6 +228,8 @@ if (Test-Path $srcSysroot) {
     }
   }
   Write-Host "Mirrored sysroot → $AppAssetsSysroot" -ForegroundColor Green
+  }
+
 } else {
   Write-Host "Skip sysroot: $srcSysroot not found" -ForegroundColor DarkYellow
 }

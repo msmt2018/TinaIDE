@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.view.Menu
+import android.view.MenuItem
 import androidx.appcompat.widget.Toolbar
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -151,7 +152,7 @@ class ProjectManagerActivity : BaseActivity() {
 
     private fun requestStoragePermissionsIfNeeded(onAfterGranted: () -> Unit) {
         when {
-            // Android 11+：申请“所有文件访问”以便访问自定义项目目录
+            // Android 11+：申请“所有文件访问”以便访问自定义项目目录（交由 XXPermissions 全权处理）
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
                 XXPermissions.with(this)
                     .permission(Permission.MANAGE_EXTERNAL_STORAGE)
@@ -172,14 +173,26 @@ class ProjectManagerActivity : BaseActivity() {
                         }
                     })
             }
-            // Android 6.0 - 10：使用平台 API 请求读写权限，避免 XXPermissions 在 target >= 33 时抛错
+            // Android 6.0 - 10：交由 XXPermissions 请求读写权限
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                val legacyPerms = arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                )
-                requestPermissions(legacyPerms, REQ_STORAGE_PERMS)
-                // onRequestPermissionsResult 中回调 onAfterGranted()
+                XXPermissions.with(this)
+                    .permission(Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE)
+                    .request(object : OnPermissionCallback {
+                        override fun onGranted(permissions: MutableList<String>, allGranted: Boolean) {
+                            if (!allGranted) {
+                                toastWarning(getString(R.string.permission_not_all_granted))
+                            }
+                            onAfterGranted()
+                        }
+                        override fun onDenied(permissions: MutableList<String>, doNotAskAgain: Boolean) {
+                            if (doNotAskAgain) {
+                                toastLong(getString(R.string.permission_denied_never_ask))
+                                XXPermissions.startPermissionActivity(this@ProjectManagerActivity, permissions)
+                            } else {
+                                toastError(getString(R.string.permission_denied))
+                            }
+                        }
+                    })
             }
             else -> {
                 // 低于 M 无需运行时权限
@@ -188,17 +201,7 @@ class ProjectManagerActivity : BaseActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_STORAGE_PERMS) {
-            val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-            if (granted) {
-                reloadProjects()
-            } else {
-                toastError(getString(R.string.permission_denied))
-            }
-        }
-    }
+
 
     companion object {
         private const val REQ_STORAGE_PERMS = 1001
@@ -214,19 +217,23 @@ class ProjectManagerActivity : BaseActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_CHOOSE_DIR && data != null) {
-            val treeUri: Uri? = data.data
-            if (treeUri != null) {
-                contentResolver.takePersistableUriPermission(
-                    treeUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-                val path = resolveTreeUriToPath(treeUri)
-                if (path != null) {
-                    ServiceLocator.get<IConfigManager>().set(KEY_PROJECTS_ROOT, path)
-                    reloadProjects()
-                } else {
-                    toastError("无法解析选择的目录，请选择内部存储目录")
+        when (requestCode) {
+            REQ_CHOOSE_DIR -> {
+                if (data != null) {
+                    val treeUri: Uri? = data.data
+                    if (treeUri != null) {
+                        contentResolver.takePersistableUriPermission(
+                            treeUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        )
+                        val path = resolveTreeUriToPath(treeUri)
+                        if (path != null) {
+                            ServiceLocator.get<IConfigManager>().set(KEY_PROJECTS_ROOT, path)
+                            reloadProjects()
+                        } else {
+                            toastError("无法解析选择的目录，请选择内部存储目录")
+                        }
+                    }
                 }
             }
         }

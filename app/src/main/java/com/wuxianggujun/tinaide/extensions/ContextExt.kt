@@ -49,3 +49,15 @@ fun Context.toastWarning(message: String) {
 fun Context.toastInfo(message: String) {
     ToastUtil.showInfo(this, message)
 }
+
+/**
+ * 使用 Toast 处理错误
+ */
+fun Context.handleErrorWithToast(error: Throwable, prefix: String = "") {
+    val message = if (prefix.isNotEmpty()) {
+        "$prefix: ${error.message}"
+    } else {
+        error.message ?: "未知错误"
+    }
+    toastError(message)
+}

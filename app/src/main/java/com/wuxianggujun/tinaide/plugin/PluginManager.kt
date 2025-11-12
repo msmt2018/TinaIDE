@@ -44,15 +44,17 @@ class PluginManager private constructor() : IPluginManager {
      * 注册内置插件
      */
     private fun registerBuiltinPlugins(context: Context) {
-        // C/C++ 插件（内置）
-        val cppPlugin = CppLanguagePlugin()
-        cppPlugin.initialize(context)
-        registerPlugin(cppPlugin)
+        // TODO: C/C++ 插件（内置）- 待实现
+        // val cppPlugin = CppLanguagePlugin()
+        // cppPlugin.initialize(context)
+        // registerPlugin(cppPlugin)
         
         // 可以在这里添加更多内置插件
         // val pythonPlugin = PythonLanguagePlugin()
         // pythonPlugin.initialize(context)
         // registerPlugin(pythonPlugin)
+        
+        Logger.i("No builtin plugins registered yet")
     }
     
     override fun registerPlugin(plugin: ILanguagePlugin) {

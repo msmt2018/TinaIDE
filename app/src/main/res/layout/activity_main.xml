@@ -19,7 +19,6 @@
             android:id="@+id/app_bar_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fitsSystemWindows="true"
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
 
             <androidx.appcompat.widget.Toolbar
@@ -39,72 +38,43 @@
             android:orientation="vertical"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <!-- 编辑器区域 -->
+            <!-- 编辑器区域（全屏显示） -->
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/editor_container"
                 android:name="com.wuxianggujun.tinaide.ui.fragment.EditorContainerFragment"
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <!-- 终端区域已移除 -->
-
-            <!-- 输出工具栏（点击打开独立输出窗口） -->
-            <LinearLayout
-                android:id="@+id/output_toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:orientation="horizontal"
-                android:paddingStart="12dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:background="@android:color/darker_gray"
-                android:clickable="true"
-                android:focusable="true">
-
-                <TextView
-                    android:id="@+id/output_title"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_gravity="center_vertical"
-                    android:text="编译输出（点击查看）"
-                    android:textColor="@android:color/white"
-                    android:textStyle="bold" />
-
-                <ImageButton
-                    android:id="@+id/btn_output_info"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="打开输出窗口"
-                    android:src="@android:drawable/ic_dialog_info" />
-            </LinearLayout>
+                android:layout_height="match_parent" />
 
         </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <!-- 文件树侧边栏 -->
-    <LinearLayout
+    <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="280dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:orientation="vertical"
-        android:background="?android:attr/colorBackground"
-        android:fitsSystemWindows="true">
+        android:fitsSystemWindows="true"
+        android:background="?android:attr/colorBackground">
 
-        <include layout="@layout/include_file_tree_header" />
-
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/file_tree_container"
-            android:name="com.wuxianggujun.tinaide.ui.fragment.FileTreeFragment"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:fitsSystemWindows="false">
 
-    </LinearLayout>
+            <include layout="@layout/include_file_tree_header" />
+
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/file_tree_container"
+                android:name="com.wuxianggujun.tinaide.ui.fragment.FileTreeFragment"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+        </LinearLayout>
+
+    </com.google.android.material.navigation.NavigationView>
 
 </androidx.drawerlayout.widget.DrawerLayout>

@@ -26,6 +26,9 @@
         
         <!-- Window background -->
         <item name="android:windowBackground">@color/dark_background</item>
+
+        <!-- Toolbar 图标颜色：确保在深色背景上可见 -->
+        <item name="colorControlNormal">@color/dark_on_primary</item>
     </style>
 
     <style name="Theme.TinaIDE" parent="Base.Theme.TinaIDE" />

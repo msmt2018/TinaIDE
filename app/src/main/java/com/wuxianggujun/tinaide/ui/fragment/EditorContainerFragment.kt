@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.ui.fragment
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
@@ -24,12 +25,13 @@ import java.io.File
  * 包含多标签页功能
  */
 class EditorContainerFragment : Fragment() {
-    
+
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: EditorTabAdapter
     private var tabLayoutMediator: TabLayoutMediator? = null
     private lateinit var editorToolbar: View
+    private var emptyView: View? = null  // 改为可空类型，延迟加载
     
     private val editorManager: IEditorManager by lazy {
         ServiceLocator.get<IEditorManager>()
@@ -45,11 +47,12 @@ class EditorContainerFragment : Fragment() {
     
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
+
         tabLayout = view.findViewById(R.id.tab_layout)
         viewPager = view.findViewById(R.id.view_pager)
         editorToolbar = view.findViewById(R.id.editor_toolbar)
-        
+        // emptyView 不在这里初始化，延迟到需要时再加载
+
         setupViewPager()
         setupTabLayout()
         setupEditorToolbar()
@@ -143,8 +146,21 @@ class EditorContainerFragment : Fragment() {
     
     private fun updateTabLayoutVisibility() {
         val hasFiles = adapter.itemCount > 0
+
         tabLayout.visibility = if (hasFiles) View.VISIBLE else View.GONE
         editorToolbar.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        viewPager.visibility = if (hasFiles) View.VISIBLE else View.GONE
+
+        // 懒加载空状态视图
+        if (!hasFiles) {
+            if (emptyView == null) {
+                val stub = view?.findViewById<android.view.ViewStub>(R.id.empty_stub)
+                emptyView = stub?.inflate()
+            }
+            emptyView?.visibility = View.VISIBLE
+        } else {
+            emptyView?.visibility = View.GONE
+        }
     }
     
     private fun setupTabLayout() {
