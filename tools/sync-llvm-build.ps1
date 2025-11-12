@@ -9,7 +9,10 @@ Param(
   [string]$SysrootMode = 'zip',
   [bool]$CopyLibcxxToJni = $true,
   [bool]$CopyLlvmToJni   = $false,
-  [string]$ToolBinSource = ''
+  [string]$ToolBinSource = '',
+  # New: do NOT inject host-built tool binaries (cmake/ninja) into sysroot by default
+  # Because Android SELinux denies exec() from app private dirs (execute_no_trans)
+  [bool]$InjectToolsToSysroot = $false
 )
 
 Write-Host "== Sync LLVM build artifacts (ABI=$Abi) ==" -ForegroundColor Cyan
@@ -123,18 +126,22 @@ if ($SysrootMode -eq 'none') {
 if ($srcSysroot -and (Test-Path $srcSysroot)) {
   if ($SysrootMode -eq 'zip') {
     $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
-    # Optionally inject tool binaries (cmake/ninja) into sysroot/usr/bin before packaging
-    if (-not $ToolBinSource -or -not (Test-Path $ToolBinSource)) {
-      $auto = Join-Path (Join-Path $BuildOutputRoot $Abi) 'tools/bin'
-      if (Test-Path $auto) { $ToolBinSource = $auto }
-    }
-    if ($ToolBinSource -and (Test-Path $ToolBinSource)) {
-      $dstBin = Join-Path $srcSysroot 'usr/bin'
-      New-Item -ItemType Directory -Force -Path $dstBin | Out-Null
-      Get-ChildItem -LiteralPath $ToolBinSource -File | ForEach-Object {
-        Copy-Item $_.FullName -Destination (Join-Path $dstBin $_.Name) -Force
+    # Optional tool binaries injection disabled by default; enable with -InjectToolsToSysroot
+    if ($InjectToolsToSysroot) {
+      if (-not $ToolBinSource -or -not (Test-Path $ToolBinSource)) {
+        $auto = Join-Path (Join-Path $BuildOutputRoot $Abi) 'tools/bin'
+        if (Test-Path $auto) { $ToolBinSource = $auto }
       }
-      Write-Host "[i] Injected tool binaries → $dstBin" -ForegroundColor Green
+      if ($ToolBinSource -and (Test-Path $ToolBinSource)) {
+        $dstBin = Join-Path $srcSysroot 'usr/bin'
+        New-Item -ItemType Directory -Force -Path $dstBin | Out-Null
+        Get-ChildItem -LiteralPath $ToolBinSource -File | ForEach-Object {
+          Copy-Item $_.FullName -Destination (Join-Path $dstBin $_.Name) -Force
+        }
+        Write-Host "INFO: Injected tool binaries -> $dstBin" -ForegroundColor Green
+      } else {
+        Write-Host "INFO: ToolBinSource not provided or missing; skip tool injection" -ForegroundColor Yellow
+      }
     }
     # 注入运行时 clang/LLVM 共享库到 sysroot（运行期从此处 System.load）。
     $triple = if ($Abi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
