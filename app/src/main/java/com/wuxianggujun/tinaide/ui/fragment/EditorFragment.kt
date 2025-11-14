@@ -1,10 +1,9 @@
 package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import androidx.fragment.app.Fragment
+import com.wuxianggujun.tinaide.base.BaseBindingFragment
+import com.wuxianggujun.tinaide.databinding.FragmentEditorBinding
 import com.wuxianggujun.tinaide.R
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
@@ -14,7 +13,9 @@ import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
  * 编辑器 Fragment
  * 包含 SoraEditor 实例
  */
-class EditorFragment : Fragment() {
+class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
+    FragmentEditorBinding::inflate
+) {
     private lateinit var codeEditor: CodeEditor
     private var filePath: String? = null
     
@@ -35,18 +36,10 @@ class EditorFragment : Fragment() {
         filePath = arguments?.getString(ARG_FILE_PATH)
     }
     
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_editor, container, false)
-    }
-    
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        codeEditor = view.findViewById(R.id.code_editor)
+        codeEditor = binding.codeEditor
         setupEditor()
         loadFileContent()
     }

@@ -81,6 +81,7 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        viewBinding = true
     }
 
     // Native packaging: 保留 libproot.so 调试符号，避免被 strip 导致体积大幅缩小
