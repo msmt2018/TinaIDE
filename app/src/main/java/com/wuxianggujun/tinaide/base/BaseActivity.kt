@@ -1,8 +1,11 @@
 package com.wuxianggujun.tinaide.base
 
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.viewbinding.ViewBinding
 import com.gyf.immersionbar.ktx.immersionBar
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.ui.dialog.MaterialDialogBuilder
@@ -20,11 +23,19 @@ import kotlin.coroutines.CoroutineContext
  * - 错误处理
  * - 日志记录
  */
-abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
+abstract class BaseActivity<VB : ViewBinding>(
+    private val inflateBinding: (LayoutInflater) -> VB
+) : AppCompatActivity(), CoroutineScope {
     
     // 协程作用域
     override val coroutineContext: CoroutineContext
         get() = SupervisorJob() + Dispatchers.Main
+    
+    // ViewBinding
+    private var _binding: VB? = null
+    protected val binding: VB
+        get() = _binding
+            ?: error("ViewBinding 在 onDestroy 之后不可用，请在 Activity 生命周期内访问 binding")
     
     // 加载对话框
     private var progressDialog: AlertDialog? = null
@@ -33,6 +44,9 @@ abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
         // 设置主题
         setTheme(R.style.Theme_TinaIDE)
         super.onCreate(savedInstanceState)
+
+        _binding = inflateBinding(layoutInflater)
+        setContentView(binding.root)
 
         // 设置沉浸式状态栏
         setupImmersionBar()
@@ -45,6 +59,11 @@ abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
      */
     override fun setContentView(layoutResID: Int) {
         super.setContentView(layoutResID)
+        setupFitsSystemWindows()
+    }
+
+    override fun setContentView(view: View?) {
+        super.setContentView(view)
         setupFitsSystemWindows()
     }
 
@@ -181,6 +200,7 @@ abstract class BaseActivity : AppCompatActivity(), CoroutineScope {
         coroutineContext.cancelChildren()
         // 隐藏加载框
         hideLoading()
+        _binding = null
         Logger.d("${this::class.simpleName} destroyed", tag = "Lifecycle")
     }
 }

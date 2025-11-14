@@ -1,10 +1,9 @@
 package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import androidx.fragment.app.Fragment
+import com.wuxianggujun.tinaide.base.BaseBindingFragment
+import com.wuxianggujun.tinaide.databinding.FragmentEditorContainerBinding
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
@@ -25,7 +24,9 @@ import java.io.File
  * 编辑器容器 Fragment
  * 包含多标签页功能
  */
-class EditorContainerFragment : Fragment() {
+class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBinding>(
+    FragmentEditorContainerBinding::inflate
+) {
 
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
@@ -38,20 +39,12 @@ class EditorContainerFragment : Fragment() {
         ServiceLocator.get<IEditorManager>()
     }
     
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_editor_container, container, false)
-    }
-    
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        tabLayout = view.findViewById(R.id.tab_layout)
-        viewPager = view.findViewById(R.id.view_pager)
-        editorToolbar = view.findViewById(R.id.editor_toolbar)
+        tabLayout = binding.tabLayout
+        viewPager = binding.viewPager
+        editorToolbar = binding.editorToolbar
         // emptyView 不在这里初始化，延迟到需要时再加载
 
         setupViewPager()
@@ -60,23 +53,23 @@ class EditorContainerFragment : Fragment() {
     }
     
     private fun setupEditorToolbar() {
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_undo)?.setOnClickListener {
+        binding.btnUndo.setOnClickListener {
             getCurrentEditorFragment()?.undo()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_redo)?.setOnClickListener {
+        binding.btnRedo.setOnClickListener {
             getCurrentEditorFragment()?.redo()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_find)?.setOnClickListener {
+        binding.btnFind.setOnClickListener {
             showFindDialog()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_goto_line)?.setOnClickListener {
+        binding.btnGotoLine.setOnClickListener {
             showGotoLineDialog()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_save)?.setOnClickListener {
+        binding.btnSave.setOnClickListener {
             saveCurrentFile()
         }
     }
@@ -152,8 +145,7 @@ class EditorContainerFragment : Fragment() {
         // 懒加载空状态视图
         if (!hasFiles) {
             if (emptyView == null) {
-                val stub = view?.findViewById<android.view.ViewStub>(R.id.empty_stub)
-                emptyView = stub?.inflate()
+                emptyView = binding.emptyStub.inflate()
             }
             emptyView?.visibility = View.VISIBLE
         } else {

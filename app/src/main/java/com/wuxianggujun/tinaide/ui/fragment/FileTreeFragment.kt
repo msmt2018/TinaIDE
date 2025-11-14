@@ -1,13 +1,12 @@
 package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
-import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.wuxianggujun.tinaide.base.BaseBindingFragment
+import com.wuxianggujun.tinaide.databinding.FragmentFileTreeBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,7 +25,9 @@ import java.io.File
  * 文件树 Fragment
  * 显示项目文件结构
  */
-class FileTreeFragment : Fragment() {
+class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
+    FragmentFileTreeBinding::inflate
+) {
     private lateinit var treeViewContainer: FrameLayout
     private lateinit var emptyView: TextView
     private var treeView: TreeView<File>? = null
@@ -35,19 +36,11 @@ class FileTreeFragment : Fragment() {
         ServiceLocator.get(IFileManager::class.java)
     } catch (_: IllegalStateException) { null }
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_file_tree, container, false)
-    }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        treeViewContainer = view.findViewById(R.id.file_tree_recycler)
-        emptyView = view.findViewById(R.id.empty_view)
+        treeViewContainer = binding.fileTreeRecycler
+        emptyView = binding.emptyView
 
         // 推迟到首帧后加载，避免进入页面首帧阻塞导致黑屏
         view.post { loadProject() }

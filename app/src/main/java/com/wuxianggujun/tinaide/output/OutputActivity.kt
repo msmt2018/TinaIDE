@@ -5,6 +5,7 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.widget.Toolbar
 import com.wuxianggujun.tinaide.base.BaseActivity
+import com.wuxianggujun.tinaide.databinding.ActivityOutputBinding
 import io.github.rosemoe.sora.widget.CodeEditor
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.core.ServiceLocator
@@ -19,20 +20,19 @@ import io.github.rosemoe.sora.lang.EmptyLanguage
  * - 高性能
  * - 滚动流畅
  */
-class OutputActivity : BaseActivity(), IOutputManager.OutputListener {
+class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding::inflate), IOutputManager.OutputListener {
     
     private lateinit var outputEditor: CodeEditor
     private lateinit var outputManager: IOutputManager
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)  // BaseActivity 已处理主题和状态栏
-        setContentView(R.layout.activity_output)
         
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        val toolbar = binding.toolbar
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         
-        outputEditor = findViewById(R.id.output_editor)
+        outputEditor = binding.outputEditor
         setupEditor()
         
         // 获取输出管理器

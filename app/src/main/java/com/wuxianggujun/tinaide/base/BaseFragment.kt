@@ -31,14 +31,14 @@ abstract class BaseFragment : Fragment(), CoroutineScope {
      * 显示加载对话框（委托给 Activity）
      */
     fun showLoading(message: String = "加载中...", cancelable: Boolean = false) {
-        (activity as? BaseActivity)?.showLoading(message, cancelable)
+        (activity as? BaseActivity<*>)?.showLoading(message, cancelable)
     }
     
     /**
      * 隐藏加载对话框（委托给 Activity）
      */
     fun hideLoading() {
-        (activity as? BaseActivity)?.hideLoading()
+        (activity as? BaseActivity<*>)?.hideLoading()
     }
     
     /**
@@ -82,7 +82,7 @@ abstract class BaseFragment : Fragment(), CoroutineScope {
     protected open fun handleDefaultError(error: Throwable) {
         hideLoading()
         activity?.let { act ->
-            (act as? BaseActivity)?.handleDefaultError(error)
+            (act as? BaseActivity<*>)?.handleDefaultError(error)
         }
     }
     

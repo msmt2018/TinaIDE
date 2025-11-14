@@ -14,6 +14,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.wuxianggujun.tinaide.base.BaseActivity
+import com.wuxianggujun.tinaide.databinding.ActivityMainBinding
+import com.wuxianggujun.tinaide.databinding.IncludeFileTreeHeaderBinding
 import com.wuxianggujun.tinaide.extensions.toast
 import com.wuxianggujun.tinaide.extensions.toastSuccess
 import com.wuxianggujun.tinaide.extensions.toastError
@@ -42,7 +44,7 @@ import com.wuxianggujun.tinaide.ui.IUIManager
 import com.wuxianggujun.tinaide.ui.UIManager
 import com.wuxianggujun.tinaide.output.IOutputManager
 import com.wuxianggujun.tinaide.output.OutputManager
-class MainActivity : BaseActivity() {
+class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::inflate) {
 
     // 用于在 ServiceLocator 中隔离与本 Activity 绑定的服务
     private val serviceScope = "MainActivity_${hashCode()}"
@@ -53,18 +55,20 @@ class MainActivity : BaseActivity() {
     private lateinit var outputManager: IOutputManager
     private lateinit var compilerViewModel: CompilerViewModel
 
+    private var navHeaderBinding: IncludeFileTreeHeaderBinding? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)  // BaseActivity 已处理主题和沉浸式状态栏
 
-        setContentView(R.layout.activity_main)
-
         // Adjust drawer/header for status bar insets to prevent overlap (NavigationView headerView)
         try {
-            val nav = findViewById<com.google.android.material.navigation.NavigationView>(R.id.nav_view)
+            val nav = binding.navView
             if (nav != null) {
                 val headerView = if (nav.headerCount > 0) nav.getHeaderView(0) else null
-                val headerRoot = headerView?.findViewById<android.view.View>(R.id.drawer_header_root) ?: headerView
-                if (headerRoot != null) {
+                if (headerView != null) {
+                    val headerBinding = IncludeFileTreeHeaderBinding.bind(headerView)
+                    navHeaderBinding = headerBinding
+                    val headerRoot = headerBinding.root
                     androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(headerRoot) { v, insets ->
                         val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
                         v.setPadding(v.paddingLeft, status.top, v.paddingRight, v.paddingBottom)
@@ -113,7 +117,7 @@ class MainActivity : BaseActivity() {
             }
         }
 
-        toolbar = findViewById(R.id.toolbar)
+        toolbar = binding.toolbar
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setHomeAsUpIndicator(android.R.drawable.ic_menu_sort_by_size)
@@ -124,7 +128,7 @@ class MainActivity : BaseActivity() {
             onOptionsItemSelected(item)
         }
 
-        drawerLayout = findViewById(R.id.drawer_layout)
+        drawerLayout = binding.drawerLayout
         setupFileTreeHeader()
 
         uiManager.restoreLayoutState()
@@ -173,26 +177,26 @@ class MainActivity : BaseActivity() {
         updateProjectHeaderName()
     }
     private fun setupFileTreeHeader() {
-        findViewById<ImageButton>(R.id.btn_add_file)?.setOnClickListener {
+        val header = navHeaderBinding ?: return
+        header.btnAddFile.setOnClickListener {
             showAddFileDialog()
         }
-        findViewById<ImageButton>(R.id.btn_refresh_file_tree)?.setOnClickListener {
+        header.btnRefreshFileTree.setOnClickListener {
             refreshFileTree()
         }
-        findViewById<ImageButton>(R.id.btn_view_mode)?.setOnClickListener {
+        header.btnViewMode.setOnClickListener {
             toastInfo("查看功能开发中")
         }
         updateProjectHeaderName()
     }
 
     private fun updateProjectHeaderName() {
-        val nav = findViewById<com.google.android.material.navigation.NavigationView>(R.id.nav_view)
-        val headerView = nav?.let { if (it.headerCount > 0) it.getHeaderView(0) else null }
-        val nameView = headerView?.findViewById<TextView>(R.id.tv_project_name)
-        if (nameView == null) {
-            android.util.Log.e("MainActivity", "tv_project_name not found in nav header!")
+        val header = navHeaderBinding
+        if (header == null) {
+            android.util.Log.e("MainActivity", "Nav header binding is null!")
             return
         }
+        val nameView = header.tvProjectName
         val fm = ServiceLocator.get<IFileManager>()
         val project = fm.getCurrentProject()
         val projectName = project?.name ?: "未打开项目"
@@ -200,6 +204,7 @@ class MainActivity : BaseActivity() {
         nameView.visibility = View.VISIBLE
         android.util.Log.d("MainActivity", "Project name updated to: $projectName")
     }
+
     private fun showAddFileDialog() {
         val fm = ServiceLocator.get<IFileManager>()
         val project = fm.getCurrentProject()
@@ -258,7 +263,7 @@ class MainActivity : BaseActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
-                drawerLayout.openDrawer(findViewById(R.id.nav_view))
+                drawerLayout.openDrawer(binding.navView)
                 true
             }
             R.id.action_open_project -> {

@@ -17,6 +17,7 @@ import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import com.wuxianggujun.tinaide.base.BaseActivity
+import com.wuxianggujun.tinaide.databinding.ProjectManagerFragmentBinding
 import com.wuxianggujun.tinaide.extensions.*
 import com.wuxianggujun.tinaide.utils.Logger
 import com.wuxianggujun.tinaide.R
@@ -36,7 +37,7 @@ import android.provider.DocumentsContract
 /**
  * 项目管理页：菜单栏 + 项目列表
  */
-class ProjectManagerActivity : BaseActivity() {
+class ProjectManagerActivity : BaseActivity<ProjectManagerFragmentBinding>(ProjectManagerFragmentBinding::inflate) {
 
     private lateinit var recycler: RecyclerView
     private lateinit var adapter: ProjectListAdapter
@@ -44,15 +45,13 @@ class ProjectManagerActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)  // BaseActivity 已处理主题和状态栏
-        // 使用新的主界面布局（project_manager_fragment 风格）
-        setContentView(R.layout.project_manager_fragment)
 
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        val toolbar = binding.toolbar
         setSupportActionBar(toolbar)
 
         initializeServices()
 
-        recycler = findViewById(R.id.projects_recycler)
+        recycler = binding.projectsRecycler
         recycler.layoutManager = LinearLayoutManager(this)
         adapter = ProjectListAdapter { dir ->
             openProject(dir)
@@ -60,14 +59,14 @@ class ProjectManagerActivity : BaseActivity() {
         recycler.adapter = adapter
 
         // 设置下拉刷新：下拉即重新加载项目列表
-        val swipeRefresh = findViewById<SwipeRefreshLayout>(R.id.scrolling_view)
-        swipeRefresh?.setOnRefreshListener {
+        val swipeRefresh = binding.scrollingView
+        swipeRefresh.setOnRefreshListener {
             reloadProjects()
             swipeRefresh.isRefreshing = false
         }
 
         // 设置 FAB 新建项目入口
-        findViewById<ExtendedFloatingActionButton>(R.id.create_project_fab)?.setOnClickListener {
+        binding.createProjectFab.setOnClickListener {
             showProjectDialog(ProjectDialog.Mode.NEW_PROJECT)
         }
 
@@ -127,18 +126,18 @@ class ProjectManagerActivity : BaseActivity() {
         adapter.submitList(dirs)
 
         // 使用 Material Design 风格的空态视图，而不是旧的 tv_empty 文本
-        val emptyProjects = findViewById<View>(R.id.empty_projects)
-        val loadingContainer = findViewById<View>(R.id.empty_container)
+        val emptyProjects = binding.emptyProjects.root
+        val loadingContainer = binding.emptyContainer.root
 
         // 主动隐藏 loading 容器，避免与空态文案叠加
-        loadingContainer?.visibility = View.GONE
+        loadingContainer.visibility = View.GONE
 
         if (dirs.isEmpty()) {
             recycler.visibility = View.GONE
-            emptyProjects?.visibility = View.VISIBLE
+            emptyProjects.visibility = View.VISIBLE
         } else {
             recycler.visibility = View.VISIBLE
-            emptyProjects?.visibility = View.GONE
+            emptyProjects.visibility = View.GONE
         }
     }
 
