@@ -2,44 +2,46 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- 根设置列表：参照 CodeAssist，使用纯文本项 + fragment 跳转 -->
+
     <!-- 编辑器设置 -->
-    <PreferenceScreen
+    <Preference
         android:key="editor"
         android:title="编辑器"
         android:summary="字体、Tab、换行等编辑器行为"
-        android:icon="@drawable/outline_edit_note_24"
-        app:fragment="com.wuxianggujun.tinaide.settings.EditorPreferenceFragment" />
+        app:fragment="com.wuxianggujun.tinaide.settings.EditorPreferenceFragment"
+        app:iconSpaceReserved="false" />
 
     <!-- 编译器设置 -->
-    <PreferenceScreen
+    <Preference
         android:key="compiler"
         android:title="编译器"
         android:summary="优化级别、目标架构等"
-        android:icon="@drawable/outline_build_24"
-        app:fragment="com.wuxianggujun.tinaide.settings.CompilerPreferenceFragment" />
+        app:fragment="com.wuxianggujun.tinaide.settings.CompilerPreferenceFragment"
+        app:iconSpaceReserved="false" />
 
     <!-- 项目设置 -->
-    <PreferenceScreen
+    <Preference
         android:key="project"
         android:title="项目"
         android:summary="默认项目路径、自动保存等"
-        android:icon="@drawable/baseline_mode_edit_24"
-        app:fragment="com.wuxianggujun.tinaide.settings.ProjectPreferenceFragment" />
+        app:fragment="com.wuxianggujun.tinaide.settings.ProjectPreferenceFragment"
+        app:iconSpaceReserved="false" />
 
     <!-- 外观设置 -->
-    <PreferenceScreen
+    <Preference
         android:key="appearance"
         android:title="外观"
         android:summary="应用主题、沉浸式状态栏"
-        android:icon="@drawable/baseline_color_lens_24"
-        app:fragment="com.wuxianggujun.tinaide.settings.AppearancePreferenceFragment" />
+        app:fragment="com.wuxianggujun.tinaide.settings.AppearancePreferenceFragment"
+        app:iconSpaceReserved="false" />
 
     <!-- 关于 -->
-    <PreferenceScreen
+    <Preference
         android:key="about"
         android:title="关于"
         android:summary="版本信息、GitHub、开源许可"
-        android:icon="@drawable/round_info_outline_24"
-        app:fragment="com.wuxianggujun.tinaide.settings.AboutPreferenceFragment" />
+        app:fragment="com.wuxianggujun.tinaide.settings.AboutPreferenceFragment"
+        app:iconSpaceReserved="false" />
 
 </PreferenceScreen>

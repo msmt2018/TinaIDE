@@ -19,14 +19,9 @@ class AboutPreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.about_preferences, rootKey)
 
+        Logger.i("AboutPreferenceFragment onCreatePreferences", tag = "Settings")
         setupVersionPreference()
         setupLicensesPreference()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Logger.i("AboutPreferenceFragment onResume, activity=$activity", tag = "Settings")
-        (activity as? SettingsActivity)?.updateTitle("关于")
     }
 
     private fun setupVersionPreference() {

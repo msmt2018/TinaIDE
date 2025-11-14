@@ -25,16 +25,11 @@ class CompilerPreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.compiler_preferences, rootKey)
 
+        Logger.i("CompilerPreferenceFragment onCreatePreferences", tag = "Settings")
         setupOptimizationPreference()
         setupTargetArchPreference()
         setupThreadsPreference()
         setupDebugSymbolsPreference()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Logger.i("CompilerPreferenceFragment onResume, activity=$activity", tag = "Settings")
-        (activity as? SettingsActivity)?.updateTitle("编译器")
     }
 
     private fun setupOptimizationPreference() {

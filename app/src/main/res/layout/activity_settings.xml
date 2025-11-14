@@ -16,10 +16,8 @@
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
-            style="?attr/toolBarStyle"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:titleCentered="true"
             app:titleTextColor="@color/dark_on_surface"
             app:subtitleTextColor="@color/dark_on_surface"
             app:navigationIconTint="@color/dark_on_primary" />
