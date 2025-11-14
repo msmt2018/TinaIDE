@@ -27,14 +27,9 @@ class AppearancePreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.appearance_preferences, rootKey)
 
+        Logger.i("AppearancePreferenceFragment onCreatePreferences", tag = "Settings")
         setupThemePreference()
         setupStatusBarPreference()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Logger.i("AppearancePreferenceFragment onResume, activity=$activity", tag = "Settings")
-        (activity as? SettingsActivity)?.updateTitle("外观")
     }
 
     private fun setupThemePreference() {

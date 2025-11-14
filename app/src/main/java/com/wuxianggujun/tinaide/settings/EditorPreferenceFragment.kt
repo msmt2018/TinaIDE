@@ -20,18 +20,12 @@ class EditorPreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.editor_preferences, rootKey)
 
+        Logger.i("EditorPreferenceFragment onCreatePreferences", tag = "Settings")
         setupFontSizePreference()
         setupLineNumbersPreference()
         setupAutoIndentPreference()
         setupTabSizePreference()
         setupWordWrapPreference()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // 更新设置页 Toolbar 标题为当前分组名称
-        Logger.i("EditorPreferenceFragment onResume, activity=$activity", tag = "Settings")
-        (activity as? SettingsActivity)?.updateTitle("编辑器")
     }
 
     private fun setupFontSizePreference() {

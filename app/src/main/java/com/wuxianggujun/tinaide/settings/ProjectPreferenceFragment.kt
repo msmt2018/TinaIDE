@@ -26,15 +26,10 @@ class ProjectPreferenceFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.project_preferences, rootKey)
 
+        Logger.i("ProjectPreferenceFragment onCreatePreferences", tag = "Settings")
         setupDefaultPathPreference()
         setupAutoSavePreference()
         setupBackupPreference()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Logger.i("ProjectPreferenceFragment onResume, activity=$activity", tag = "Settings")
-        (activity as? SettingsActivity)?.updateTitle("项目")
     }
 
     private fun setupDefaultPathPreference() {
