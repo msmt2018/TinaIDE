@@ -29,22 +29,84 @@ Ninja 不是一个编译器，而是一个**构建系统**：
 - **使用 `posix_spawn` 启动子进程**（clang、ld 等）
 - 管理并行构建
 
-### 2. Android 的限制
+### 2. Android 的限制（更准确的理解）
 
-**SELinux 阻止应用启动子进程**：
+**不是"完全不能启动子进程"，而是有复杂的限制**：
+
+Android 对 `exec()` / `posix_spawn()` 的限制包括：
+
+1. **文件系统挂载参数**
+   ```bash
+   /data 分区可能被挂载为 noexec
+   → 该分区的文件无法执行
+   ```
+
+2. **SELinux 策略**
+   ```
+   avc: denied { execute_no_trans } for path="/data/data/.../clang"
+   → SELinux 拒绝执行该路径的文件
+   ```
+
+3. **W^X 内存保护**
+   - 新版 Android 的安全特性
+   - 限制从 data 分区执行代码
+
+4. **文件权限和上下文**
+   - 即使有 `chmod +x`，也可能因上下文标签被拒绝
+
+**为什么 Termux 能跑？**
+- 使用了 proot/chroot 等技巧
+- 或者在特殊的可执行分区
+- 或者有特殊的 SELinux 上下文
+
+**我们的情况：**
 ```
-avc: denied { execute_no_trans } for path="/data/data/.../clang"
+工具链位置：/data/data/com.wuxianggujun.tinaide/files/sysroot/usr/bin/
+           ↓
+很可能遇到：
+- noexec 挂载参数 ❌
+- SELinux execute_no_trans 拒绝 ❌
+- W^X 限制 ❌
 ```
 
-即使我们把编译器放在 `files/sysroot/usr/bin/`，也无法通过 `exec()` 或 `posix_spawn()` 执行。
+### 3. 为什么崩溃（两层问题）
 
-### 3. 为什么崩溃
+**层面 1：posix_spawn 失败**
+```
+Ninja → posix_spawn("/data/data/.../clang", ...)
+         ↓
+Android 限制（noexec / SELinux / W^X）
+         ↓
+posix_spawn() 返回错误（EACCES / ETXTBSY）
+```
 
-1. Ninja 调用 `posix_spawn()` 尝试启动 clang
-2. SELinux 拒绝执行
-3. `posix_spawn()` 失败但 Ninja 的错误处理不完善
-4. 多线程状态混乱，互斥锁被破坏
-5. 后续访问互斥锁时崩溃
+**层面 2：错误处理 Bug**
+```
+posix_spawn() 失败
+    ↓
+Ninja 的错误处理路径有 bug
+    ↓
+某个 pthread_mutex_t 被提前销毁
+    ↓
+但 HWUI 渲染线程还在访问这个 mutex
+    ↓
+FORTIFY 检测到 → pthread_mutex_lock on destroyed mutex
+    ↓
+SIGABRT → 进程崩溃
+```
+
+**崩溃堆栈证据：**
+```
+#02 posix_spawn+95          ← 这里失败
+#05 Subprocess::Start+371   ← Ninja 尝试启动子进程
+...
+FORTIFY: pthread_mutex_lock called on a destroyed mutex
+Fatal signal 6 (SIGABRT)
+```
+
+所以：
+- **架构问题**：Ninja 依赖 exec，但 Android 限制了 exec
+- **实现问题**：失败路径的并发处理有 bug，导致 mutex 生命周期错误
 
 ## 为什么 JNI 包装器不可行
 
@@ -176,7 +238,50 @@ class NinjaExecutor {
 - ❌ Ninja JNI 不可行（SELinux 限制）
 - ⏳ 需要实现构建管理层
 
+## 调试步骤（验证问题）
+
+### 1. 测试工具链是否可执行
+
+使用 `ExecutableTest.kt`：
+```kotlin
+ExecutableTest.testExecutable(context)
+```
+
+查看 logcat：
+```
+如果看到 "Permission denied" → SELinux 或 noexec 限制
+如果看到 "Text file busy" → W^X 限制
+如果看到 "No such file" → 依赖缺失
+```
+
+### 2. 检查挂载参数
+
+```bash
+adb shell cat /proc/mounts | grep /data
+```
+
+如果看到 `noexec`，说明 data 分区不允许执行。
+
+### 3. 检查 SELinux 日志
+
+```bash
+adb logcat | grep avc
+```
+
+查找 `denied { execute_no_trans }` 相关的日志。
+
+### 4. Native 层测试
+
+使用 `exec_test.cpp` 中的 `testNativeExec`：
+- 测试 `access(X_OK)`
+- 测试 `fork() + execve()`
+- 测试 `posix_spawn()`
+
+查看哪一步失败，以及具体的 errno。
+
 ## 下一步
+
+### 如果确认是 exec 限制
 
 1. **移除 Ninja JNI 相关代码**
    - 保留 libninja_runner.so（可能未来有用）
