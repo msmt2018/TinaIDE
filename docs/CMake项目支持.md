@@ -1,5 +1,11 @@
 # CMake 项目支持
 
+> **重要提示**: 由于 Android 10+ 的 SELinux 限制，应用沙箱内无法执行普通的可执行文件。
+> 所有构建工具（CMake、Ninja）必须编译成共享库（.so）并通过 JNI 调用。
+> 详见：[Android-SELinux-限制说明.md](./Android-SELinux-限制说明.md)
+
+# CMake 项目支持
+
 ## 概述
 
 TinaIDE 现在支持编译 CMake 项目！系统会自动检测项目根目录下的 `CMakeLists.txt` 文件，并使用 sysroot 中预编译的 CMake 和 Ninja 工具进行构建。

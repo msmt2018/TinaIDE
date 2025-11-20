@@ -1,5 +1,13 @@
 # Android SELinux 权限问题解决方案
 
+> **⚠️ 重要更新**: 经过实际测试，在 Android 10+ (API 29+) 上，**shell 包装器方案也无法工作**。
+> 
+> **唯一可行方案**: 必须使用 JNI 包装器（.so 文件）。详见：[Android-SELinux-限制说明.md](./Android-SELinux-限制说明.md)
+
+---
+
+# Android SELinux 权限问题解决方案（已废弃）
+
 ## 问题描述
 
 在 Android 应用中直接执行应用私有目录中的二进制文件时，会遇到 SELinux 权限拒绝：
@@ -59,19 +67,23 @@ external fun runNinja(args: Array<String>): Int
 - ✅ `libninja_runner.so` 已存在
 - ❌ `libcmake_runner.so` 不存在（需要构建）
 
-### 方案 2: Shell 包装器 ⭐⭐⭐⭐（当前采用）
+### 方案 2: Shell 包装器 ❌（已废弃 - 不可行）
 
 **原理**: 创建 shell 脚本，使用 `/system/bin/sh` 执行二进制文件
 
-**优点**:
-- ✅ 实现简单
-- ✅ 不需要修改工具源码
-- ✅ 适用于任何可执行文件
-- ✅ `/system/bin/sh` 有执行权限
+**为什么不可行**:
+- ❌ Android 10+ 的 SELinux 策略会检查最终执行的文件
+- ❌ 即使通过 shell 包装，`exec` 调用仍然会被拒绝
+- ❌ 错误信息：`execve() failed: Permission denied`
 
-**缺点**:
-- ⚠️ 依赖系统 shell
-- ⚠️ 可能在某些定制 ROM 上失败
+**原本的优点**（理论上）:
+- 实现简单
+- 不需要修改工具源码
+- 适用于任何可执行文件
+
+**实际测试结果**:
+- ❌ 在 Android 10+ 上完全失败
+- ❌ SELinux 会拦截 `exec` 系统调用
 
 **实现**:
 ```kotlin
@@ -325,18 +337,25 @@ adb logcat | grep avc
 
 ## 总结
 
-通过使用 **shell 包装器**方案，我们成功绕过了 Android SELinux 的限制，实现了：
+### ❌ Shell 包装器方案已废弃
 
-1. ✅ 在应用中执行 cmake 和 ninja
-2. ✅ 无需修改工具源码
-3. ✅ 实现简单，维护成本低
-4. ✅ 性能影响可忽略
-5. ✅ 兼容性好
+经过实际测试，**shell 包装器方案在 Android 10+ 上不可行**：
 
-这是一个实用且优雅的解决方案，适合当前项目的需求和约束。
+1. ❌ SELinux 会检查最终执行的文件
+2. ❌ `exec` 系统调用会被拒绝
+3. ❌ 无法绕过 SELinux 策略
+
+### ✅ 唯一可行方案：JNI 包装器
+
+必须将工具编译成共享库（.so）并通过 JNI 调用：
+
+1. ✅ Ninja - 已实现 `libninja_runner.so`
+2. 🚧 CMake - 需要实现 `libcmake_runner.so`（构建复杂）
+
+详见：[Android-SELinux-限制说明.md](./Android-SELinux-限制说明.md)
 
 ---
 
 **更新时间**: 2025-11-19  
-**状态**: ✅ 已实现并测试  
-**提交**: 7fd64a2
+**状态**: ❌ 已废弃（方案不可行）  
+**替代方案**: JNI 包装器
