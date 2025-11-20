@@ -80,32 +80,89 @@ if [ "${BUILD_NINJA_SO}" = "True" ] || [ "${BUILD_NINJA_SO}" = "true" ] || [ "${
   NDK_CLANGXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/${TRIPLE}${API_LEVEL}-clang++"
   mkdir -p /work/build/tools/ninja-runner
   cat > /work/build/tools/ninja-runner/ninja_runner.cpp <<'EOF'
+#include <jni.h>
 #include <android/log.h>
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
+#include <vector>
+
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "NinjaRunner", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "NinjaRunner", __VA_ARGS__)
 
 extern "C" int main(int, char**);
-extern "C" int ninja_run(int argc, char** argv) { return main(argc, argv); }
 
-// Provide implementation for browse functionality
+// Provide C++ stub for browse functionality (matching browse.h signature)
 // On Android, we don't have Python, so we provide a minimal implementation
-// that logs a message and returns an error
+// that logs a message and exits with error
 struct State;
-extern "C" int RunBrowsePython(State* state, const char* ninja_command,
-                               const char* input_file, int argc, char** argv) {
+void RunBrowsePython(State* state, const char* ninja_command,
+                     const char* input_file, int argc, char* argv[]) {
   __android_log_print(ANDROID_LOG_WARN, "NinjaRunner", 
     "Browse mode is not supported on Android (no Python runtime)");
   __android_log_print(ANDROID_LOG_INFO, "NinjaRunner",
     "To view build graph, use ninja -t graph or ninja -t targets");
-  return 1;
+  // Original function does not return on success, so we exit with error
+  std::exit(1);
+}
+
+// JNI wrapper for running Ninja
+extern "C" JNIEXPORT jint JNICALL
+Java_com_wuxianggujun_tinaide_core_nativebridge_NinjaRunner_runNinja(
+    JNIEnv* env, jobject /* this */, jstring jWorkingDir, jobjectArray jArgs) {
+  
+  // Get working directory
+  const char* workingDir = env->GetStringUTFChars(jWorkingDir, nullptr);
+  if (!workingDir) {
+    LOGE("Failed to get working directory");
+    return -1;
+  }
+  
+  // Change to working directory
+  if (chdir(workingDir) != 0) {
+    LOGE("Failed to change directory to: %s", workingDir);
+    env->ReleaseStringUTFChars(jWorkingDir, workingDir);
+    return -1;
+  }
+  env->ReleaseStringUTFChars(jWorkingDir, workingDir);
+  
+  // Convert Java string array to C argv
+  jsize argc = env->GetArrayLength(jArgs);
+  std::vector<char*> argv(argc + 1);  // +1 for NULL terminator
+  std::vector<std::string> argStrings(argc);
+  
+  for (jsize i = 0; i < argc; i++) {
+    jstring jArg = (jstring)env->GetObjectArrayElement(jArgs, i);
+    const char* arg = env->GetStringUTFChars(jArg, nullptr);
+    argStrings[i] = arg;
+    argv[i] = const_cast<char*>(argStrings[i].c_str());
+    env->ReleaseStringUTFChars(jArg, arg);
+    env->DeleteLocalRef(jArg);
+  }
+  argv[argc] = nullptr;
+  
+  LOGI("Calling ninja main with %d arguments", argc);
+  
+  // Call ninja's main function
+  int result = main(argc, argv.data());
+  
+  LOGI("Ninja returned: %d", result);
+  return result;
 }
 EOF
-  # Collect ALL object files from the ninja target (including browse.cc.o)
-  # We provide RunBrowsePython implementation above, so no missing symbols
+  # Collect ALL object files from the ninja target EXCEPT browse.cc.o
+  # browse.cc requires Python runtime which we don't have on Android
+  # We provide a C++ stub implementation below to satisfy any references
   ninja_objs_core=$(find /work/build/tools/ninja-${ABI}-api${API_LEVEL}/CMakeFiles/libninja.dir -name '*.o' | xargs echo)
   ninja_objs_re2c=$(find /work/build/tools/ninja-${ABI}-api${API_LEVEL}/CMakeFiles/libninja-re2c.dir -name '*.o' | xargs echo)
-  ninja_main_obj=$(find /work/build/tools/ninja-${ABI}-api${API_LEVEL}/CMakeFiles/ninja.dir -name 'ninja.cc.o' | head -n1)
-  if [ -n "${ninja_main_obj}" ]; then ninja_objs_main=${ninja_main_obj}; else ninja_objs_main=""; fi
-  if [ -n "${ninja_objs_core}" ] || [ -n "${ninja_objs_re2c}" ]; then ninja_objs="${ninja_objs_core} ${ninja_objs_re2c} ${ninja_objs_main}"; else ninja_objs=""; fi
-  echo "[i] Including all Ninja objects with RunBrowsePython stub implementation"
+  # Collect all ninja.dir objects EXCEPT browse.cc.o
+  ninja_objs_main=$(find /work/build/tools/ninja-${ABI}-api${API_LEVEL}/CMakeFiles/ninja.dir -name '*.o' ! -name 'browse.cc.o' | xargs echo)
+  if [ -n "${ninja_objs_core}" ] || [ -n "${ninja_objs_re2c}" ] || [ -n "${ninja_objs_main}" ]; then 
+    ninja_objs="${ninja_objs_core} ${ninja_objs_re2c} ${ninja_objs_main}"
+  else 
+    ninja_objs=""
+  fi
+  echo "[i] Excluding browse.cc.o and providing C++ stub for RunBrowsePython"
   if [ -n "${ninja_objs}" ] && [ -x "${NDK_CLANGXX}" ]; then
     ${NDK_CLANGXX} -shared -fPIC -Wl,-z,now -Wl,-z,relro \
       -o /hostout/${ABI}/tools/bin/libninja_runner.so \
@@ -116,6 +173,11 @@ EOF
   fi
 fi
 
+echo "[i] Ninja build complete. CMake build is disabled in this script."
+echo "[i] To build CMake, use: pwsh docker/llvm-build/build-cmake-so-only.ps1"
+
+# ===== CMake build disabled - use build-cmake-so-only.ps1 instead =====
+if false; then
 # Build CMake (minimal) for Android
 if [ ! -d /work/src/cmake/.git ]; then
   # Use the tag from host env (injected by outer script via env) or fallback
@@ -270,20 +332,56 @@ if [ "${BUILD_CMAKE_SO}" = "True" ] || [ "${BUILD_CMAKE_SO}" = "true" ] || [ "${
     x86_64)    TRIPLE=x86_64-linux-android;;
   esac
   NDK_CLANGXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/${TRIPLE}${API_LEVEL}-clang++"
+  
+  echo "[i] Building PIC version of CMake for libcmake_runner.so..."
+  
+  # 构建一个单独的 PIC 版本的 CMake（用于生成 .so）
+  # 注意：这会创建一个新的构建目录，避免与普通版本冲突
+  cmake -S /work/src/cmake -B /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -G Ninja \
+    -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME} \
+    -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
+    -DCMAKE_ANDROID_ARCH_ABI=${ABI} -DCMAKE_ANDROID_API=${API_LEVEL} \
+    -DANDROID_ABI=${ABI} -DANDROID_PLATFORM=android-${API_LEVEL} \
+    -DCMAKE_BUILD_TYPE=MinSizeRel \
+    -DBUILD_TESTING=OFF -DBUILD_CursesDialog=OFF \
+    -DCMAKE_USE_OPENSSL=OFF -DCMAKE_USE_SYSTEM_CURL=OFF \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DCMAKE_C_FLAGS="-fPIC -D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" \
+    -DCMAKE_CXX_FLAGS="-fPIC -D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" 2>&1 | tail -20
+  
+  # 只构建 CMakeLib 和 cmake 目标（不需要完整构建）
+  ninja -C /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -j$(nproc) CMakeLib 2>&1 | tail -20
+  
+  # 收集 PIC 对象文件
   mkdir -p /work/build/tools/cmake-runner
   cat > /work/build/tools/cmake-runner/cmake_runner.cpp <<'EOF'
+#include <android/log.h>
+
 extern "C" int main(int, char**);
 extern "C" int cmake_run(int argc, char** argv) { return main(argc, argv); }
 EOF
-  cmake_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL} -path '*/Source/CMakeFiles/cmake.dir/*' -name '*.o' | xargs echo)
-  if [ -n "${cmake_objs}" ] && [ -x "${NDK_CLANGXX}" ]; then
+  
+  cmake_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -path '*/Source/CMakeFiles/cmake.dir/*' -name '*.o' | xargs echo)
+  cmake_lib_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -path '*/Source/CMakeFiles/CMakeLib.dir/*' -name '*.o' | xargs echo)
+  
+  if [ -n "${cmake_objs}" ] && [ -n "${cmake_lib_objs}" ]; then
+    echo "[i] Found CMake PIC objects, linking libcmake_runner.so..."
     ${NDK_CLANGXX} -shared -fPIC -Wl,-z,now -Wl,-z,relro \
       -o /hostout/${ABI}/tools/bin/libcmake_runner.so \
-      ${cmake_objs} /work/build/tools/cmake-runner/cmake_runner.cpp -llog -landroid || \
+      ${cmake_objs} ${cmake_lib_objs} /work/build/tools/cmake-runner/cmake_runner.cpp \
+      -llog -landroid -ldl -lm 2>&1 || \
       echo "[w] libcmake_runner.so link failed; continuing"
+    
+    if [ -f /hostout/${ABI}/tools/bin/libcmake_runner.so ]; then
+      echo "[i] Successfully built libcmake_runner.so"
+      ls -lh /hostout/${ABI}/tools/bin/libcmake_runner.so
+    fi
   else
-    echo "[w] Could not locate cmake objects or NDK clang++ for runner build; skipping"
+    echo "[w] Could not locate cmake PIC objects; skipping libcmake_runner.so build"
   fi
+fi
+# End of CMake build (disabled)
 fi
 '@
 

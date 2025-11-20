@@ -1,11 +1,30 @@
 # 正确的 CMake 项目构建流程
 
+## 核心问题：Android 高版本无法执行普通可执行文件
+
+### SELinux 限制
+
+在 Android 10+ (API 29+) 上，由于 SELinux 策略限制，应用沙箱内**无法直接执行**普通的可执行文件（如 `cmake`、`ninja`）：
+
+```
+execve() failed: Permission denied
+```
+
+即使使用 `sh -c` 包装也无法绕过这个限制。
+
+### 解决方案：JNI 包装器
+
+**唯一可行的方案**是将工具编译成 **共享库 (.so)**，然后通过 JNI 调用：
+
+1. ✅ **Ninja** - 已实现 `libninja_runner.so` + JNI 接口
+2. ⚠️ **CMake** - 需要实现 `libcmake_runner.so` + JNI 接口（构建复杂）
+
 ## 问题总结
 
 经过多次尝试，我们发现了问题的根本原因：
 
 1. ✅ **构建脚本支持生成 `.so` 运行器** - `build-tools.ps1` 可以构建 `libninja_runner.so` 和 `libcmake_runner.so`
-2. ❌ **但是没有运行工具构建脚本** - 只运行了 `build-local.ps1`（构建 LLVM/Clang），没有运行 `build-tools.ps1`（构建 CMake/Ninja）
+2. ⚠️ **CMake 的 so 构建很复杂** - CMake 依赖众多，需要特殊处理才能编译成 PIC 共享库
 3. ❌ **没有对应的 JNI 调用代码** - 即使有 `.so` 文件，也没有 Kotlin/Java 代码来调用它们
 
 ## 完整的构建流程
@@ -66,12 +85,17 @@ CMake 的 `.so` 构建是 **best-effort**（尽力而为），可能因为依赖
 
 ## 解决方案选择
 
-### 方案 A: 使用 JNI 包装器（推荐）⭐⭐⭐⭐⭐
+### ✅ 方案 A: 使用 JNI 包装器（唯一可行方案）⭐⭐⭐⭐⭐
+
+**为什么必须使用 JNI**:
+- Android 10+ 的 SELinux 策略**完全禁止**应用沙箱内执行可执行文件
+- `execve()` 和 `sh -c` 都会被拒绝
+- 只有通过 `System.loadLibrary()` 加载的 so 文件可以运行
 
 **优点**:
-- 完全绕过 SELinux 限制
-- 性能最好
-- 最安全
+- 完全绕过 SELinux 限制（唯一可行方案）
+- 性能最好（直接函数调用）
+- 最安全（在应用进程内运行）
 
 **步骤**:
 1. 运行 `build-tools.ps1` 构建 `.so` 文件
@@ -97,39 +121,47 @@ object CMakeRunner {
 }
 ```
 
-### 方案 B: 使用 sh -c 执行（当前方案）⭐⭐⭐
+### ❌ 方案 B: 使用 sh -c 执行（已废弃 - 不可行）
 
-**优点**:
-- 实现简单
-- 不需要额外构建
+**为什么不可行**:
+- Android 10+ SELinux 策略禁止应用执行任何可执行文件
+- 即使使用 `sh -c` 包装也会被拒绝
+- 错误信息：`execve() failed: Permission denied`
 
-**缺点**:
-- 仍然可能受 SELinux 限制
-- 性能略差
-
-**当前实现**:
+**已废弃的实现**:
 ```kotlin
+// ❌ 这在 Android 10+ 上不工作
 val pb = ProcessBuilder("/system/bin/sh", "-c", command)
 ```
 
-## 推荐的实施计划
+## 实施计划
 
-### 短期（立即）
-1. ✅ 使用 `sh -c` 方案测试是否能工作
-2. 如果成功，先发布这个版本
-3. 收集用户反馈和兼容性数据
+### ✅ 已完成：Ninja JNI 包装器
+1. ✅ 构建 `libninja_runner.so`
+2. ✅ 实现 JNI 接口（`NinjaRunner.kt`）
+3. ✅ 集成到编译流程
 
-### 中期（1-2周）
-1. 运行 `build-tools.ps1` 构建 `.so` 文件
-2. 实现 JNI 包装器代码
-3. 添加配置选项：允许用户选择执行方式
-   - 优先使用 JNI（如果可用）
-   - 回退到 sh -c
+### 🚧 进行中：CMake JNI 包装器
 
-### 长期（1-2月）
-1. 完全迁移到 JNI 方案
-2. 移除 sh -c 依赖
-3. 优化性能和错误处理
+#### 挑战
+CMake 的 so 构建比 Ninja 复杂得多：
+- CMake 有大量依赖（libuv, libarchive, curl, nghttp2 等）
+- 默认构建不使用 `-fPIC`，无法链接成共享库
+- 需要重新配置和构建 PIC 版本
+
+#### 临时方案
+由于 CMake 的 so 构建复杂，可以考虑：
+1. **使用 Ninja 直接构建**（跳过 CMake 配置步骤）
+   - 用户手动提供 `build.ninja` 文件
+   - 或者使用预生成的 `build.ninja` 模板
+2. **使用简化的 CMake 替代品**
+   - 例如：Meson（更轻量）
+   - 或者自定义的构建配置生成器
+
+#### 长期方案
+1. 完善 `build-tools.ps1` 中的 CMake PIC 构建
+2. 实现 `libcmake_runner.so` + JNI 接口
+3. 完全支持 CMake 项目的配置和构建
 
 ## JNI 包装器接口设计
 
