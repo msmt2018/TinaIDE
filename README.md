@@ -37,10 +37,10 @@ TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手
 
 ```powershell
 # 构建 LLVM/Clang 工具链（首次需要 30-60 分钟）
-pwsh ./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -ApiLevel 24
+pwsh ./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -ApiLevel 28
 
 # 同步到项目
-pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24
+pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 ```
 
 ### 2. 构建应用
@@ -87,7 +87,7 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24
 - `arm64-v8a` (主要支持，真机)
 - `x86_64` (模拟器支持)
 
-目标 API Level: 24 (Android 7.0+)
+目标 API Level: 28 (Android 9.0+)
 
 ## 🔧 系统要求
 
@@ -98,7 +98,7 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24
 - PowerShell 7+
 
 ### 运行环境
-- Android 7.0+ (API 24+)
+- Android 9.0+ (API 28+)
 - 推荐 2GB+ RAM
 - 推荐 500MB+ 可用存储
 

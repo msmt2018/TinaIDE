@@ -28,7 +28,7 @@
 - 项目模板系统
 
 ### 变更
-- 统一 API Level 为 24
+- 统一 API Level 为 28 (Android 9.0+)
 - 优化 sysroot 打包策略
 - 改进编译流程
 - 移除 CMake 依赖，简化架构
