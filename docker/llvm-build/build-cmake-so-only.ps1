@@ -3,7 +3,8 @@ Param(
   [int]$ApiLevel = 28,
   [string]$ContainerName = 'tina-llvm-build',
   [string]$OutputPath,
-  [string]$CMakeTag = 'v3.31.4'
+  [string]$XmakeRepoUrl = 'https://github.com/wuxianggujun/xmake.git',
+  [string]$XmakeRef = 'master'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,7 +31,7 @@ if (-not $running) {
 
 function Exec-In-Dev { param([string]$cmd) & docker exec $ContainerName bash -lc $cmd }
 
-$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel';"
+$assign = "ABI='$Abi'; API_LEVEL='$ApiLevel'; XMAKE_REPO='$XmakeRepoUrl'; XMAKE_REF='$XmakeRef';"
 $session = @'
 set -eux
 case "${ABI}" in
@@ -39,195 +40,151 @@ case "${ABI}" in
   *) echo "Unsupported ABI: ${ABI}"; exit 1;;
 esac
 
-NDK_CLANGXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/${TRIPLE}${API_LEVEL}-clang++"
-
-# 确保 CMake 源码存在
-if [ ! -d /work/src/cmake/.git ]; then
-  : ${CMAKE_TAG:=v3.31.4}
-  git clone --depth=1 --branch "${CMAKE_TAG}" https://github.com/Kitware/CMake.git /work/src/cmake || \
-  git clone --depth=1 https://github.com/Kitware/CMake.git /work/src/cmake
+TOOLCHAIN_BIN="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+if [ ! -d "${TOOLCHAIN_BIN}" ]; then
+  echo "[!] LLVM toolchain not found at ${TOOLCHAIN_BIN}"
+  exit 2
 fi
+CC="${TOOLCHAIN_BIN}/${TRIPLE}${API_LEVEL}-clang"
+CXX="${TOOLCHAIN_BIN}/${TRIPLE}${API_LEVEL}-clang++"
+AR="${TOOLCHAIN_BIN}/llvm-ar"
+RANLIB="${TOOLCHAIN_BIN}/llvm-ranlib"
+STRIP="${TOOLCHAIN_BIN}/llvm-strip"
+LD="${TOOLCHAIN_BIN}/ld.lld"
 
-# 应用必要的补丁（android_lf.h）
-if [ ! -f /work/src/cmake/Utilities/cmlibarchive/contrib/android/include/android_lf.h ]; then
-  mkdir -p /work/src/cmake/Utilities/cmlibarchive/contrib/android/include
-  cat > /work/src/cmake/Utilities/cmlibarchive/contrib/android/include/android_lf.h <<'EOF'
-#ifndef ARCHIVE_ANDROID_LF_H_INCLUDED
-#define ARCHIVE_ANDROID_LF_H_INCLUDED
-#if __ANDROID_API__ > 20
-# include <dirent.h>
-# include <fcntl.h>
-# include <unistd.h>
-# include <sys/stat.h>
-# include <sys/statvfs.h>
-# include <sys/types.h>
-# include <sys/vfs.h>
-# define readdir  readdir64
-# define dirent   dirent64
-# define openat   openat64
-# define open     open64
-# define mkstemp  mkstemp64
-# define lseek    lseek64
-# define ftruncate ftruncate64
-# define fstatat  fstatat64
-# define fstat    fstat64
-# define lstat    lstat64
-# define stat     stat64
-# define fstatvfs fstatvfs64
-# define statvfs  statvfs64
-# define off_t    off64_t
-# define fstatfs  fstatfs64
-# define statfs   statfs64
-#endif
-#endif
-EOF
+SRC_DIR="/work/src/xmake"
+if [ ! -d "${SRC_DIR}/.git" ]; then
+  rm -rf "${SRC_DIR}"
+  git clone --depth=1 "${XMAKE_REPO}" "${SRC_DIR}"
 fi
-
-# 应用 libuv 补丁（Android 支持）
-if grep -q 'if(CMAKE_SYSTEM_NAME STREQUAL "Linux")' /work/src/cmake/Utilities/cmlibuv/CMakeLists.txt; then
-  sed -i 's/if(CMAKE_SYSTEM_NAME STREQUAL "Linux")/if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android")/' \
-    /work/src/cmake/Utilities/cmlibuv/CMakeLists.txt
-  sed -i 's/list(APPEND uv_libraries dl rt)/list(APPEND uv_libraries dl $<$<STREQUAL:${CMAKE_SYSTEM_NAME},Linux>:rt>)/' \
-    /work/src/cmake/Utilities/cmlibuv/CMakeLists.txt
-fi
-
-# 创建 uv_android_compat.h
-mkdir -p /work/src/cmake/Utilities/cmlibuv/include
-cat > /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h <<'EOF'
-#ifndef UV_ANDROID_COMPAT_H_
-#define UV_ANDROID_COMPAT_H_
-#ifdef __ANDROID__
-# include <sched.h>
-# include <pthread.h>
-# include <errno.h>
-static inline int pthread_setaffinity_np(pthread_t thread,
-                                         size_t cpusetsize,
-                                         const cpu_set_t* mask) {
-  (void)thread;
-  return sched_setaffinity(0, cpusetsize, mask);
-}
-static inline int pthread_getaffinity_np(pthread_t thread,
-                                         size_t cpusetsize,
-                                         cpu_set_t* mask) {
-  (void)thread;
-  return sched_getaffinity(0, cpusetsize, mask);
-}
-#endif
-#endif
-EOF
-
-echo "[i] Building PIC version of CMake for libcmake_runner.so..."
-
-# 强制清理旧的 PIC 构建目录
-echo "[i] Cleaning old build directory..."
-rm -rf /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic
-mkdir -p /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic
-
-# 配置 PIC 版本的 CMake
-# 关键：明确禁用 Android toolchain 的 PIE 设置
-echo "[i] Configuring CMake with -DANDROID_PIE=OFF..."
-cmake -S /work/src/cmake -B /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -G Ninja \
-  -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=${ANDROID_NDK_HOME} \
-  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
-  -DCMAKE_ANDROID_ARCH_ABI=${ABI} -DCMAKE_ANDROID_API=${API_LEVEL} \
-  -DANDROID_ABI=${ABI} -DANDROID_PLATFORM=android-${API_LEVEL} \
-  -DANDROID_PIE=OFF \
-  -DCMAKE_BUILD_TYPE=MinSizeRel \
-  -DBUILD_TESTING=OFF -DBUILD_CursesDialog=OFF \
-  -DCMAKE_USE_OPENSSL=OFF -DCMAKE_USE_SYSTEM_CURL=OFF \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DCMAKE_C_FLAGS="-fPIC -fno-PIE -D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" \
-  -DCMAKE_CXX_FLAGS="-fPIC -fno-PIE -D_GNU_SOURCE -include /work/src/cmake/Utilities/cmlibuv/include/uv_android_compat.h" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fPIC -no-pie" \
-  -DCMAKE_SHARED_LINKER_FLAGS="-fPIC"
-
-echo "[i] CMake configuration completed. Checking build.ninja..."
-if [ ! -f /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic/build.ninja ]; then
-  echo "[!] ERROR: build.ninja not generated! CMake configuration failed."
-  exit 1
-fi
-
-# Android toolchain still appends -fPIE for executable targets (cmake/cmcmd),
-# which later breaks when re-linking into libcmake_runner.so (ld.lld refuses PIE
-# objects inside shared libraries). Normalize these compile flags before building.
-echo "[i] Normalizing cmake target compile flags (-fPIE -> -fPIC)..."
-PATCHED=0
-if grep -q -- "-fPIE -pthread" /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic/build.ninja; then
-  sed -i 's/-fPIE -pthread/-fPIC -pthread/g' /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic/build.ninja
-  PATCHED=1
-fi
-if [ ${PATCHED} -eq 1 ]; then
-  echo "[i] Patched cmake target to emit PIC objects."
+cd "${SRC_DIR}"
+git fetch origin --tags --depth=1 || true
+if [ -n "${XMAKE_REF}" ]; then
+  git fetch origin "${XMAKE_REF}" --depth=1 || true
+  git checkout --force "${XMAKE_REF}" || git checkout --force origin/"${XMAKE_REF}" || git checkout --force "$(git rev-parse --abbrev-ref origin/HEAD)"
 else
-  echo "[w] Expected -fPIE pattern not found; skipping PIC patch."
+  git checkout --force "$(git rev-parse --abbrev-ref origin/HEAD)"
 fi
+git submodule update --init --recursive
 
-echo "[i] build.ninja found. Building CMakeLib and cmake targets..."
-
-# 构建 CMakeLib 和 cmake 目标
-ninja -C /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -j$(nproc) CMakeLib cmake
-
-echo "[i] Build completed. Collecting PIC object files..."
-
-# 收集 PIC 对象文件
-mkdir -p /work/build/tools/cmake-runner
-cat > /work/build/tools/cmake-runner/cmake_runner.cpp <<'EOF'
-#include <android/log.h>
-
-extern "C" int main(int, char**);
-extern "C" int cmake_run(int argc, char** argv) { return main(argc, argv); }
-EOF
-
-cmake_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -path '*/Source/CMakeFiles/cmake.dir/*' -name '*.o' | xargs echo)
-cmake_lib_objs=$(find /work/build/tools/cmake-${ABI}-api${API_LEVEL}-pic -path '*/Source/CMakeFiles/CMakeLib.dir/*' -name '*.o' | xargs echo)
-
-echo "[i] cmake_objs count: $(echo ${cmake_objs} | wc -w)"
-echo "[i] cmake_lib_objs count: $(echo ${cmake_lib_objs} | wc -w)"
-
-if [ -n "${cmake_objs}" ] && [ -n "${cmake_lib_objs}" ]; then
-  echo "[i] Found CMake PIC objects, linking libcmake_runner.so..."
-  
-  # 直接使用 NDK 提供的 libc++_shared.so（已经是 PIC 编译的）
-  # 关键参数：-lc++_shared 告诉链接器使用动态 C++ 库而不是静态库
-  
-  echo "[i] Linking with NDK's libc++_shared.so..."
-  ${NDK_CLANGXX} -shared -fPIC -Wl,-z,now -Wl,-z,relro \
-    -o /hostout/${ABI}/tools/bin/libcmake_runner.so \
-    ${cmake_objs} ${cmake_lib_objs} /work/build/tools/cmake-runner/cmake_runner.cpp \
-    -lc++_shared -llog -landroid -ldl -lm
-  
-  if [ $? -ne 0 ]; then
-    echo "[!] Linking failed! Check the error messages above."
-    exit 1
-  fi
-  
-  # 复制 libc++_shared.so 到输出目录（运行时需要）
-  LIBCXX_SHARED="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${TRIPLE}/libc++_shared.so"
-  if [ -f "${LIBCXX_SHARED}" ]; then
-    cp -f "${LIBCXX_SHARED}" /hostout/${ABI}/tools/bin/
-    echo "[i] Copied libc++_shared.so to output (required at runtime)"
+# Ensure Android config header exists for tbox (fallback to linux config)
+if [ ! -d core/src/tbox/inc/android ]; then
+  mkdir -p core/src/tbox/inc/android
+fi
+if [ ! -f core/src/tbox/inc/android/tbox.config.h ]; then
+  if [ -f core/src/tbox/inc/linux/tbox.config.h ]; then
+    cp core/src/tbox/inc/linux/tbox.config.h core/src/tbox/inc/android/tbox.config.h
   else
-    echo "[w] Warning: libc++_shared.so not found at ${LIBCXX_SHARED}"
+    echo "[!] Missing linux tbox.config.h to bootstrap Android config"
+    exit 2
   fi
-  
-  if [ -f /hostout/${ABI}/tools/bin/libcmake_runner.so ]; then
-    echo "[i] Successfully built libcmake_runner.so"
-    ls -lh /hostout/${ABI}/tools/bin/libcmake_runner.so
-  fi
-else
-  echo "[w] Could not locate cmake PIC objects; skipping libcmake_runner.so build"
-  exit 1
 fi
+
+BUILD_DIR="/work/build/tools/xmake-${ABI}-api${API_LEVEL}"
+INSTALL_ROOT="/work/build/tools/xmake-install-${ABI}-api${API_LEVEL}"
+PREFIX="/usr"
+rm -rf "${BUILD_DIR}" "${INSTALL_ROOT}"
+mkdir -p "${BUILD_DIR}" "${INSTALL_ROOT}"
+
+export CC CXX AR RANLIB STRIP LD
+export CFLAGS="-fPIE -fPIC -DANDROID -D__ANDROID_API__=${API_LEVEL}"
+export CXXFLAGS="-fPIE -fPIC -DANDROID -D__ANDROID_API__=${API_LEVEL}"
+export LDFLAGS="-fPIE -pie"
+export PKG_CONFIG_PATH=""
+export CCACHE_DISABLE=1
+
+./configure \
+  --plat=android \
+  --arch="${ABI}" \
+  --mode=minsize \
+  --toolchain=clang \
+  --builddir="${BUILD_DIR}" \
+  --prefix="${PREFIX}" \
+  --host="${TRIPLE}"
+
+sed -i "s|^cc=.*|cc=${CC}|g" "${SRC_DIR}/Makefile"
+sed -i "s|^cxx=.*|cxx=${CXX}|g" "${SRC_DIR}/Makefile"
+sed -i "s|^as=.*|as=${CC}|g" "${SRC_DIR}/Makefile"
+sed -i "s|^ld=.*|ld=${CXX}|g" "${SRC_DIR}/Makefile"
+sed -i "s|^ar=.*|ar=${AR}|g" "${SRC_DIR}/Makefile"
+sed -i 's/-lpthread//g' "${SRC_DIR}/Makefile"
+
+make -j"$(nproc)"
+make DESTDIR="${INSTALL_ROOT}" install
+
+# Re-link CLI objects into shared lib (libxmake_runner.so)
+RUNNER_DIR="/work/build/tools/xmake-runner"
+mkdir -p "${RUNNER_DIR}"
+cat > "${RUNNER_DIR}/xmake_runner.cpp" <<'EOF'
+extern "C" int main(int, char**);
+extern "C" __attribute__((visibility("default"))) int xmake_run(int argc, char** argv) {
+    return main(argc, argv);
+}
+EOF
+CLI_OBJ_LIST="$(mktemp)"
+find "/work/build/tools/xmake-${ABI}-api${API_LEVEL}/.objs/cli/android/${ABI}/minsize" -name '*.o' > "${CLI_OBJ_LIST}"
+if [ ! -s "${CLI_OBJ_LIST}" ]; then
+  echo "[!] No CLI object files found; cannot build libxmake_runner.so"
+  exit 2
+fi
+LIB_DIR="/work/build/tools/xmake-${ABI}-api${API_LEVEL}/android/${ABI}/minsize"
+OUT_SO="/hostout/${ABI}/tools/bin/libxmake_runner.so"
+"${CXX}" -shared -fPIC -Wl,-z,now -Wl,-z,relro \
+  -o "${OUT_SO}" \
+  @"${CLI_OBJ_LIST}" \
+  "${LIB_DIR}/libxmake.a" \
+  "${LIB_DIR}/liblua_cjson.a" \
+  "${LIB_DIR}/liblz4.a" \
+  "${LIB_DIR}/libsv.a" \
+  "${LIB_DIR}/libtbox.a" \
+  "${LIB_DIR}/liblua.a" \
+  "${RUNNER_DIR}/xmake_runner.cpp" \
+  -lc++_shared -llog -landroid -latomic -ldl -lm
+rm -f "${CLI_OBJ_LIST}"
+if [ -f "${OUT_SO}" ]; then
+  chmod 0755 "${OUT_SO}"
+  "${STRIP}" -S "${OUT_SO}" || true
+fi
+
+HOST_BIN="/hostout/${ABI}/tools/bin"
+SYSROOT_BASE="/hostout/${ABI}/sysroot/usr"
+mkdir -p "${HOST_BIN}" "${SYSROOT_BASE}/bin" "${SYSROOT_BASE}/share" "${SYSROOT_BASE}/lib"
+
+if [ -f "${INSTALL_ROOT}${PREFIX}/bin/xmake" ]; then
+  cp -af "${INSTALL_ROOT}${PREFIX}/bin/xmake" "${HOST_BIN}/xmake"
+  chmod 0755 "${HOST_BIN}/xmake"
+  "${STRIP}" -S "${HOST_BIN}/xmake" || true
+else
+  echo "[!] xmake binary missing under ${INSTALL_ROOT}${PREFIX}/bin"
+  exit 2
+fi
+
+if [ -f "${INSTALL_ROOT}${PREFIX}/bin/xrepo" ]; then
+  cp -af "${INSTALL_ROOT}${PREFIX}/bin/xrepo" "${HOST_BIN}/xrepo"
+  chmod 0755 "${HOST_BIN}/xrepo"
+fi
+
+for dir in bin share lib; do
+  if [ -d "${INSTALL_ROOT}${PREFIX}/${dir}" ]; then
+    mkdir -p "${SYSROOT_BASE}/${dir}"
+    cp -af "${INSTALL_ROOT}${PREFIX}/${dir}/." "${SYSROOT_BASE}/${dir}/"
+  fi
+done
+
+if [ -f "${OUT_SO}" ]; then
+  mkdir -p "${SYSROOT_BASE}/lib/${TRIPLE}/runtime"
+  cp -af "${OUT_SO}" "${SYSROOT_BASE}/lib/${TRIPLE}/runtime/"
+fi
+
+echo "[i] xmake installed to sysroot: ${SYSROOT_BASE}/bin/xmake"
 '@
 
-Write-Info "Building CMake .so for ABI=$Abi (API=$ApiLevel) in container: $ContainerName"
+Write-Info "Building xmake for ABI=$Abi (API=$ApiLevel) in container: $ContainerName"
 $cmd = @"
-CMAKE_TAG='$CMakeTag'
 $assign
 $session
 "@
-# Remove Windows line endings (CRLF -> LF) before sending to Docker
 $cmd = $cmd -replace "`r`n", "`n"
 Exec-In-Dev $cmd
-Write-Info "CMake .so built. Output at: $(Join-Path $outDirHost 'tools/bin/libcmake_runner.so')"
+Write-Info "xmake build completed. Binaries at: $(Join-Path $outDirHost 'tools/bin/xmake')"
 Write-Info "Done."

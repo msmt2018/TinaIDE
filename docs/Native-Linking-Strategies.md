@@ -36,7 +36,7 @@
 - `tools/sync-llvm-build.ps1`：默认从 `jniLibs` 移除 `libLLVM*.so/libclang-cpp*.so/libc++_shared.so`，并把运行时所需 `.so` 注入 sysroot `usr/lib/<triple>/runtime/`。
 
 自测/排障 Checklist
-- Gradle/Ninja 链接行应出现：`... liblldELF.a liblldCommon.a -lLLVM-17 -lclang-cpp ...`
+- Gradle 链接行应出现：`... liblldELF.a liblldCommon.a -lLLVM-17 -lclang-cpp ...`
 - `llvm-nm` 检查静态库敏感符号是否清理（理想查不到）：`__tls_get_addr`、`llvm::parallel::threadIndex`。
 - 运行日志：按顺序加载 `libc++_shared.so → libLLVM-17.so → libclang-cpp.so → native_compiler`。
 
@@ -136,10 +136,10 @@
   - `./tools/sync-llvm-build.ps1 -Abi x86_64`
 
 清理并重建 app：
-- `:app:externalNativeBuildCleanDebug` → `:app:buildCMakeDebug[x86_64]`
+- `:app:externalNativeBuildCleanDebug` → `:app:externalNativeBuildDebug`
 
-检查链接行（Ninja）：
-- `app/.cxx/Debug/.../<abi>/build.ninja` 中 `LINK_LIBRARIES` 应包含预期条目与顺序。
+检查链接行：
+- 构建日志中 `LINK_LIBRARIES` 应包含预期条目与顺序。
 
 二进制自检：
 - `llvm-nm -gC <static.a>` 查看是否仍含敏感符号（理想无 `__tls_get_addr`、`llvm::parallel::threadIndex`）。

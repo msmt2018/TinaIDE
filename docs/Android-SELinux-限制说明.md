@@ -34,10 +34,9 @@ neverallow untrusted_app exec_type:file { execute execute_no_trans };
 ### 影响的工具
 
 以下工具在 Android 10+ 上无法直接执行：
-- `cmake` - CMake 构建系统
-- `ninja` - Ninja 构建工具
 - `clang` - Clang 编译器
 - `clang++` - Clang++ 编译器
+- `xmake` - xmake 构建工具
 - `ld.lld` - LLD 链接器
 - 任何自定义的可执行文件
 
@@ -49,7 +48,7 @@ neverallow untrusted_app exec_type:file { execute execute_no_trans };
 
 ```kotlin
 // ✅ 这可以工作
-System.loadLibrary("ninja_runner")  // 加载 libninja_runner.so
+System.loadLibrary("xmake_runner")  // 加载 libxmake_runner.so
 ```
 
 原因：
@@ -63,10 +62,10 @@ System.loadLibrary("ninja_runner")  // 加载 libninja_runner.so
 
 ```bash
 # 原始方式：编译成可执行文件
-clang++ -o ninja ninja.cpp
+clang++ -o xmake xmake.cpp
 
 # JNI 方式：编译成共享库
-clang++ -shared -fPIC -o libninja_runner.so ninja.cpp ninja_runner.cpp
+clang++ -shared -fPIC -o libxmake_runner.so xmake.cpp xmake_runner.cpp
 ```
 
 #### 2. 提供 JNI 入口点
@@ -126,9 +125,9 @@ val result = NinjaRunner.runNinja(
 - 需要使用 `-fPIC` 重新编译所有依赖
 - 构建时间长，复杂度高
 
-**临时方案**:
-- 跳过 CMake 配置步骤
-- 直接使用 Ninja 构建（需要预生成的 `build.ninja`）
+**推荐方案**:
+- 使用 xmake 构建系统（实验性）
+- 或使用单文件编译模式
 
 ## 其他尝试过的方案（均失败）
 

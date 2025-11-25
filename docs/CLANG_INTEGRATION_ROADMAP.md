@@ -352,7 +352,6 @@ class LibraryLoaderFactory {
 
 **当前不需要**：
 - ❌ clangd LSP 服务器（体积大，后置）
-- ❌ cmake/ninja 工具链（暂不集成到 APK）
 - ❌ 多版本工具链切换
 
 #### 3. **DRY (Don't Repeat Yourself)**

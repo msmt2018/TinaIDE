@@ -57,15 +57,14 @@ cmakePath.setExecutable(true)  // ❌ 无效
 **实现**:
 ```kotlin
 // 加载共享库
-System.loadLibrary("ninja_runner")
+System.loadLibrary("xmake_runner")
 
 // 通过 JNI 调用
-external fun runNinja(args: Array<String>): Int
+external fun runXmake(args: Array<String>): Int
 ```
 
 **状态**: 
-- ✅ `libninja_runner.so` 已存在
-- ❌ `libcmake_runner.so` 不存在（需要构建）
+- ✅ `libxmake_runner.so` 已存在（arm64-v8a）
 
 ### 方案 2: Shell 包装器 ❌（已废弃 - 不可行）
 
@@ -161,8 +160,7 @@ val wrapperDir = File(context.cacheDir, "bin").apply { mkdirs() }
 目录结构：
 ```
 /data/data/com.wuxianggujun.tinaide/cache/bin/
-├── cmake      # shell 脚本
-└── ninja      # shell 脚本
+└── xmake      # shell 脚本
 ```
 
 #### 2. 生成 shell 脚本
@@ -190,8 +188,7 @@ exec "/data/data/com.wuxianggujun.tinaide/files/sysroot/usr/bin/cmake" "$@"
 
 #### 3. 使用包装器
 ```kotlin
-val cmakePath = createShellWrapper(wrapperDir, "cmake", cmakeSrc.absolutePath)
-val ninjaPath = createShellWrapper(wrapperDir, "ninja", ninjaSrc.absolutePath)
+val xmakePath = createShellWrapper(wrapperDir, "xmake", xmakeSrc.absolutePath)
 
 // 正常调用
 val pb = ProcessBuilder(listOf(cmakePath.absolutePath, "--version"))
@@ -349,8 +346,7 @@ adb logcat | grep avc
 
 必须将工具编译成共享库（.so）并通过 JNI 调用：
 
-1. ✅ Ninja - 已实现 `libninja_runner.so`
-2. 🚧 CMake - 需要实现 `libcmake_runner.so`（构建复杂）
+1. ✅ xmake - 已实现 `libxmake_runner.so`（实验性）
 
 详见：[Android-SELinux-限制说明.md](./Android-SELinux-限制说明.md)
 
