@@ -1,42 +1,134 @@
-TinaIDE
+# TinaIDE
 
-本项目聚焦于在 Android 设备端提供轻量的本地开发体验：集成 Sora Editor 编辑器、基础项目管理、以及"嵌入式 Clang/LLVM（库模式）"以在 App 进程内完成 C/C++ 的语法检查与编译（按需启用）。
+> 在 Android 设备上运行的轻量级 C/C++ IDE
 
-当前形态（2025-11）
-- 不引入 Termux/proot 终端模块（settings.gradle.kts 中 `:termux-*` 已注释）。
-- 推荐"库模式（in-process）"集成 LLVM/Clang：运行时从 `assets/sysroot.zip` 解压到 `<files>/sysroot`，按需加载运行库并通过 JNI 提供编译接口。
-- **支持 CMake 项目构建**：自动检测 CMakeLists.txt，使用 sysroot 中的 cmake 和 ninja 进行完整项目构建。
-- 代码编辑与 UI 基于 `external/sora-editor`。
+TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手机或平板上直接编写、编译和运行 C/C++ 代码。
 
-支持架构
-- 目标 ABI：`arm64-v8a`、`x86_64`（按需）
-- 统一目标 API：24（兼顾体积与兼容性）
+## ✨ 特性
 
-快速开始（库模式）
-1) 准备构建产物（Docker 脚本）
-   - `pwsh ./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -ApiLevel 24`
-2) 同步到 App（仅运行库与 sysroot）
-   - `pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24`
-   - 默认会在 `app/src/main/assets/` 生成/更新 `sysroot.zip`（或镜像目录），并仅保留我们托管的运行库
-3) 安装运行
-   - `./gradlew installDebug`
+- 🚀 **嵌入式编译器**: 内置 Clang/LLVM 17，无需外部工具
+- 📝 **强大编辑器**: 基于 Sora Editor，支持语法高亮和代码补全
+- 🔨 **xmake 支持**: Android 原生构建工具（实验性）
+- ⚡ **快速编译**: 单文件快速编译
+- 🎨 **现代 UI**: Material Design 3 设计语言
+- 🔌 **插件系统**: 可扩展的插件架构
 
-运行与验证
-- 首次运行会自动解压 `assets/sysroot.zip` 到 `<files>/sysroot`（见 `SysrootInstaller`）。
-- UI 中"编译/输出"入口可查看当前 ABI、LLVM 版本与 sysroot 路径（如已启用）。
-- 创建 CMake 项目：选择"C++(CMake)"类型，系统自动生成包含 CMakeLists.txt 的项目模板。
-- 编译 CMake 项目：点击编译按钮，自动检测并使用 CMake 构建系统。
+## 🎯 核心功能
 
-已知限制与建议
-- x86/x86_64 模拟器处于不同系统策略下时可能限制某些行为；库模式默认不依赖 `ptrace`，不受 proot 约束。
-- 仅在确有需求时再引入可执行工具链/终端依赖（YAGNI）。
+### 编译器集成
+- **库模式**: Clang/LLVM 以动态库形式集成，进程内编译
+- **完整工具链**: 包含 xmake 等构建工具（实验性）
+- **Sysroot**: 完整的 Android NDK 头文件和库
 
-参考文档
-- 路线图与现状：`docs/CLANG_INTEGRATION_ROADMAP.md`、`docs/LLVM_CLANG_STATUS.md`
-- 工具链与打包：`docs/LLVM_BUILD_TOOLS.md`
-- 原生链接策略：`docs/Native-Linking-Strategies.md`
-- CMake 项目支持：`docs/CMake项目支持.md`
-- CMake 测试指南：`docs/CMake项目测试指南.md`
+### 项目支持
+- **单文件项目**: 快速编译单个 C/C++ 文件
+- **xmake 项目**: 使用 xmake 构建系统（实验性）
+- **项目模板**: 内置多种项目模板
 
-——
-如需切换目标或定制集成方式，请在 issue/PR 说明约束与目标，我方将按 KISS/YAGNI/DRY/SOLID 原则给出最小变更方案。
+### 编辑器功能
+- 语法高亮
+- 代码补全
+- 错误提示
+- 代码导航
+
+## 🚀 快速开始
+
+### 1. 构建工具链
+
+```powershell
+# 构建 LLVM/Clang 工具链（首次需要 30-60 分钟）
+pwsh ./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -ApiLevel 24
+
+# 同步到项目
+pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24
+```
+
+### 2. 构建应用
+
+```bash
+# 构建并安装
+./gradlew installDebug
+```
+
+### 3. 开始使用
+
+1. 启动应用（首次启动会自动解压 sysroot）
+2. 创建新项目（单文件或 xmake）
+3. 编写代码
+4. 点击编译按钮
+
+详细步骤请查看 [快速开始指南](docs/快速开始.md)
+
+## 📚 文档
+
+- [快速开始](docs/快速开始.md) - 从零开始使用 TinaIDE
+- [架构概览](docs/架构概览.md) - 了解项目架构
+- [开发指南](docs/开发指南.md) - 参与项目开发
+- [文档中心](docs/README.md) - 完整文档索引
+
+### 技术文档
+
+- [Clang/LLVM 集成路线图](docs/CLANG_INTEGRATION_ROADMAP.md)
+- [架构概览](docs/架构概览.md)
+- [Android SELinux 解决方案](docs/Android-SELinux-解决方案.md)
+- [插件系统架构](docs/Plugin-System-Architecture.md)
+
+## 🏗️ 技术栈
+
+- **语言**: Kotlin, C++
+- **UI**: Jetpack Compose, Material Design 3
+- **编辑器**: Sora Editor
+- **编译器**: Clang/LLVM 17
+- **构建工具**: xmake (实验性)
+- **构建系统**: Gradle, Docker
+
+## 🎨 支持的架构
+
+- `arm64-v8a` (主要支持，真机)
+- `x86_64` (模拟器支持)
+
+目标 API Level: 24 (Android 7.0+)
+
+## 🔧 系统要求
+
+### 开发环境
+- Android Studio (最新稳定版)
+- JDK 17+
+- Docker Desktop
+- PowerShell 7+
+
+### 运行环境
+- Android 7.0+ (API 24+)
+- 推荐 2GB+ RAM
+- 推荐 500MB+ 可用存储
+
+## 🤝 贡献
+
+欢迎贡献代码、报告问题或提出建议！
+
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feat/amazing-feature`)
+3. 提交更改 (`git commit -m 'feat: add amazing feature'`)
+4. 推送到分支 (`git push origin feat/amazing-feature`)
+5. 创建 Pull Request
+
+详见 [开发指南](docs/开发指南.md)
+
+## 📄 许可证
+
+本项目使用 Apache 2.0 with LLVM Exceptions 许可证。
+
+## 🙏 致谢
+
+- [LLVM Project](https://llvm.org/) - 编译器基础设施
+- [Sora Editor](https://github.com/Rosemoe/sora-editor) - 代码编辑器
+- [xmake](https://xmake.io/) - 构建工具
+
+## 📮 联系方式
+
+- GitHub Issues: [提交问题](https://github.com/wuxianggujun/TinaIDE/issues)
+- 项目主页: [TinaIDE](https://github.com/wuxianggujun/TinaIDE)
+
+---
+
+**让移动开发更自由** 🚀

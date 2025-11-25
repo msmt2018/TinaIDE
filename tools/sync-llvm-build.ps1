@@ -10,7 +10,7 @@ Param(
   [bool]$CopyLibcxxToJni = $true,
   [bool]$CopyLlvmToJni   = $false,
   [string]$ToolBinSource = '',
-  # New: do NOT inject host-built tool binaries (cmake/ninja) into sysroot by default
+  # New: do NOT inject host-built tool binaries into sysroot by default
   # Because Android SELinux denies exec() from app private dirs (execute_no_trans)
   [bool]$InjectToolsToSysroot = $false,
   # New: copy in-process tool runners (shared objects) into jniLibs for app-side JNI loading
@@ -112,12 +112,12 @@ if (Test-Path $srcLibDir) {
     }
   }
 
-  # Optionally copy tool runner .so (libninja_runner.so / libcmake_runner.so) from build-output tools/bin
+  # Optionally copy tool runner .so (libxmake_runner.so) from build-output tools/bin
   if ($CopyToolRunnersToJni) {
     try {
       $toolsBin = Join-Path (Join-Path $BuildOutputRoot $Abi) 'tools/bin'
       if (Test-Path $toolsBin) {
-        $runners = @('libninja_runner.so','libcmake_runner.so','libclangd_runner.so')
+        $runners = @('libxmake_runner.so')
         foreach($r in $runners){
           $src = Join-Path $toolsBin $r
           if (Test-Path $src) {
@@ -211,7 +211,7 @@ if ($srcSysroot -and (Test-Path $srcSysroot)) {
       try {
         $toolsBin = Join-Path (Join-Path $BuildOutputRoot $Abi) 'tools/bin'
         if (Test-Path $toolsBin) {
-          $runners = @('libninja_runner.so','libcmake_runner.so','libclangd_runner.so')
+          $runners = @('libxmake_runner.so')
           foreach($r in $runners){
             $src = Join-Path $toolsBin $r
             if (Test-Path $src) {
