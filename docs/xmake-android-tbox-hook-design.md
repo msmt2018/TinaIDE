@@ -1,5 +1,12 @@
 # xmake Android 集成方案：tbox 进程层 Hook
 
+> **源码位置说明**  
+> 由于仓库已经移除 `external/xmake` 子模块，以下所有对 xmake/tbox 的修改都应在
+> Docker 构建环境中完成。运行 `docker/llvm-build/build-xmake.ps1` 时，脚本会将
+> 官方仓库克隆到容器内 `/work/src/xmake`，本地对应路径是
+> `docker/llvm-build/dev-work/src/xmake`。请在该目录中创建补丁（或维护自己的 fork），
+> 再由 `build-xmake.ps1` 自动应用；否则修改不会出现在最终的 libxmake_runner/sysroot 中。
+
 ## 1. 问题背景
 
 ### 1.1 当前状态
