@@ -50,3 +50,8 @@ app/src/main/jniLibs/**/libc++_shared.so
 
 # Sysroot（由同步脚本生成，不提交）
 app/src/main/assets/sysroot/
+
+# Generated LLVM build artifacts (headers/libs/sysroot)
+external/llvm-build-libs/
+!external/llvm-build-libs/README.md
+
