@@ -1,5 +1,5 @@
 Param(
-  [ValidateSet('arm64-v8a','x86_64')][string[]]$Abi = @('arm64-v8a','x86_64'),
+  [string[]]$Abi = @('arm64-v8a','x86_64'),
   [int]$ApiLevel = 28,
   [string]$ContainerName = 'tina-llvm-build',
   [string]$OutputPath,
@@ -13,9 +13,34 @@ $ErrorActionPreference = 'Stop'
 
 function Write-Info($msg) { Write-Host "[i] $msg" -ForegroundColor Cyan }
 function Write-Err($msg)  { Write-Host "[!] $msg" -ForegroundColor Red }
+function Sync-XmakeOverlay {
+  param([string]$Source,[string]$Target)
+  if (-not (Test-Path $Source -PathType Container)) {
+    if (Test-Path $Target) {
+      Remove-Item -Recurse -Force $Target | Out-Null
+    }
+    return $false
+  }
+  New-Item -ItemType Directory -Force -Path $Target | Out-Null
+  $cmd = "robocopy `"$Source`" `"$Target`" /MIR /NFL /NDL /NJH /NJS /nc /ns /np"
+  cmd /c $cmd | Out-Null
+  $rc = $LASTEXITCODE
+  if ($rc -gt 3) {
+    Write-Err "Failed to synchronize external/xmake overlay (robocopy exit $rc)"
+    exit $rc
+  }
+  return $true
+}
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $root = Resolve-Path (Join-Path $scriptRoot '..\..')
+
+$overlaySource = Join-Path $root 'external/xmake'
+$overlayTarget = Join-Path $root 'docker/llvm-build/dev-work/overlays/xmake'
+$overlaySynced = Sync-XmakeOverlay -Source $overlaySource -Target $overlayTarget
+if ($overlaySynced) {
+  Write-Info "Synced xmake overlay from $overlaySource"
+}
 
 $templateRunnerPath = Join-Path $root 'docker/llvm-build/templates/xmake_runner.cpp'
 if (-not (Test-Path $templateRunnerPath)) {
@@ -42,7 +67,30 @@ if (-not $running) {
 
 function Exec-In-Dev { param([string]$cmd) & docker exec $ContainerName bash -lc $cmd }
 
-$abiList = if ($Abi -and $Abi.Length -gt 0) { $Abi } else { @('arm64-v8a','x86_64') }
+$validAbis = @('arm64-v8a','x86_64')
+function Normalize-AbiList {
+  param([string[]]$values)
+  $result = @()
+  foreach ($value in $values) {
+    if (-not $value) { continue }
+    $parts = $value.Split(',', [System.StringSplitOptions]::RemoveEmptyEntries)
+    foreach ($part in $parts) {
+      $trimmed = $part.Trim()
+      if ($trimmed) { $result += $trimmed }
+    }
+  }
+  return $result
+}
+$normalizedAbi = Normalize-AbiList -values $Abi
+if (-not $normalizedAbi -or $normalizedAbi.Count -eq 0) {
+  $normalizedAbi = $validAbis
+}
+foreach ($entry in $normalizedAbi) {
+  if ($validAbis -notcontains $entry) {
+    throw "Unsupported ABI '$entry'. Valid values: $($validAbis -join ', ')"
+  }
+}
+$abiList = $normalizedAbi
 
 $cleanFlag = if ($Clean) { "1" } else { "0" }
 $session = @'
@@ -79,6 +127,39 @@ else
   git checkout --force "$(git rev-parse --abbrev-ref origin/HEAD)"
 fi
 git submodule update --init --recursive
+
+OVERLAY_DIR="/work/overlays/xmake"
+if [ -d "${OVERLAY_DIR}" ] && [ "$(ls -A "${OVERLAY_DIR}")" ]; then
+  echo "[i] Applying TinaIDE xmake overlay from ${OVERLAY_DIR}"
+  cp -af "${OVERLAY_DIR}/." "${SRC_DIR}/"
+fi
+
+# ============================================================================
+# TinaIDE: Patch configure script to add is_os() function
+# xmake.sh (configure) only has is_plat(), but tbox's xmake.lua uses is_os()
+# We need to add is_os() so that "if is_os('android')" works correctly
+# ============================================================================
+echo "[i] Patching configure script to add is_os() function..."
+if ! grep -q "^is_os()" "${SRC_DIR}/configure"; then
+  # Insert is_os() function after is_plat() function
+  sed -i '/^is_plat() {/,/^}$/{ /^}$/a\
+\
+# determining target os (for Android, os == plat)\
+# TinaIDE: xmake.sh originally does not have is_os(), but tbox xmake.lua uses it\
+is_os() {\
+    local os=""\
+    for os in $@; do\
+        if test_eq "${_target_plat}" "${os}"; then\
+            return 0\
+        fi\
+    done\
+    return 1\
+}
+}' "${SRC_DIR}/configure"
+  echo "[i] is_os() function added to configure script"
+else
+  echo "[i] is_os() function already exists in configure script"
+fi
 
 # Ensure Android config header exists for tbox (fallback to linux config)
 if [ ! -d core/src/tbox/inc/android ]; then
@@ -128,8 +209,25 @@ sed -i "s|^ld=.*|ld=${CXX}|g" "${SRC_DIR}/Makefile"
 sed -i "s|^ar=.*|ar=${AR}|g" "${SRC_DIR}/Makefile"
 sed -i 's/-lpthread//g' "${SRC_DIR}/Makefile"
 
+# 添加 -llog 链接标志（Android 日志库）
+echo "[i] Adding -llog to linker flags..."
+sed -i 's/-latomic/-latomic -llog/g' "${SRC_DIR}/Makefile"
+
+# 检查 Makefile 是否包含 platform/android 文件
+echo "[i] Checking if Makefile includes Android platform files..."
+if grep -q "platform/android" "${SRC_DIR}/Makefile"; then
+  echo "[i] Android platform files are included in Makefile"
+else
+  echo "[!] Warning: Android platform files NOT found in Makefile"
+  echo "[!] The is_os() patch may not have worked correctly"
+fi
+
+# 构建所有目标
 make -j"$(nproc)"
 make DESTDIR="${INSTALL_ROOT}" install
+
+# remove standalone CLI binaries (not needed inside TinaIDE sysroot)
+rm -f "${INSTALL_ROOT}${PREFIX}/bin/xmake" "${INSTALL_ROOT}${PREFIX}/bin/xrepo" || true
 
 # Re-link CLI objects into shared lib (libxmake_runner.so)
 RUNNER_DIR="/work/build/tools/xmake-runner"
@@ -165,20 +263,6 @@ fi
 HOST_BIN="/hostout/${ABI}/tools/bin"
 SYSROOT_BASE="/hostout/${ABI}/sysroot/usr"
 mkdir -p "${HOST_BIN}" "${SYSROOT_BASE}/bin" "${SYSROOT_BASE}/share" "${SYSROOT_BASE}/lib"
-
-if [ -f "${INSTALL_ROOT}${PREFIX}/bin/xmake" ]; then
-  cp -af "${INSTALL_ROOT}${PREFIX}/bin/xmake" "${HOST_BIN}/xmake"
-  chmod 0755 "${HOST_BIN}/xmake"
-  "${STRIP}" -S "${HOST_BIN}/xmake" || true
-else
-  echo "[!] xmake binary missing under ${INSTALL_ROOT}${PREFIX}/bin"
-  exit 2
-fi
-
-if [ -f "${INSTALL_ROOT}${PREFIX}/bin/xrepo" ]; then
-  cp -af "${INSTALL_ROOT}${PREFIX}/bin/xrepo" "${HOST_BIN}/xrepo"
-  chmod 0755 "${HOST_BIN}/xrepo"
-fi
 
 for dir in bin share lib; do
   if [ -d "${INSTALL_ROOT}${PREFIX}/${dir}" ]; then
