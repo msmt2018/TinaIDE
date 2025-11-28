@@ -1,0 +1,27 @@
+--- a/configure
++++ b/configure
+@@ -819,6 +819,24 @@ is_plat() {
+     return 1
+ }
+ 
++# determining target os (for Android, os == plat)
++# e.g.
++# if is_os "android" "linux"; then
++#     ...
++# fi
++# TinaIDE: xmake.sh originally doesn't have is_os(), but tbox's xmake.lua uses it
++# For Android builds, is_os("android") should return true when plat is android
++is_os() {
++    local os=""
++    for os in $@; do
++        # For Android, the OS is the same as the platform
++        if test_eq "${_target_plat}" "${os}"; then
++            return 0
++        fi
++    done
++    return 1
++}
++
+ # determining target architecture
+ # e.g.
+ # if is_arch "x86_64" "i386"; then
