@@ -72,6 +72,11 @@ class CompileProjectUseCase(
         projectRoot: File,
         projectName: String
     ): Result = withContext(Dispatchers.IO) {
+        val logForwarder: (String, Boolean) -> Unit = { line, isError ->
+            val prefix = if (isError) "[xmake:err]" else "[xmake]"
+            outputManager.appendOutput("$prefix $line\n")
+        }
+        XmakeRunner.setNativeLogListener(logForwarder)
         try {
             outputManager.appendOutput("=== xmake 构建开始 ===\n")
             outputManager.appendOutput("项目: $projectName\n")
@@ -93,6 +98,34 @@ class CompileProjectUseCase(
             outputManager.appendOutput("检查 xmake 版本...\n")
             val versionResult = XmakeRunner.run("--version")
             outputManager.appendOutput("xmake --version 返回码: $versionResult\n\n")
+
+            // 执行 xmake 配置，强制使用 envs 工具链
+            val toolchainArgs = arrayOf(
+                "--toolchain=envs",
+                "--cc=clang",
+                "--cxx=clang++",
+                "--ld=clang",
+                "--sh=clang",
+                "--as=clang",
+                "--ar=llvm-ar"
+            )
+            // TinaIDE: 禁用 xmake build cache，避免 xxhash 在 Android 私有沙箱内访问预处理文件失败
+            val configArgs = toolchainArgs + "--ccache=n"
+            outputManager.appendOutput("执行 xmake 配置...\n")
+            outputManager.appendOutput(
+                buildString {
+                    append("命令: xmake f -P ${projectRoot.absolutePath}")
+                    configArgs.forEach { append(" $it") }
+                    append("\n\n")
+                }
+            )
+            outputManager.appendOutput("提示: 默认关闭 xmake build cache 以兼容 TinaIDE 进程桥接。\n\n")
+            val configResult = XmakeRunner.config(projectRoot.absolutePath, *configArgs)
+            if (configResult != 0) {
+                val msg = "xmake 配置失败，返回码: $configResult"
+                outputManager.appendOutput("\n$msg\n")
+                return@withContext Result.Error(msg, null)
+            }
             
             // 执行 xmake 构建
             outputManager.appendOutput("执行 xmake build...\n")
@@ -123,6 +156,8 @@ class CompileProjectUseCase(
             outputManager.appendOutput("\n$msg\n")
             outputManager.appendOutput("异常堆栈: ${e.stackTraceToString()}\n")
             Result.Error(msg, e)
+        } finally {
+            XmakeRunner.setNativeLogListener(null)
         }
     }
 
