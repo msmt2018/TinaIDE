@@ -57,6 +57,4 @@
   <string name="settings_cat_editor_behavior">编辑行为</string>
   <string name="settings_cat_compiler_options">编译选项</string>
   <string name="settings_cat_compiler_debug_perf">调试与性能</string>
-  <string name="pref_force_sysroot_override_title">调试：始终覆盖 Sysroot 补丁</string>
-  <string name="pref_force_sysroot_override_summary">仅供调试使用。开启后会在每次启动时重新同步 xmake 覆盖文件，方便测试补丁，可能降低首次构建性能。</string>
 </resources>

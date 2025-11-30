@@ -9,15 +9,6 @@ Param(
   [string]$SysrootMode = 'zip',
   [bool]$CopyLibcxxToJni = $false,  # 使用 sysroot 中的 libc++_shared.so，避免重复
   [bool]$CopyLlvmToJni   = $false,
-  [string]$ToolBinSource = '',
-  # New: do NOT inject host-built tool binaries into sysroot by default
-  # Because Android SELinux denies exec() from app private dirs (execute_no_trans)
-  [bool]$InjectToolsToSysroot = $false,
-  # Tool runners (xmake_runner.so) are loaded from sysroot, not jniLibs
-  # Set to $true only if you want to duplicate them in jniLibs (not recommended)
-  [bool]$CopyToolRunnersToJni = $false,
-  # Copy tool runners into sysroot runtime directory for System.load()
-  [bool]$CopyToolRunnersToSysroot = $true
 )
 
 $validAbis = @('arm64-v8a','x86_64')
@@ -47,7 +38,7 @@ if (-not $normalizedAbi -or $normalizedAbi.Count -eq 0) {
 }
 
 $assetsRoot = Split-Path -Parent $AppAssetsSysroot
-$zipCleanupPatterns = @("sysroot-*.zip","xmake-share.zip")
+$zipCleanupPatterns = @("sysroot-*.zip")
 if ($SysrootMode -eq 'none') {
   foreach ($pattern in $zipCleanupPatterns) {
     Get-ChildItem -Path $assetsRoot -Filter $pattern -File -ErrorAction SilentlyContinue | ForEach-Object {
@@ -174,25 +165,6 @@ if (Test-Path $srcLibDir) {
     }
   }
 
-  # Optionally copy tool runner .so (libxmake_runner.so) from build-output tools/bin
-  if ($CopyToolRunnersToJni) {
-    try {
-      $toolsBin = Join-Path -Path $abiOutputRoot -ChildPath 'tools/bin'
-      if (Test-Path $toolsBin) {
-        $runners = @('libxmake_runner.so')
-        foreach($r in $runners){
-          $src = Join-Path $toolsBin $r
-          if (Test-Path $src) {
-            $dst = Join-Path $dstLibDir $r
-            Copy-Item $src -Destination $dst -Force
-            Write-Host "INFO: Copied $r -> $dst" -ForegroundColor Green
-          }
-        }
-      }
-    } catch {
-      Write-Host "[w] Failed to copy tool runners to jniLibs: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-  }
 } else {
   Write-Host "Skip libs: $srcLibDir not found" -ForegroundColor DarkYellow
 }
@@ -202,23 +174,6 @@ if (Test-Path $srcLibDir) {
   if ($srcSysroot -and (Test-Path $srcSysroot)) {
     $triple = if ($currentAbi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
     if ($SysrootMode -eq 'zip') {
-      # Optional tool binaries injection disabled by default; enable with -InjectToolsToSysroot
-      if ($InjectToolsToSysroot) {
-        if (-not $ToolBinSource -or -not (Test-Path $ToolBinSource)) {
-          $auto = Join-Path -Path $abiOutputRoot -ChildPath 'tools/bin'
-          if (Test-Path $auto) { $ToolBinSource = $auto }
-        }
-        if ($ToolBinSource -and (Test-Path $ToolBinSource)) {
-          $dstBin = Join-Path $srcSysroot 'usr/bin'
-          New-Item -ItemType Directory -Force -Path $dstBin | Out-Null
-          Get-ChildItem -LiteralPath $ToolBinSource -File | ForEach-Object {
-            Copy-Item $_.FullName -Destination (Join-Path $dstBin $_.Name) -Force
-          }
-          Write-Host "INFO: Injected tool binaries -> $dstBin" -ForegroundColor Green
-        } else {
-          Write-Host "INFO: ToolBinSource not provided or missing; skip tool injection" -ForegroundColor Yellow
-        }
-      }
       # 注入运行时 clang/LLVM 共享库到 sysroot（运行期从此处 System.load）。
       $dstRuntime = Join-Path $srcSysroot ("usr/lib/$triple/runtime")
       $prebuiltLibs = Join-Path $abiLibRoot $currentAbi
@@ -239,14 +194,13 @@ if (Test-Path $srcLibDir) {
         Write-Host "[w] Prebuilt libs not found at $prebuiltLibs; skip runtime injection" -ForegroundColor Yellow
       }
       
-      # 关键：也复制 libc++_shared.so 到 runtime 目录
-      # 因为 libxmake_runner.so 依赖它，而且在 runtime 目录中
+      # 关键：也复制 libc++_shared.so 到 runtime 目录，供运行期加载
       $srcTripleApiDir = Join-Path $srcSysroot ("usr/lib/$triple/$ApiLevel")
       $libcxxShared = Join-Path $srcTripleApiDir "libc++_shared.so"
       if (Test-Path $libcxxShared) {
         New-Item -ItemType Directory -Force -Path $dstRuntime | Out-Null
         Copy-Item $libcxxShared -Destination (Join-Path $dstRuntime "libc++_shared.so") -Force
-        Write-Host "INFO: Copied libc++_shared.so to runtime dir for libxmake_runner.so" -ForegroundColor Green
+        Write-Host "INFO: Copied libc++_shared.so to runtime dir" -ForegroundColor Green
       } else {
         Write-Host "[w] libc++_shared.so not found at $libcxxShared" -ForegroundColor Yellow
       }
@@ -263,7 +217,7 @@ if (Test-Path $srcLibDir) {
         $zip = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create, $false)
         $root = (Resolve-Path $srcSysroot).Path
         $rootLen = $root.Length
-        $prunedBinFiles = @('cmake','ninja','libcmake_runner.so','libninja_runner.so','llvm-symbolizer-host','llvm-objdump-host','llvm-dwarfdump-host','libc++_shared.so')
+        $prunedBinFiles = @('cmake','ninja','llvm-symbolizer-host','llvm-objdump-host','llvm-dwarfdump-host','libc++_shared.so')
         Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
           if ($_.Extension -ieq '.a') { return }
           $rel = $_.FullName.Substring($rootLen).TrimStart([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
@@ -278,24 +232,6 @@ if (Test-Path $srcLibDir) {
         }
       } finally { if ($zip) { $zip.Dispose() }; if ($fs) { $fs.Dispose() } }
       Write-Host "INFO: Packaged sysroot archive -> $zipPath" -ForegroundColor Green
-      # Optionally copy tool runners into sysroot runtime too (for archival/absolute System.load)
-      if ($CopyToolRunnersToSysroot) {
-        try {
-          $toolsBin = Join-Path -Path $abiOutputRoot -ChildPath 'tools/bin'
-          if (Test-Path $toolsBin) {
-            $runners = @('libxmake_runner.so')
-            foreach($r in $runners){
-              $src = Join-Path $toolsBin $r
-              if (Test-Path $src) {
-                Copy-Item $src -Destination (Join-Path $dstRuntime $r) -Force
-                Write-Host "INFO: Archived $r into sysroot runtime" -ForegroundColor Green
-              }
-            }
-          }
-        } catch {
-          Write-Host "[w] Failed to archive tool runners into sysroot runtime: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
-      }
     } else {
       $assetsSysrootTarget = if ($isMultiAbi) { Join-Path $assetsRoot ("sysroot-$currentAbi") } else { $AppAssetsSysroot }
       New-Item -ItemType Directory -Force -Path $assetsSysrootTarget | Out-Null

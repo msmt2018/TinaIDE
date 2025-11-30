@@ -138,7 +138,7 @@ class ProjectDialog(
                 }
 
                 if (!hasError) {
-                    createNewProject(projectName, projectPath, selectedTypeIndex.coerceAtLeast(0))
+                    createNewProject(projectName, projectPath)
                     dialog.dismiss()
                 }
             }
@@ -203,7 +203,7 @@ class ProjectDialog(
     /**
      * 创建新项目
      */
-    private fun createNewProject(projectName: String, projectPath: String, selectedType: Int) {
+    private fun createNewProject(projectName: String, projectPath: String) {
         try {
             val projectDir = File(projectPath, projectName)
 
@@ -217,11 +217,7 @@ class ProjectDialog(
                 return
             }
 
-            val ok = when (selectedType) {
-                0 -> ProjectTemplateInstaller.installCppXmakeTemplate(requireContext(), projectDir, projectName)
-                1 -> ProjectTemplateInstaller.installCppSingleFile(projectDir, projectName)
-                else -> false
-            }
+            val ok = ProjectTemplateInstaller.installCppSingleFile(projectDir, projectName)
 
             if (!ok) {
                 requireContext().toastError(getString(R.string.error_template_failed))

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="project_types">
-        <item>C++ 项目 (xmake)</item>
         <item>C++ 单文件</item>
     </string-array>
 

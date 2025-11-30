@@ -13,10 +13,6 @@
 - [LLVM 构建工具](LLVM_BUILD_TOOLS.md) - 工具链构建说明
 - [Native 链接策略](Native-Linking-Strategies.md) - 原生库链接方案
 
-### Android 平台
-- [Android SELinux 限制说明](Android-SELinux-限制说明.md) - SELinux 安全策略说明
-- [Android SELinux 解决方案](Android-SELinux-解决方案.md) - 如何应对 SELinux 限制
-
 ### 开发指南
 - [代码重构指南](Code-Refactoring-Guide.md) - 代码重构的最佳实践
 - [Material Design 指南](Material-Design-Guide.md) - UI 设计规范
@@ -30,11 +26,9 @@
 - ✅ **单文件编译**: 快速编译 C/C++ 单文件项目
 - ✅ **Sora Editor**: 强大的代码编辑器
 - ✅ **项目管理**: 创建、打开、管理 C/C++ 项目
-- ✅ **xmake 支持**: Android 原生构建工具（实验性）
 
-### 支持的构建工具
+### 支持的工具链
 - **Clang/LLVM**: 编译和链接 C/C++ 代码
-- **xmake**: Android 原生构建工具（实验性）
 
 ### 支持的架构
 - `arm64-v8a` (主要支持)
@@ -75,7 +69,6 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 24
 ### 后端
 - **C++**: JNI 原生代码
 - **Clang/LLVM 17**: 编译器工具链
-- **xmake**: 构建工具（实验性）
 
 ### 构建工具
 - **Gradle**: Android 构建系统
