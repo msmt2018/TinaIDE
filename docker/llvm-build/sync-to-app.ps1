@@ -106,4 +106,4 @@ if ($triple) {
   $tripleDir = Join-Path $dstSys ("usr/lib/$triple/$ApiLevel")
   if (-not (Test-Path $tripleDir)) { Warn "sysroot 缺少 $triple/$ApiLevel 目录：$tripleDir" }
 }
-Info "Done: 已同步 .so 到 $dstSo，sysroot 到 $dstSys（含可用的 xmake/xrepo）"
+Info "Done: 已同步 .so 到 $dstSo，sysroot 到 $dstSys（含最新工具链）"

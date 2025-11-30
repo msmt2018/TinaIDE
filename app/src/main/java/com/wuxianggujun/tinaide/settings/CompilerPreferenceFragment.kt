@@ -6,11 +6,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SeekBarPreference
-import androidx.preference.SwitchPreferenceCompat
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.config.IConfigManager
-import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.get
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
 import com.wuxianggujun.tinaide.utils.Logger
@@ -37,7 +35,6 @@ class CompilerPreferenceFragment : PreferenceFragmentCompat() {
         setupTargetArchPreference()
         setupThreadsPreference()
         setupDebugSymbolsPreference()
-        setupForceSysrootOverridePreference()
         setupReinstallSysrootPreference()
     }
 
@@ -91,17 +88,6 @@ class CompilerPreferenceFragment : PreferenceFragmentCompat() {
             setOnPreferenceChangeListener { _, newValue ->
                 val enabled = newValue as Boolean
                 configManager.set("compiler.debugSymbols", enabled)
-                true
-            }
-        }
-    }
-
-    private fun setupForceSysrootOverridePreference() {
-        findPreference<SwitchPreferenceCompat>("compiler_force_sysroot_override")?.apply {
-            isChecked = Prefs.forceSysrootOverrides
-            setOnPreferenceChangeListener { _, newValue ->
-                val enabled = newValue as Boolean
-                Prefs.setForceSysrootOverrides(enabled)
                 true
             }
         }

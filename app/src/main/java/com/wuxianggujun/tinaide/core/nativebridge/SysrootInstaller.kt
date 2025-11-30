@@ -3,8 +3,6 @@ package com.wuxianggujun.tinaide.core.nativebridge
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import com.wuxianggujun.tinaide.BuildConfig
-import com.wuxianggujun.tinaide.core.config.Prefs
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -15,9 +13,6 @@ import java.util.zip.ZipInputStream
 
 object SysrootInstaller {
     private const val TAG = "SysrootInstaller"
-    private val BRIDGE_PLACEHOLDER_TOOLS = arrayOf("clang", "clang++", "llvm-ar")
-    private const val OVERRIDES_ASSET_ROOT = "xmake-overrides"
-    private const val OVERRIDE_MARK_FILE = ".tina_overrides"
 
     /**
      * Ensure <files>/sysroot is present by copying from assets/sysroot on first run.
@@ -29,13 +24,7 @@ object SysrootInstaller {
         val cppSentinel = File(dst, "usr/include/c++/v1/__ios/fpos.h")
         val clangResSentinel = File(dst, "lib/clang/17/include/stdarg.h")
         val needInstall = !(cSentinel.exists() && cppSentinel.exists() && clangResSentinel.exists())
-        return if (needInstall) {
-            forceReinstall(context)
-        } else {
-            ensureBridgeToolPlaceholders(dst)
-            applyXmakeOverrides(context, dst, Prefs.forceSysrootOverrides)
-            dst
-        }
+        return if (needInstall) forceReinstall(context) else dst
     }
 
     /**
@@ -70,8 +59,6 @@ object SysrootInstaller {
             fixExecPermissions(dst)
         } catch (_: Throwable) {
         }
-        ensureBridgeToolPlaceholders(dst)
-        applyXmakeOverrides(context, dst, true)
         Log.i(TAG, "sysroot installed/refreshed at ${dst.absolutePath}")
         return dst
     }
@@ -87,96 +74,6 @@ object SysrootInstaller {
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * Create lightweight placeholder executables (clang/clang++/llvm-ar) so xmake tool detection
-     * succeeds even though actual compilation is bridged到 NativeCompiler.
-     */
-    private fun ensureBridgeToolPlaceholders(root: File) {
-        val binDir = File(root, "usr/bin")
-        if (!binDir.exists()) {
-            try {
-                binDir.mkdirs()
-            } catch (_: Throwable) {
-            }
-        }
-        if (!binDir.exists()) return
-        BRIDGE_PLACEHOLDER_TOOLS.forEach { name ->
-            val tool = File(binDir, name)
-            if (!tool.exists()) {
-                try {
-                    tool.writeText("#!/system/bin/sh\nexit 0\n")
-                    tool.setExecutable(true, false)
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to create placeholder tool $name", t)
-                }
-            }
-        }
-    }
-
-    private fun applyXmakeOverrides(context: Context, root: File, force: Boolean) {
-        try {
-            val assets = context.assets
-            val hasOverrides = assets.list(OVERRIDES_ASSET_ROOT)?.isNotEmpty() == true
-            if (!hasOverrides) {
-                Log.d(TAG, "xmake overrides skipped: no assets under $OVERRIDES_ASSET_ROOT")
-                return
-            }
-            if (!force && !overridesNeedRefresh(root)) {
-                Log.d(TAG, "xmake overrides already up-to-date (marker=${File(root, OVERRIDE_MARK_FILE)})")
-                return
-            }
-            copyAssetTree(context, OVERRIDES_ASSET_ROOT, root)
-            writeOverrideMarker(root)
-            Log.i(TAG, "xmake overrides applied (force=$force)")
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to apply xmake overrides: ${t.message}")
-        }
-    }
-
-    private fun copyAssetTree(context: Context, assetPath: String, dest: File) {
-        val assets = context.assets
-        val entries = assets.list(assetPath)
-        if (entries == null || entries.isEmpty()) {
-            if (assetPath == OVERRIDES_ASSET_ROOT) return
-            dest.parentFile?.mkdirs()
-            assets.open(assetPath).use { input ->
-                FileOutputStream(dest).use { out -> input.copyTo(out) }
-            }
-            return
-        }
-        if (assetPath != OVERRIDES_ASSET_ROOT && !dest.exists()) {
-            dest.mkdirs()
-        }
-        entries.forEach { child ->
-            val childAssetPath = "$assetPath/$child"
-            val childDest = File(dest, child)
-            copyAssetTree(context, childAssetPath, childDest)
-        }
-    }
-
-    private fun overridesNeedRefresh(root: File): Boolean {
-        val marker = File(root, OVERRIDE_MARK_FILE)
-        return try {
-            if (!marker.exists()) {
-                true
-            } else {
-                marker.readText().trim() != BuildConfig.VERSION_CODE.toString()
-            }
-        } catch (_: Throwable) {
-            true
-        }
-    }
-
-    private fun writeOverrideMarker(root: File) {
-        try {
-            val marker = File(root, OVERRIDE_MARK_FILE)
-            marker.parentFile?.mkdirs()
-            marker.writeText(BuildConfig.VERSION_CODE.toString())
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to write override marker: ${t.message}")
         }
     }
 

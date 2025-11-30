@@ -7,11 +7,7 @@ Param(
   [ValidateSet('none','zip','mirror')]
   [string]$SysrootMode = 'zip',
   [bool]$CopyLibcxxToJni = $true,
-  [bool]$CopyLlvmToJni   = $false,
-  [string]$ToolBinSource = '',
-  [bool]$InjectToolsToSysroot = $false,
-  [bool]$CopyToolRunnersToJni = $false,
-  [bool]$CopyToolRunnersToSysroot = $true
+  [bool]$CopyLlvmToJni   = $false
 )
 
 $validAbis = @('arm64-v8a','x86_64')
@@ -36,11 +32,7 @@ function Invoke-SyncSingleAbi {
     '-AppAssetsSysroot', $AppAssetsSysroot,
     '-SysrootMode', $SysrootMode,
     "-CopyLibcxxToJni:$CopyLibcxxToJni",
-    "-CopyLlvmToJni:$CopyLlvmToJni",
-    '-ToolBinSource', $ToolBinSource,
-    "-InjectToolsToSysroot:$InjectToolsToSysroot",
-    "-CopyToolRunnersToJni:$CopyToolRunnersToJni",
-    "-CopyToolRunnersToSysroot:$CopyToolRunnersToSysroot"
+    "-CopyLlvmToJni:$CopyLlvmToJni"
   )
   & pwsh -NoLogo @args
   if ($LASTEXITCODE -ne 0) {
@@ -64,47 +56,11 @@ function Rename-SysrootZip {
   }
 }
 
-function Ensure-XmakeShareZip {
-  $assetsRoot = Split-Path -Parent $AppAssetsSysroot
-  $shareZip = Join-Path $assetsRoot 'xmake-share.zip'
-  $shareSource = $null
-  foreach ($abi in $abiList) {
-    $candidate = Join-Path (Join-Path $BuildOutputRoot $abi) 'sysroot/usr/share/xmake'
-    if (Test-Path $candidate) { $shareSource = $candidate; break }
-  }
-  if (-not $shareSource) {
-    Write-Host "Skip xmake-share packaging: source directory not found." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $shareZip) { Remove-Item -Force $shareZip }
-  try { Add-Type -AssemblyName System.IO.Compression.FileSystem } catch { }
-  $fs = [System.IO.File]::Open($shareZip, [System.IO.FileMode]::CreateNew)
-  try {
-    $zip = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create, $false)
-    $root = (Resolve-Path $shareSource).Path
-    $rootLen = $root.Length
-    Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
-      $rel = $_.FullName.Substring($rootLen).TrimStart([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
-      $entryName = "usr/share/xmake/" + ($rel -replace '\\','/')
-      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
-    }
-  }
-  finally {
-    if ($zip) { $zip.Dispose() }
-    if ($fs) { $fs.Dispose() }
-  }
-  Write-Host "Packaged xmake-share.zip -> $shareZip" -ForegroundColor Green
-}
-
 foreach ($abi in $abiList) {
   Invoke-SyncSingleAbi -AbiValue $abi
   if ($SysrootMode -eq 'zip') {
     Rename-SysrootZip -AbiValue $abi
   }
-}
-
-if ($SysrootMode -eq 'zip') {
-  Ensure-XmakeShareZip
 }
 
 Write-Host "== Completed multi-ABI sync ==" -ForegroundColor Cyan

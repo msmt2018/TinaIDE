@@ -8,7 +8,6 @@ TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手
 
 - 🚀 **嵌入式编译器**: 内置 Clang/LLVM 17，无需外部工具
 - 📝 **强大编辑器**: 基于 Sora Editor，支持语法高亮和代码补全
-- 🔨 **xmake 支持**: Android 原生构建工具（实验性）
 - ⚡ **快速编译**: 单文件快速编译
 - 🎨 **现代 UI**: Material Design 3 设计语言
 - 🔌 **插件系统**: 可扩展的插件架构
@@ -17,13 +16,12 @@ TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手
 
 ### 编译器集成
 - **库模式**: Clang/LLVM 以动态库形式集成，进程内编译
-- **完整工具链**: 包含 xmake 等构建工具（实验性）
+- **完整工具链**: 嵌入式 Clang/LLVM + Android Sysroot
 - **Sysroot**: 完整的 Android NDK 头文件和库
 
 ### 项目支持
 - **单文件项目**: 快速编译单个 C/C++ 文件
-- **xmake 项目**: 使用 xmake 构建系统（实验性）
-- **项目模板**: 内置多种项目模板
+- **项目模板**: 内置单文件模板
 
 ### 编辑器功能
 - 语法高亮
@@ -53,7 +51,7 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 ### 3. 开始使用
 
 1. 启动应用（首次启动会自动解压 sysroot）
-2. 创建新项目（单文件或 xmake）
+2. 创建新项目（单文件）
 3. 编写代码
 4. 点击编译按钮
 
@@ -70,7 +68,6 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 
 - [Clang/LLVM 集成路线图](docs/CLANG_INTEGRATION_ROADMAP.md)
 - [架构概览](docs/架构概览.md)
-- [Android SELinux 解决方案](docs/Android-SELinux-解决方案.md)
 - [插件系统架构](docs/Plugin-System-Architecture.md)
 
 ## 🏗️ 技术栈
@@ -79,7 +76,6 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 - **UI**: Jetpack Compose, Material Design 3
 - **编辑器**: Sora Editor
 - **编译器**: Clang/LLVM 17
-- **构建工具**: xmake (实验性)
 - **构建系统**: Gradle, Docker
 
 ## 🎨 支持的架构
@@ -122,7 +118,6 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 
 - [LLVM Project](https://llvm.org/) - 编译器基础设施
 - [Sora Editor](https://github.com/Rosemoe/sora-editor) - 代码编辑器
-- [xmake](https://xmake.io/) - 构建工具
 
 ## 📮 联系方式
 

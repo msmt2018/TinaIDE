@@ -42,13 +42,6 @@
         android:title="工具链调试"
         app:iconSpaceReserved="false">
 
-        <SwitchPreferenceCompat
-            android:key="compiler_force_sysroot_override"
-            android:title="@string/pref_force_sysroot_override_title"
-            android:summary="@string/pref_force_sysroot_override_summary"
-            android:defaultValue="false"
-            app:iconSpaceReserved="false" />
-
         <Preference
             android:key="reinstall_sysroot"
             android:title="重新安装 Sysroot"

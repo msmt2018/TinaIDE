@@ -4,7 +4,6 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.nativebridge.NativeCompiler
 import com.wuxianggujun.tinaide.core.nativebridge.NativeLoader
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
-import com.wuxianggujun.tinaide.core.nativebridge.XmakeRunner
 import com.wuxianggujun.tinaide.file.IFileManager
 import com.wuxianggujun.tinaide.output.IOutputManager
 import kotlinx.coroutines.CancellationException
@@ -17,9 +16,7 @@ import java.io.File
 /**
  * 编译用例
  *
- * 支持两种编译模式：
- * 1. xmake 项目 - 使用 XmakeRunner 调用 xmake 构建
- * 2. 单文件项目 - 使用 NativeCompiler 编译单个 cpp 文件
+ * 当前仅支持**单文件/轻量项目**的直接编译，未来会扩展自定义构建流程。
  */
 class CompileProjectUseCase(
     private val appContext: Context,
@@ -38,129 +35,24 @@ class CompileProjectUseCase(
         data class Error(val userMessage: String, val throwable: Throwable?) : Result()
     }
     
-    /**
-     * 检测是否为 xmake 项目
-     */
-    private fun isXmakeProject(projectRoot: File): Boolean {
-        return File(projectRoot, "xmake.lua").exists()
-    }
-
     suspend fun execute(onProgress: (CompileProgress) -> Unit): Result = withContext(Dispatchers.IO) {
         try {
             val project = fileManager.getCurrentProject()
                 ?: return@withContext Result.Error("未找到项目", null)
 
             val projectRoot = File(project.rootPath)
-            
-            // 根据项目类型选择编译方式
-            if (isXmakeProject(projectRoot)) {
-                compileXmakeProject(projectRoot, project.name)
-            } else {
-                compileSingleFileProject(projectRoot, project.name, onProgress)
+
+            if (File(projectRoot, "xmake.lua").exists()) {
+                return@withContext Result.Error("xmake 项目已不再受支持，请迁移到自定义构建流程。", null)
             }
+
+            compileSingleFileProject(projectRoot, project.name, onProgress)
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
             Result.Error(t.message ?: "编译失败", t)
         }
     }
-    
-    /**
-     * 编译 xmake 项目
-     */
-    private suspend fun compileXmakeProject(
-        projectRoot: File,
-        projectName: String
-    ): Result = withContext(Dispatchers.IO) {
-        val logForwarder: (String, Boolean) -> Unit = { line, isError ->
-            val prefix = if (isError) "[xmake:err]" else "[xmake]"
-            outputManager.appendOutput("$prefix $line\n")
-        }
-        XmakeRunner.setNativeLogListener(logForwarder)
-        try {
-            outputManager.appendOutput("=== xmake 构建开始 ===\n")
-            outputManager.appendOutput("项目: $projectName\n")
-            outputManager.appendOutput("路径: ${projectRoot.absolutePath}\n\n")
-            
-            // 检查 xmake.lua 是否存在
-            val xmakeLua = File(projectRoot, "xmake.lua")
-            if (!xmakeLua.exists()) {
-                return@withContext Result.Error("xmake.lua 不存在", null)
-            }
-            outputManager.appendOutput("xmake.lua 存在: ${xmakeLua.absolutePath}\n")
-            
-            // 加载 xmake_runner
-            outputManager.appendOutput("加载 xmake_runner...\n")
-            XmakeRunner.loadIfNeeded()
-            outputManager.appendOutput("xmake_runner 加载成功\n\n")
-            
-            // 先尝试获取 xmake 版本
-            outputManager.appendOutput("检查 xmake 版本...\n")
-            val versionResult = XmakeRunner.run("--version")
-            outputManager.appendOutput("xmake --version 返回码: $versionResult\n\n")
-
-            // 执行 xmake 配置，强制使用 envs 工具链
-            val toolchainArgs = arrayOf(
-                "--toolchain=envs",
-                "--cc=clang",
-                "--cxx=clang++",
-                "--ld=clang",
-                "--sh=clang",
-                "--as=clang",
-                "--ar=llvm-ar"
-            )
-            // TinaIDE: 禁用 xmake build cache，避免 xxhash 在 Android 私有沙箱内访问预处理文件失败
-            val configArgs = toolchainArgs + "--ccache=n"
-            outputManager.appendOutput("执行 xmake 配置...\n")
-            outputManager.appendOutput(
-                buildString {
-                    append("命令: xmake f -P ${projectRoot.absolutePath}")
-                    configArgs.forEach { append(" $it") }
-                    append("\n\n")
-                }
-            )
-            outputManager.appendOutput("提示: 默认关闭 xmake build cache 以兼容 TinaIDE 进程桥接。\n\n")
-            val configResult = XmakeRunner.config(projectRoot.absolutePath, *configArgs)
-            if (configResult != 0) {
-                val msg = "xmake 配置失败，返回码: $configResult"
-                outputManager.appendOutput("\n$msg\n")
-                return@withContext Result.Error(msg, null)
-            }
-            
-            // 执行 xmake 构建
-            outputManager.appendOutput("执行 xmake build...\n")
-            outputManager.appendOutput("命令: xmake -P ${projectRoot.absolutePath} -v\n\n")
-            val result = XmakeRunner.build(projectRoot.absolutePath, verbose = true)
-            
-            if (result == 0) {
-                val summary = buildString {
-                    appendLine("=== xmake 构建成功 ===")
-                    appendLine("项目: $projectName")
-                    appendLine("返回码: $result")
-                }
-                outputManager.appendOutput("\n$summary")
-                Result.Success(summary)
-            } else {
-                val msg = "xmake 构建失败，返回码: $result"
-                outputManager.appendOutput("\n$msg\n")
-                outputManager.appendOutput("提示: 返回码 -1 通常表示 xmake 内部错误\n")
-                outputManager.appendOutput("可能原因:\n")
-                outputManager.appendOutput("  1. xmake 需要初始化配置\n")
-                outputManager.appendOutput("  2. 项目路径权限问题\n")
-                outputManager.appendOutput("  3. xmake 在 Android 环境下的兼容性问题\n")
-                Result.Error(msg, null)
-            }
-            
-        } catch (e: Exception) {
-            val msg = "xmake 编译失败: ${e.message}"
-            outputManager.appendOutput("\n$msg\n")
-            outputManager.appendOutput("异常堆栈: ${e.stackTraceToString()}\n")
-            Result.Error(msg, e)
-        } finally {
-            XmakeRunner.setNativeLogListener(null)
-        }
-    }
-
     
     /**
      * 编译单文件项目
