@@ -553,7 +553,10 @@ pwsh tools/sync-llvm-build.ps1 -Abi x86_64 -ApiLevel 24
 
 **Q: 应用启动报错 "dlopen failed: library 'libc++_shared.so' not found"**
 
-A: 确保 `libc++_shared.so` 已打包到 `jniLibs/<abi>/`
+A: 运行期所有 LLVM/Clang 依赖都从 sysroot 加载。请确认：
+1. `tools/sync-llvm-build.ps1` 已同步成功，并在 `app/src/main/assets` 生成对应的 `sysroot-<abi>.zip`；
+2. 首次启动日志出现 `SysrootInstaller: Installing sysroot...`，`files/sysroot/usr/lib/<triple>/runtime/libc++_shared.so` 存在；
+3. 若依旧报错，删除 `<files>/sysroot` 后再次启动或在设置页选择“重新安装 sysroot”。
 
 **Q: sysroot 未解压**
 

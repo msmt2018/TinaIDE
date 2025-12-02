@@ -57,7 +57,7 @@ app/src/main/java/com/wuxianggujun/tinaide/core/lsp/
 
 ```powershell
 # 构建 host 端 clangd（Linux x86_64 可执行文件）
-./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -BuildClangdHost $true
+./docker/llvm-build/build-local.ps1 -Abi arm64-v8a
 
 # 同步到 assets
 ./tools/sync-llvm-build.ps1 -Abi arm64-v8a
@@ -68,16 +68,18 @@ clangd 会被放置在 `sysroot/tools/bin/clangd-host`。
 #### 方式 B：构建共享库（Android 端）
 
 ```powershell
-# 构建 Android 端 clangd 共享库（libclangd.so）
-./docker/llvm-build/build-local.ps1 -Abi arm64-v8a -BuildClangdAndroid $true
+# 构建 Android 端 clangd 共享库（libclangd.so，脚本默认包含）
+./docker/llvm-build/build-local.ps1 -Abi arm64-v8a
 
 # 同步到 assets
 ./tools/sync-llvm-build.ps1 -Abi arm64-v8a
 ```
 
-libclangd.so 会被放置在：
+libclangd.so 会被打包到 sysroot：
 - `sysroot/usr/lib/aarch64-linux-android/runtime/libclangd.so`
-- `libs/arm64-v8a/libclangd.so`
+(构建输出目录 `docker/llvm-build/build-output/<abi>/libs/<abi>/libclangd.so` 仅供同步脚本注入 sysroot，APK 不再携带 jniLibs 副本。)
+
+同步脚本会清理 `app/src/main/jniLibs/<abi>` 中的 LLVM/Clang 运行库，应用启动后由 `SysrootInstaller + SysrootLibraryLoader` 从解压的 sysroot 目录加载所需 `.so`。
 
 > **注意**：构建 clangd 需要大量内存（建议 16GB+）和时间（可能需要数小时）。
 

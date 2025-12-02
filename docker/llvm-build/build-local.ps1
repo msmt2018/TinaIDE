@@ -9,8 +9,6 @@ Param(
   # Build-type/diagnostics toggles for Android runtime libraries
   [ValidateSet('MinSizeRel','RelWithDebInfo','Debug')][string]$AndroidBuildType = 'MinSizeRel',
   [bool]$EnableAssertions = $false,
-  # Android-side clangd (as shared library for LSP)
-  [bool]$BuildClangdAndroid = $false,
   # 源码更新控制
   [bool]$UpdateSource = $false,  # 默认不更新源码，使用本地已有的
   [bool]$ForceClone = $false,    # 强制重新克隆（会删除现有源码）
@@ -157,13 +155,9 @@ if [ "${MODE}" = "reconfigure" ] || [ "${MODE}" = "clean" ]; then
   rm -f /work/build/android/${ABI}-api${API_LEVEL}/CMakeCache.txt || true
   rm -rf /work/build/android/${ABI}-api${API_LEVEL}/CMakeFiles || true
 fi
-# Determine if we need threads (clangd requires threads)
-if [ "${BUILD_CLANGD_ANDROID}" = "True" ] || [ "${BUILD_CLANGD_ANDROID}" = "true" ] || [ "${BUILD_CLANGD_ANDROID}" = "1" ]; then
-  ENABLE_THREADS=ON
-  echo "[i] Enabling threads for clangd build"
-else
-  ENABLE_THREADS=OFF
-fi
+# clangd 需要线程支持，默认始终启用
+ENABLE_THREADS=ON
+echo "[i] Enabling threads for clangd build"
 
 cmake -S /work/src/llvm-project/llvm -B /work/build/android/${ABI}-api${API_LEVEL} -G Ninja \
   -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGET}" -DCMAKE_BUILD_TYPE=${ANDROID_BUILD_TYPE} \
@@ -181,22 +175,32 @@ cmake -S /work/src/llvm-project/llvm -B /work/build/android/${ABI}-api${API_LEVE
   -DLLVM_PARALLEL_LINK_JOBS=${LINK_JOBS}
 ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j${COMPILE_JOBS} clang-cpp libclang lld lldELF lldCommon
 
+CLANGD_WRAPPER_PATH=""
 # Build clangd for Android as a shared library (libclangd.so)
 # This requires clang-tools-extra to be enabled in LLVM_ENABLE_PROJECTS
-if [ "${BUILD_CLANGD_ANDROID}" = "True" ] || [ "${BUILD_CLANGD_ANDROID}" = "true" ] || [ "${BUILD_CLANGD_ANDROID}" = "1" ]; then
-  echo "[i] Building clangd for Android (this may take a while)..."
-  # Build clangd static libraries first
-  ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j${COMPILE_JOBS} clangDaemon clangdSupport clangdMain clangDaemonTweaks || {
-    echo "[w] clangd Android build failed, retrying with reduced parallelism..."
-    ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j1 clangDaemon clangdSupport clangdMain clangDaemonTweaks || true
-  }
-  
-  # Create a wrapper shared library that exports clangd_main
-  # This allows us to dlopen and call clangd from Android
-  CLANGD_WRAPPER_DIR="/work/build/android/${ABI}-api${API_LEVEL}/clangd-wrapper"
-  mkdir -p "${CLANGD_WRAPPER_DIR}"
-  
-  cat > "${CLANGD_WRAPPER_DIR}/clangd_wrapper.cpp" << 'CLANGD_WRAPPER_EOF'
+echo "[i] Building clangd for Android (this may take a while)..."
+# Build clangd static libraries first
+ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j${COMPILE_JOBS} clangDaemon clangdSupport clangdMain clangDaemonTweaks || {
+  echo "[w] clangd Android build failed, retrying with reduced parallelism..."
+  ninja -C /work/build/android/${ABI}-api${API_LEVEL} -j1 clangDaemon clangdSupport clangdMain clangDaemonTweaks || true
+}
+
+# Create a wrapper shared library that exports clangd_main
+# This allows us to dlopen and call clangd from Android
+CLANGD_WRAPPER_DIR="/work/build/android/${ABI}-api${API_LEVEL}/clangd-wrapper"
+mkdir -p "${CLANGD_WRAPPER_DIR}"
+
+LLVM_LINK_FLAG="-lLLVM"
+LLVM_RESOLVED=$(ls /work/build/android/${ABI}-api${API_LEVEL}/lib/libLLVM-*.so 2>/dev/null | head -n1 || true)
+if [ -n "${LLVM_RESOLVED}" ]; then
+  LLVM_BASENAME=$(basename "${LLVM_RESOLVED}")
+  LLVM_LINK_FLAG="-l:${LLVM_BASENAME}"
+  echo "[i] Using LLVM shared library ${LLVM_BASENAME} for clangd wrapper link"
+else
+  echo "[w] libLLVM-*.so not found, falling back to -lLLVM"
+fi
+
+cat > "${CLANGD_WRAPPER_DIR}/clangd_wrapper.cpp" << 'CLANGD_WRAPPER_EOF'
 // clangd wrapper for Android - exports clangd_main as a shared library entry point
 #include <cstdio>
 #include <cstdlib>
@@ -240,42 +244,85 @@ int clangd_run() {
 } // extern "C"
 CLANGD_WRAPPER_EOF
 
-  # Compile the wrapper
-  ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ \
-    --target=${TRIPLE}${API_LEVEL} \
-    -std=c++17 \
-    -fPIC \
-    -shared \
-    -femulated-tls \
-    -I/work/src/llvm-project/clang-tools-extra/clangd \
-    -I/work/src/llvm-project/clang-tools-extra/clangd/tool \
-    -I/work/src/llvm-project/clang/include \
-    -I/work/src/llvm-project/llvm/include \
-    -I/work/build/android/${ABI}-api${API_LEVEL}/include \
-    -I/work/build/android/${ABI}-api${API_LEVEL}/tools/clang/include \
-    -o "${CLANGD_WRAPPER_DIR}/libclangd.so" \
-    "${CLANGD_WRAPPER_DIR}/clangd_wrapper.cpp" \
-    -L/work/build/android/${ABI}-api${API_LEVEL}/lib \
-    -Wl,--whole-archive \
-    -lclangdMain \
-    -lclangDaemon \
-    -lclangDaemonTweaks \
-    -lclangdSupport \
-    -Wl,--no-whole-archive \
-    -lclang-cpp \
-    -lLLVM \
-    -lc++_shared \
-    -landroid \
-    -llog \
-    || echo "[w] Failed to build libclangd.so wrapper"
-  
-  if [ -f "${CLANGD_WRAPPER_DIR}/libclangd.so" ]; then
-    cp -af "${CLANGD_WRAPPER_DIR}/libclangd.so" /hostout/${ABI}/libs/${ABI}/
-    cp -af "${CLANGD_WRAPPER_DIR}/libclangd.so" /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/
-    echo "[i] libclangd.so built successfully for Android"
-  else
-    echo "[w] libclangd.so not found after build attempt"
-  fi
+# Compile the wrapper
+${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ \
+  --target=${TRIPLE}${API_LEVEL} \
+  -std=c++17 \
+  -fPIC \
+  -shared \
+  -femulated-tls \
+  -I/work/src/llvm-project/clang-tools-extra/clangd \
+  -I/work/src/llvm-project/clang-tools-extra/clangd/tool \
+  -I/work/src/llvm-project/clang/include \
+  -I/work/src/llvm-project/llvm/include \
+  -I/work/build/android/${ABI}-api${API_LEVEL}/include \
+  -I/work/build/android/${ABI}-api${API_LEVEL}/tools/clang/include \
+  -o "${CLANGD_WRAPPER_DIR}/libclangd.so" \
+  "${CLANGD_WRAPPER_DIR}/clangd_wrapper.cpp" \
+  -L/work/build/android/${ABI}-api${API_LEVEL}/lib \
+  -Wl,--whole-archive \
+  -lclangdMain \
+  -lclangDaemon \
+  -lclangdRemoteIndex \
+  -lclangDaemonTweaks \
+  -lclangdSupport \
+  -lclangTidy \
+  -lclangTidyAbseilModule \
+  -lclangTidyAlteraModule \
+  -lclangTidyAndroidModule \
+  -lclangTidyBoostModule \
+  -lclangTidyBugproneModule \
+  -lclangTidyCERTModule \
+  -lclangTidyConcurrencyModule \
+  -lclangTidyCppCoreGuidelinesModule \
+  -lclangTidyDarwinModule \
+  -lclangTidyFuchsiaModule \
+  -lclangTidyGoogleModule \
+  -lclangTidyHICPPModule \
+  -lclangTidyLinuxKernelModule \
+  -lclangTidyLLVMLibcModule \
+  -lclangTidyLLVMModule \
+  -lclangTidyMiscModule \
+  -lclangTidyModernizeModule \
+  -lclangTidyMPIModule \
+  -lclangTidyObjCModule \
+  -lclangTidyOpenMPModule \
+  -lclangTidyPerformanceModule \
+  -lclangTidyPortabilityModule \
+  -lclangTidyReadabilityModule \
+  -lclangTidyUtils \
+  -lclangTidyZirconModule \
+  -Wl,--no-whole-archive \
+  -lclangIncludeCleaner \
+  -lclangPseudo \
+  -lclangAST \
+  -lclangASTMatchers \
+  -lclangBasic \
+  -lclangDriver \
+  -lclangFormat \
+  -lclangFrontend \
+  -lclangIndex \
+  -lclangLex \
+  -lclangSema \
+  -lclangSerialization \
+  -lclangTooling \
+  -lclangToolingCore \
+  -lclangToolingInclusions \
+  -lclangToolingInclusionsStdlib \
+  -lclangToolingSyntax \
+  -lclang-cpp \
+  ${LLVM_LINK_FLAG} \
+  -lc++_shared \
+  -landroid \
+  -llog \
+  || echo "[w] Failed to build libclangd.so wrapper"
+
+CLANGD_WRAPPER_PATH="${CLANGD_WRAPPER_DIR}/libclangd.so"
+if [ -f "${CLANGD_WRAPPER_PATH}" ]; then
+  echo "[i] libclangd.so built successfully for Android"
+else
+  echo "[w] libclangd.so not found after build attempt"
+  CLANGD_WRAPPER_PATH=""
 fi
 
 # Clean destination to avoid duplicate/readonly collisions on host mounts
@@ -285,6 +332,9 @@ mkdir -p /hostout/${ABI}/include/clang-c /hostout/${ABI}/include/clang /hostout/
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang-cpp.so* /hostout/${ABI}/libs/${ABI}/ || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang.so* /hostout/${ABI}/libs/${ABI}/ || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libLLVM*.so*    /hostout/${ABI}/libs/${ABI}/ || true
+if [ -n "${CLANGD_WRAPPER_PATH}" ] && [ -f "${CLANGD_WRAPPER_PATH}" ]; then
+  cp -af "${CLANGD_WRAPPER_PATH}" /hostout/${ABI}/libs/${ABI}/ || true
+fi
 # Export LLD static libraries for in-process linking (build-time only)
 if [ -f /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldCommon.a ]; then
   cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/liblldCommon.a /hostout/${ABI}/libs/${ABI}/ || true
@@ -299,6 +349,9 @@ mkdir -p /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang-cpp.so* /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libclang.so* /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
 cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/libLLVM*.so*    /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
+if [ -n "${CLANGD_WRAPPER_PATH}" ] && [ -f "${CLANGD_WRAPPER_PATH}" ]; then
+  cp -af "${CLANGD_WRAPPER_PATH}" /hostout/${ABI}/sysroot/usr/lib/${TRIPLE}/runtime/ || true
+fi
 if compgen -G "/work/build/android/${ABI}-api${API_LEVEL}/lib/liblld*.so*" > /dev/null; then
   cp -af /work/build/android/${ABI}-api${API_LEVEL}/lib/liblld*.so* /hostout/${ABI}/libs/${ABI}/
 fi
@@ -436,7 +489,7 @@ foreach ($currentAbi in $abiList) {
   Write-Info "Building LLVM artifacts for ABI: $currentAbi"
   $outDirHost = Join-Path $OutputPath "${currentAbi}"
   New-Item -ItemType Directory -Force -Path $outDirHost | Out-Null
-  $assign = "ABI='$currentAbi'; API_LEVEL='$ApiLevel'; LLVM_TAG='$LlvmTag'; NDK_VERSION='$NdkVersion'; MODE='$Mode'; ANDROID_BUILD_TYPE='$AndroidBuildType'; ENABLE_ASSERTIONS='$EnableAssertions'; BUILD_CLANGD_ANDROID='$BuildClangdAndroid'; UPDATE_SOURCE='$UpdateSource'; FORCE_CLONE='$ForceClone'; BUILD_JOBS='$BuildJobs'; LINK_JOBS='$LinkJobs';"
+  $assign = "ABI='$currentAbi'; API_LEVEL='$ApiLevel'; LLVM_TAG='$LlvmTag'; NDK_VERSION='$NdkVersion'; MODE='$Mode'; ANDROID_BUILD_TYPE='$AndroidBuildType'; ENABLE_ASSERTIONS='$EnableAssertions'; UPDATE_SOURCE='$UpdateSource'; FORCE_CLONE='$ForceClone'; BUILD_JOBS='$BuildJobs'; LINK_JOBS='$LinkJobs';"
   $payload = "$assign`n$sessionScript"
   $payload = $payload -replace "`r",""
   $containerTemplate = @'

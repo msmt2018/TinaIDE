@@ -78,23 +78,6 @@ object NativeCompiler {
         timeoutMs: Int
     ): String
 
-    /**
-     * 获取语义 Token 列表，用于语法高亮
-     * @param sysroot sysroot 路径
-     * @param srcPath 源文件路径
-     * @param target 目标三元组 (如 aarch64-linux-android28)
-     * @param isCxx 是否为 C++ 文件
-     * @param includeDirs 额外的 include 目录
-     * @return JSON 格式的 Token 列表: [{"o":offset,"l":length,"t":type}, ...]
-     */
-    external fun getSemanticTokens(
-        sysroot: String,
-        srcPath: String,
-        target: String,
-        isCxx: Boolean,
-        includeDirs: Array<String>
-    ): String
-
     // ============================================================================
     // Clangd LSP Server Support
     // ============================================================================
@@ -116,18 +99,6 @@ object NativeCompiler {
      * @return true 如果 clangd 正在运行
      */
     external fun isClangdRunning(): Boolean
-
-    /**
-     * 获取 clangd stdin 的文件描述符（用于写入）
-     * @return 文件描述符，如果 clangd 未运行则返回 -1
-     */
-    external fun getClangdStdinFd(): Int
-
-    /**
-     * 获取 clangd stdout 的文件描述符（用于读取）
-     * @return 文件描述符，如果 clangd 未运行则返回 -1
-     */
-    external fun getClangdStdoutFd(): Int
 
     /**
      * 向 clangd 写入数据

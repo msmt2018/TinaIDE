@@ -5,22 +5,20 @@ import android.view.View
 import com.wuxianggujun.tinaide.base.BaseBindingFragment
 import com.wuxianggujun.tinaide.databinding.FragmentEditorBinding
 import com.wuxianggujun.tinaide.R
-import com.wuxianggujun.tinaide.core.editor.ClangLanguage
+import com.wuxianggujun.tinaide.core.lsp.ClangdServerDefinition
 import com.wuxianggujun.tinaide.core.lsp.LspEditorManager
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
 import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.widget.CodeEditor
-import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * 编辑器 Fragment
  * 包含 SoraEditor 实例
- * 支持 LSP (clangd) 和 libclang 两种语言支持方式
+ * 使用 LSP (clangd) 提供 C/C++ 语言支持
  */
 class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     FragmentEditorBinding::inflate
@@ -29,25 +27,19 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     private var filePath: String? = null
     private var lspEditor: LspEditor? = null
     
-    // ��否优先使用 LSP（可通过设置控制）
-    private var preferLsp: Boolean = true
-    
     companion object {
         private const val ARG_FILE_PATH = "file_path"
         private const val ARG_PROJECT_PATH = "project_path"
-        private const val ARG_PREFER_LSP = "prefer_lsp"
         private const val TAG = "EditorFragment"
         
         fun newInstance(
             filePath: String,
-            projectPath: String? = null,
-            preferLsp: Boolean = true
+            projectPath: String? = null
         ): EditorFragment {
             return EditorFragment().apply {
                 arguments = Bundle().apply {
                     putString(ARG_FILE_PATH, filePath)
                     putString(ARG_PROJECT_PATH, projectPath ?: java.io.File(filePath).parent)
-                    putBoolean(ARG_PREFER_LSP, preferLsp)
                 }
             }
         }
@@ -59,7 +51,6 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         filePath = arguments?.getString(ARG_FILE_PATH)
-        preferLsp = arguments?.getBoolean(ARG_PREFER_LSP, true) ?: true
     }
     
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -90,13 +81,13 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     
     /**
      * 根据文件类型设置语言支持
-     * 优先尝试 LSP (clangd)，如果不可用则回退到 libclang
+     * 使用 LSP (clangd) 提供 C/C++ 语言支持
      */
     private fun setupLanguage() {
         val path = filePath ?: return
         
         // 检查是否为 C/C++ 文件
-        if (!ClangLanguage.isCOrCppFile(path)) {
+        if (!ClangdServerDefinition.isCppFile(path)) {
             android.util.Log.d(TAG, "Not a C/C++ file: $path")
             return
         }
@@ -111,12 +102,12 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
                 val lspManager = LspEditorManager.getInstance(context)
                 lspManager.initialize(sysrootDir)
                 
-                // 尝试使用 LSP
-                if (preferLsp && lspManager.isAvailable()) {
+                // 使用 LSP
+                if (lspManager.isAvailable()) {
                     setupLspLanguage(path, lspManager)
                 } else {
-                    // 回退到 libclang
-                    setupClangLanguage(path, sysrootDir)
+                    android.util.Log.w(TAG, "LSP not available for: $path")
+                    android.util.Log.w(TAG, "Please ensure libclangd.so is installed in sysroot/usr/lib/<triple>/runtime/")
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Error setting up language support", e)
@@ -156,57 +147,11 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             if (lspEditor != null) {
                 android.util.Log.i(TAG, "LSP editor created successfully for: $path")
             } else {
-                android.util.Log.w(TAG, "Failed to create LSP editor, falling back to ClangLanguage")
-                // 回退到 libclang
-                val sysrootDir = SysrootInstaller.ensureInstalled(requireContext().applicationContext)
-                setupClangLanguage(path, sysrootDir)
+                android.util.Log.w(TAG, "Failed to create LSP editor for: $path")
+                android.util.Log.w(TAG, "Check logcat for ClangdConnectionProvider errors")
             }
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "Error setting up LSP, falling back to ClangLanguage", e)
-            // 回退到 libclang
-            val sysrootDir = SysrootInstaller.ensureInstalled(requireContext().applicationContext)
-            setupClangLanguage(path, sysrootDir)
-        }
-    }
-    
-    /**
-     * 设置 libclang 语言支持（回退方案）
-     */
-    private suspend fun setupClangLanguage(path: String, sysrootDir: java.io.File) {
-        android.util.Log.i(TAG, "Setting up ClangLanguage for: $path")
-        
-        // 获取目标架构
-        val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        val target = when {
-            abi.contains("arm64", ignoreCase = true) -> "aarch64-linux-android28"
-            abi.contains("x86_64", ignoreCase = true) -> "x86_64-linux-android28"
-            else -> "aarch64-linux-android28"
-        }
-        
-        // 获取项目 include 目录
-        val projectDir = java.io.File(path).parentFile
-        val includeDirs = mutableListOf<String>()
-        projectDir?.let { dir ->
-            listOf("include", "includes", "src").forEach { sub ->
-                val subDir = java.io.File(dir, sub)
-                if (subDir.exists()) {
-                    includeDirs.add(subDir.absolutePath)
-                }
-            }
-        }
-        
-        val language = ClangLanguage(
-            sysroot = sysrootDir.absolutePath,
-            filePath = path,
-            target = target,
-            includeDirs = includeDirs
-        )
-        
-        withContext(Dispatchers.Main) {
-            if (isAdded && !isDetached) {
-                codeEditor.setEditorLanguage(language)
-                android.util.Log.d(TAG, "ClangLanguage set for: $path")
-            }
+            android.util.Log.e(TAG, "Error setting up LSP for: $path", e)
         }
     }
     

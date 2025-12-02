@@ -1,7 +1,6 @@
 Param(
   [string]$DockerRoot = "docker/llvm-build/dev-work",
   [string]$DestRoot = "docker/llvm-build/build-output/common-headers",
-  [ValidateSet('arm64-v8a','x86_64')][string]$Abi = 'x86_64',
   [int]$ApiLevel = 28
 )
 
@@ -11,12 +10,14 @@ $srcBuildArm  = Join-Path $DockerRoot "build/android/arm64-v8a-api$ApiLevel/incl
 $srcCfgX64    = Join-Path $srcBuildX64  "llvm/Config"
 $srcCfgArm    = Join-Path $srcBuildArm  "llvm/Config"
 $srcClangSrc  = Join-Path $DockerRoot "src/llvm-project/clang/include/clang"
+$srcClangCSrc = Join-Path $DockerRoot "src/llvm-project/clang/include/clang-c"
 $srcClangX64  = Join-Path $DockerRoot "build/android/x86_64-api$ApiLevel/tools/clang/include/clang"
 $srcClangArm  = Join-Path $DockerRoot "build/android/arm64-v8a-api$ApiLevel/tools/clang/include/clang"
 
 $dstLlvm = Join-Path $DestRoot "llvm"
 $dstCfg  = Join-Path $DestRoot "llvm/llvm/Config"
 $dstClang = Join-Path $DestRoot "clang"
+$dstClangC = Join-Path $DestRoot "clang-c"
 ${null} = New-Item -ItemType Directory -Force -Path $dstLlvm
 
 # Specific generated headers that Clang headers require but are not in LLVM source tree
@@ -63,6 +64,13 @@ if (-not (Test-Path $srcClangSrc)) {
 }
 New-Item -ItemType Directory -Force -Path $dstClang | Out-Null
 robocopy $srcClangSrc $dstClang /E /NFL /NDL /NJH /NJS /NP | Out-Null
+
+Write-Host "Sync libclang C headers (clang-c)..." -ForegroundColor Cyan
+if (-not (Test-Path $srcClangCSrc)) {
+  throw "Missing clang-c headers at $srcClangCSrc (run docker build first)"
+}
+New-Item -ItemType Directory -Force -Path $dstClangC | Out-Null
+robocopy $srcClangCSrc $dstClangC /E /NFL /NDL /NJH /NJS /NP | Out-Null
 
 Write-Host "Sync Clang generated headers..." -ForegroundColor Cyan
 if (Test-Path $srcClangX64) {

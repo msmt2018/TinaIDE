@@ -1,1586 +1,333 @@
-// JNI & logging
+// JNI 桥接层 - 原生编译器接口
+// 这是一个薄包装层，将 JNI 调用转发到各个功能模块
+
 #include <jni.h>
 #include <string>
-#include <vector>
-#include <sstream>
-#include <android/log.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <poll.h>
-#include <errno.h>
-#include <cstring>
-#include <typeinfo>
-#include <cxxabi.h>
-#include <pthread.h>
-#include <fcntl.h>
-#include <atomic>
-#include <mutex>
 
-#if LLVM_HEADERS_AVAILABLE
-// Clang/LLVM headers for in-process compilation
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Frontend/CompilerInvocation.h"
-#include "clang/Frontend/TextDiagnosticPrinter.h"
-#include "clang/FrontendTool/Utils.h"
-#include "clang/Basic/Diagnostic.h"
-#include "clang/Basic/DiagnosticOptions.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/Support/raw_ostream.h"
-// libclang C API for semantic highlighting
-#include "clang-c/Index.h"
-#endif
+// 导入各个功能模块
+#include "utils/logging.h"
+#include "utils/jni_utils.h"
+#include "compiler/clang_compiler.h"
+#include "linker/lld_linker.h"
+#include "runner/shared_runner.h"
+#include "lsp/clangd_server.h"
 
-// ---- Semantic Token Types for syntax highlighting ----
-enum SemanticTokenType {
-    TOKEN_KEYWORD = 0,
-    TOKEN_TYPE = 1,
-    TOKEN_FUNCTION = 2,
-    TOKEN_VARIABLE = 3,
-    TOKEN_PARAMETER = 4,
-    TOKEN_MEMBER = 5,
-    TOKEN_MACRO = 6,
-    TOKEN_STRING = 7,
-    TOKEN_NUMBER = 8,
-    TOKEN_COMMENT = 9,
-    TOKEN_OPERATOR = 10,
-    TOKEN_NAMESPACE = 11,
-    TOKEN_CLASS = 12,
-    TOKEN_ENUM = 13,
-    TOKEN_ENUM_MEMBER = 14,
-};
+using namespace tinaide;
 
-#if LLVM_HEADERS_AVAILABLE
-// Map CXCursorKind to SemanticTokenType
-static int cursorKindToTokenType(CXCursorKind kind) {
-    switch (kind) {
-        // 函数相关
-        case CXCursor_FunctionDecl:
-        case CXCursor_CXXMethod:
-        case CXCursor_Constructor:
-        case CXCursor_Destructor:
-        case CXCursor_FunctionTemplate:
-        case CXCursor_CallExpr:
-        case CXCursor_OverloadedDeclRef:  // 重载函数引用
-            return TOKEN_FUNCTION;
-        
-        // 变量相关
-        case CXCursor_VarDecl:
-        case CXCursor_DeclRefExpr:  // 变量引用表达式
-            return TOKEN_VARIABLE;
-        
-        // 参数
-        case CXCursor_ParmDecl:
-            return TOKEN_PARAMETER;
-        
-        // 成员变量
-        case CXCursor_FieldDecl:
-        case CXCursor_MemberRef:
-        case CXCursor_MemberRefExpr:
-            return TOKEN_MEMBER;
-        
-        // 类/结构体
-        case CXCursor_ClassDecl:
-        case CXCursor_StructDecl:
-        case CXCursor_UnionDecl:
-        case CXCursor_ClassTemplate:
-        case CXCursor_ClassTemplatePartialSpecialization:
-        case CXCursor_CXXBaseSpecifier:  // 基类说明符
-            return TOKEN_CLASS;
-        
-        // 枚举
-        case CXCursor_EnumDecl:
-            return TOKEN_ENUM;
-        case CXCursor_EnumConstantDecl:
-            return TOKEN_ENUM_MEMBER;
-        
-        // 命名空间
-        case CXCursor_Namespace:
-        case CXCursor_NamespaceAlias:
-        case CXCursor_NamespaceRef:
-        case CXCursor_UsingDirective:  // using namespace
-        case CXCursor_UsingDeclaration:  // using 声明
-            return TOKEN_NAMESPACE;
-        
-        // 类型相关
-        case CXCursor_TypedefDecl:
-        case CXCursor_TypeAliasDecl:
-        case CXCursor_TypeRef:
-        case CXCursor_TemplateTypeParameter:
-        case CXCursor_TemplateRef:  // 模板引用
-        case CXCursor_NonTypeTemplateParameter:  // 非类型模板参数
-        case CXCursor_TemplateTemplateParameter:  // 模板模板参数
-            return TOKEN_TYPE;
-        
-        // 宏
-        case CXCursor_MacroDefinition:
-        case CXCursor_MacroExpansion:
-        case CXCursor_MacroInstantiation:
-        case CXCursor_InclusionDirective:  // #include 指令
-            return TOKEN_MACRO;
-        
-        // 标签（goto 标签）
-        case CXCursor_LabelStmt:
-        case CXCursor_LabelRef:
-            return TOKEN_VARIABLE;  // 标签当作变量处理
-        
-        default:
-            return -1;  // Unknown type
-    }
-}
-#endif
+// 全局 Clangd 服务器实例
+static lsp::ClangdServer* g_clangdServer = nullptr;
 
-// Forward declaration to avoid depending on LLD headers at build time.
-#if LLVM_HEADERS_AVAILABLE
-// 注意：为避免直接依赖 LLD 头文件，这里仅做前向声明。
-// LLVM 17（本项目打包的 LLD 静态库）对外入口原型：
-//   bool lld::elf::link(ArrayRef<const char*>, raw_ostream& /*stdout*/, raw_ostream& /*stderr*/, bool /*disableOutput*/, bool /*exitEarly*/)
-// 该签名由打包的 liblldELF.a 导出符号验证（见 llvm-nm 输出）。
-namespace llvm { template <typename T> class ArrayRef; class raw_ostream; }
-namespace lld { namespace elf { bool link(llvm::ArrayRef<const char*>, llvm::raw_ostream&, llvm::raw_ostream&, bool, bool); } }
-#endif
-
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  "native_compiler", __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  "native_compiler", __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "native_compiler", __VA_ARGS__)
-
-static bool ensureDirRecursive(const std::string& path) {
-    if (path.empty() || path == ".") {
-        return true;
-    }
-    struct stat st;
-    if (stat(path.c_str(), &st) == 0) {
-        return S_ISDIR(st.st_mode);
-    }
-    if (errno != ENOENT) {
-        LOGE("stat(%s) failed: %s", path.c_str(), strerror(errno));
-        return false;
-    }
-    auto slash = path.find_last_of('/');
-    if (slash != std::string::npos) {
-        std::string parent = path.substr(0, slash);
-        if (!parent.empty() && !ensureDirRecursive(parent)) {
-            return false;
-        }
-    }
-    if (mkdir(path.c_str(), 0775) == 0 || errno == EEXIST || errno == EISDIR) {
-        return true;
-    }
-    LOGE("mkdir(%s) failed: %s", path.c_str(), strerror(errno));
-    return false;
-}
-
-static bool ensureParentDir(const std::string& filePath) {
-    auto slash = filePath.find_last_of('/');
-    if (slash == std::string::npos) return true;
-    std::string dir = filePath.substr(0, slash);
-    if (dir.empty()) return true;
-    return ensureDirRecursive(dir);
-}
-
-
-// ---- Minimal per-arch LLVM target initialization (avoid unresolved symbols) ----
-#if LLVM_HEADERS_AVAILABLE
-extern "C" {
-#if defined(__aarch64__)
-void LLVMInitializeAArch64TargetInfo();
-void LLVMInitializeAArch64Target();
-void LLVMInitializeAArch64TargetMC();
-void LLVMInitializeAArch64AsmParser();
-void LLVMInitializeAArch64AsmPrinter();
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-void LLVMInitializeX86TargetInfo();
-void LLVMInitializeX86Target();
-void LLVMInitializeX86TargetMC();
-void LLVMInitializeX86AsmParser();
-void LLVMInitializeX86AsmPrinter();
-#endif
-}
-
-static inline void initLLVMTargetsOnce() {
-    static bool inited = false; if (inited) return; inited = true;
-#if defined(__aarch64__)
-    LLVMInitializeAArch64TargetInfo();
-    LLVMInitializeAArch64Target();
-    LLVMInitializeAArch64TargetMC();
-    LLVMInitializeAArch64AsmParser();
-    LLVMInitializeAArch64AsmPrinter();
-#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-    LLVMInitializeX86TargetInfo();
-    LLVMInitializeX86Target();
-    LLVMInitializeX86TargetMC();
-    LLVMInitializeX86AsmParser();
-    LLVMInitializeX86AsmPrinter();
-#else
-    // Fallback: do nothing (avoid unresolved refs for unknown arch)
-#endif
-}
-#endif // LLVM_HEADERS_AVAILABLE
+// ============================================================================
+// 版本信息
+// ============================================================================
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_getClangVersion(
-        JNIEnv* env,
-        jclass /*clazz*/) {
-    // 未打包 LLVM/Clang 头文件时，返回简化版本字符串以验证 JNI 调用链
-    const char* v = "LLVM 17 (runtime libs bundled)";
-    LOGI("llvm version (placeholder): %s", v);
-    return env->NewStringUTF(v);
+        JNIEnv* env, jclass /*clazz*/) {
+    const char* version = "LLVM 17 (runtime libs bundled)";
+    LOGI("getClangVersion: %s", version);
+    return env->NewStringUTF(version);
 }
+
+// ============================================================================
+// 编译功能
+// ============================================================================
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_syntaxCheck(
-        JNIEnv* env,
-        jclass /*clazz*/, jstring jSysroot, jstring jSrc, jstring jTarget, jboolean jIsCxx) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: syntaxCheck requires LLVM headers (in-process)";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string srcPath = toStr(jSrc);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
-    // Ensure LLVM target backends are registered so cc1 can emit/parse for the target
-    static bool sTargetsInitedA = false;
-    if (!sTargetsInitedA) {
-        // 仅初始化与当前 ABI 匹配的 LLVM 目标，避免链接期未定义符号
-        initLLVMTargetsOnce();
-        sTargetsInitedA = true;
-    }
-    // Derive arch triple without API suffix, e.g. "x86_64-linux-android24" → "x86_64-linux-android"
-    auto deriveTripleBase = [&](const std::string& t){
-        if (t.empty()) return std::string();
-        std::string r = t;
-        while (!r.empty() && isdigit(static_cast<unsigned char>(r.back()))) r.pop_back();
-        return r;
-    };
-    const std::string tripleBase = deriveTripleBase(target.empty()? llvm::sys::getDefaultTargetTriple(): target);
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jstring jSrc, jstring jTarget, jboolean jIsCxx) {
 
-    // Build tokens first, then materialize stable argv pointers to avoid dangling char*
-    std::vector<std::string> tokens;
-    auto push  = [&](std::string s){ tokens.emplace_back(std::move(s)); };
-    auto push2 = [&](const char* a, std::string b){ tokens.emplace_back(a); tokens.emplace_back(std::move(b)); };
-    push("-cc1");
-    push2("-triple", target.empty()? llvm::sys::getDefaultTargetTriple(): target);
-    push("-fsyntax-only");
-    push("-nobuiltininc");
-    push2("-isysroot", sysroot);
-    // Provide Clang resource-dir so builtin headers like <stdarg.h> are found under -nobuiltininc
-    push2("-resource-dir", sysroot+"/lib/clang/17");
-    // Also add the resource include as an internal system include for cc1 to pick it up reliably
-    push("-internal-isystem"); push(sysroot+"/lib/clang/17/include");
-    push("-x");
-    push(isCxx ? std::string("c++") : std::string("c"));
-    if (isCxx) push("-std=c++17");
-    push("-DANDROID"); push("-D__ANDROID__");
-    if(!sysroot.empty()){
-        push2("-isystem", sysroot+"/usr/include");
-        if (!tripleBase.empty()) push2("-isystem", sysroot+"/usr/include/"+tripleBase);
-        push2("-I", sysroot+"/usr/include/c++/v1");
-    }
-    tokens.emplace_back(srcPath);
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::string srcPath = utils::jstringToUtf8(env, jSrc);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    std::vector<const char*> args; args.reserve(tokens.size());
-    for (auto& t : tokens) args.push_back(t.c_str());
+    // 构建编译选项
+    compiler::CompileOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
 
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> dopt = new clang::DiagnosticOptions();
-    std::string diag; llvm::raw_string_ostream os(diag);
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> did(new clang::DiagnosticIDs());
-    auto printer = std::make_unique<clang::TextDiagnosticPrinter>(os, &*dopt);
-    clang::DiagnosticsEngine diags(did, &*dopt, printer.get(), false);
-    std::unique_ptr<clang::CompilerInvocation> CI(new clang::CompilerInvocation());
-    if (!clang::CompilerInvocation::CreateFromArgs(*CI, args, diags)) { os.flush(); return env->NewStringUTF(diag.empty()?"create invocation failed":diag.c_str()); }
+    // 执行语法检查
+    auto result = compiler::syntaxCheck(srcPath, options);
 
-    clang::CompilerInstance Clang; Clang.setInvocation(std::move(CI));
-    Clang.createDiagnostics(printer.release(), true);
-    bool ok = clang::ExecuteCompilerInvocation(&Clang);
-    os.flush();
-    if (!ok) return env->NewStringUTF(diag.empty()?"syntax check failed":diag.c_str());
-    return env->NewStringUTF("");
-#endif
-}
-
-static std::string jstringToUtf8(JNIEnv* env, jstring s) {
-    if (!s) return std::string();
-    const char* utf = env->GetStringUTFChars(s, nullptr);
-    std::string out = utf ? std::string(utf) : std::string();
-    if (utf) env->ReleaseStringUTFChars(s, utf);
-    return out;
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_emitObj(
-        JNIEnv* env,
-        jclass /*clazz*/,
-        jstring jSysroot,
-        jstring jSrc,
-        jstring jObjOut,
-        jstring jTarget,
-        jboolean jIsCxx,
-        jobjectArray jFlags,
-        jobjectArray jIncludeDirs) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: LLVM headers not found (run tools/sync-llvm-headers.ps1)";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string srcPath = toStr(jSrc);
-    const std::string objOut  = toStr(jObjOut);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
-    if (!ensureParentDir(objOut)) {
-        std::string err = "[TinaIDE] Failed to prepare directory for output file: " + objOut;
-        return env->NewStringUTF(err.c_str());
-    }
-    // Ensure LLVM target backends are registered so cc1 can emit objects
-    static bool sTargetsInitedB = false;
-    if (!sTargetsInitedB) {
-        // 同上
-        initLLVMTargetsOnce();
-        sTargetsInitedB = true;
-    }
-    auto deriveTripleBase = [&](const std::string& t){
-        if (t.empty()) return std::string();
-        std::string r = t;
-        while (!r.empty() && isdigit(static_cast<unsigned char>(r.back()))) r.pop_back();
-        return r;
-    };
-    const std::string tripleBase = deriveTripleBase(target.empty()? llvm::sys::getDefaultTargetTriple(): target);
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jstring jSrc, jstring jObjOut, jstring jTarget,
+        jboolean jIsCxx, jobjectArray jFlags, jobjectArray jIncludeDirs) {
 
-    // Build tokens then stable argv
-    std::vector<std::string> tokens;
-    auto push  = [&](std::string s){ tokens.emplace_back(std::move(s)); };
-    auto push2 = [&](const char* a, std::string b){ tokens.emplace_back(a); tokens.emplace_back(std::move(b)); };
-    push("-cc1");
-    push2("-triple", target.empty()? llvm::sys::getDefaultTargetTriple(): target);
-    push("-emit-obj"); push("-O2"); push("-nobuiltininc");
-    // Android 要求：.o 必须 PIC (Position Independent Code)
-    // 注意：-cc1 模式下使用 -mrelocation-model pic 而不是 -fPIC
-    push("-mrelocation-model"); push("pic");
-    push2("-isysroot", sysroot);
-    // Provide Clang resource-dir so builtin headers like <stdarg.h> are found under -nobuiltininc
-    push2("-resource-dir", sysroot+"/lib/clang/17");
-    // Also add the resource include as an internal system include for cc1 to pick it up reliably
-    push("-internal-isystem"); push(sysroot+"/lib/clang/17/include");
-    push("-x");
-    push(isCxx ? std::string("c++") : std::string("c"));
-    if (isCxx) push("-std=c++17");
-    push("-DANDROID"); push("-D__ANDROID__");
-    if(!sysroot.empty()){
-        push2("-isystem", sysroot+"/usr/include");
-        if (!tripleBase.empty()) push2("-isystem", sysroot+"/usr/include/"+tripleBase);
-        push2("-I", sysroot+"/usr/include/c++/v1");
-    }
-    if (jIncludeDirs){ jsize n=env->GetArrayLength(jIncludeDirs); for(jsize i=0;i<n;++i){ jstring s=(jstring)env->GetObjectArrayElement(jIncludeDirs,i); std::string p=toStr(s); if(!p.empty()) push2("-I",p); env->DeleteLocalRef(s);} }
-    if (jFlags){ jsize n=env->GetArrayLength(jFlags); for(jsize i=0;i<n;++i){ jstring s=(jstring)env->GetObjectArrayElement(jFlags,i); std::string f=toStr(s); if(!f.empty()) push(std::move(f)); env->DeleteLocalRef(s);} }
-    push2("-o", objOut); tokens.emplace_back(srcPath);
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::string srcPath = utils::jstringToUtf8(env, jSrc);
+    std::string objOut = utils::jstringToUtf8(env, jObjOut);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    std::vector<const char*> args; args.reserve(tokens.size());
-    for (auto& t : tokens) args.push_back(t.c_str());
+    // 构建编译选项
+    compiler::CompileOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
+    options.includeDirs = utils::jstringArrayToVector(env, jIncludeDirs);
+    options.flags = utils::jstringArrayToVector(env, jFlags);
 
-    // Debug only: dump cc1 args to log once per invocation
-#ifndef NDEBUG
-    {
-        std::ostringstream oss; oss << "cc1 args (" << args.size() << "):";
-        for (auto* a : args) { oss << " " << (a ? a : "<null>"); }
-        LOGI("%s", oss.str().c_str());
-    }
-#endif
+    // 执行编译
+    auto result = compiler::compileToObject(srcPath, objOut, options);
 
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> dopt = new clang::DiagnosticOptions();
-    std::string diag; llvm::raw_string_ostream os(diag);
-    llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> did(new clang::DiagnosticIDs());
-    auto printer = std::make_unique<clang::TextDiagnosticPrinter>(os, &*dopt);
-    clang::DiagnosticsEngine diags(did, &*dopt, printer.get(), false);
-    std::unique_ptr<clang::CompilerInvocation> CI(new clang::CompilerInvocation());
-    if (!clang::CompilerInvocation::CreateFromArgs(*CI, args, diags)) { os.flush(); return env->NewStringUTF(diag.empty()?"create invocation failed":diag.c_str()); }
-
-    clang::CompilerInstance Clang; Clang.setInvocation(std::move(CI));
-    Clang.createDiagnostics(printer.release(), true);
-    bool ok = clang::ExecuteCompilerInvocation(&Clang);
-    os.flush();
-    if (!ok) return env->NewStringUTF(diag.empty()?"compile failed":diag.c_str());
-    return env->NewStringUTF("");
-#endif
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
-// Link object to a PIE executable using LLD (in-process)
+// ============================================================================
+// 链接功能
+// ============================================================================
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkExe(
-        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jstring jObj, jstring jOut,
-        jstring jTarget, jboolean jIsCxx) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: LLD not available";
-    return env->NewStringUTF(msg);
-#elif !defined(LLD_LINK_ENABLED)
-    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string objPath = toStr(jObj);
-    const std::string outExe  = toStr(jOut);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jstring jObj, jstring jOut, jstring jTarget, jboolean jIsCxx) {
 
-    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
-    const std::string tripleBase = deriveTripleBase(target);
-    auto deriveApi = [&](const std::string& t){
-        std::string digits;
-        for (auto it = t.rbegin(); it != t.rend(); ++it) {
-            if (!isdigit(static_cast<unsigned char>(*it))) break;
-            digits.push_back(*it);
-        }
-        std::reverse(digits.begin(), digits.end());
-        return digits.empty() ? std::string("24") : digits;
-    };
-    const std::string api = deriveApi(target);
-    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::string objPath = utils::jstringToUtf8(env, jObj);
+    std::string outExe = utils::jstringToUtf8(env, jOut);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    // 检查 sysroot 库目录是否存在
-    struct stat st;
-    if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        std::string err =
-            "[TinaIDE] Sysroot library directory missing: " + libDir +
-            "\n请先同步嵌入式 NDK 资源："
-            "\n 1) ./docker/llvm-build/build-local.ps1 -Abi " + (tripleBase.find("aarch64") != std::string::npos ? "arm64-v8a" : "x86_64") + " -ApiLevel " + api +
-            "\n 2) ./tools/sync-llvm-build.ps1 -Abi " + (tripleBase.find("aarch64") != std::string::npos ? "arm64-v8a" : "x86_64") +
-            "\n这些步骤会把 NDK 的 stub 库与 crt 对象复制到 assets/sysroot 下。";
-        return env->NewStringUTF(err.c_str());
-    }
+    // 构建链接选项
+    linker::LinkOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
 
-    // 进一步预检：关键 crt 与系统库是否存在，避免到 LLD 阶段才失败
-    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
-    const std::string crtBegin = libDir + "/crtbegin_dynamic.o";
-    const std::string crtEnd   = libDir + "/crtend_android.o";
-    const std::string libcSo   = libDir + "/libc.so";
-    const std::string libmSo   = libDir + "/libm.so";
-    const std::string liblogSo = libDir + "/liblog.so";
-    const std::string libandroidSo = libDir + "/libandroid.so";
-    std::vector<std::string> missing;
-    if (!exists(crtBegin))      missing.push_back("crtbegin_dynamic.o");
-    if (!exists(crtEnd))        missing.push_back("crtend_android.o");
-    if (!exists(libcSo))        missing.push_back("libc.so");
-    if (!exists(libmSo))        missing.push_back("libm.so");
-    if (!exists(liblogSo))      missing.push_back("liblog.so");
-    if (!exists(libandroidSo))  missing.push_back("libandroid.so");
-    if (jIsCxx == JNI_TRUE) {
-        // 动态 C++ 运行时必需：libc++_shared.so 可在 API 目录或 triple 根目录
-        const std::string libcxxSharedApi  = libDir + "/libc++_shared.so";
-        const std::string libcxxSharedRoot = (sysroot+"/usr/lib/"+tripleBase) + "/libc++_shared.so";
-        if (!exists(libcxxSharedApi) && !exists(libcxxSharedRoot)) {
-            missing.push_back("libc++_shared.so");
-        }
-    }
-    if (!missing.empty()) {
-        std::ostringstream oss;
-        oss << "[TinaIDE] 链接所需的 NDK stub/crt 缺失于: " << libDir << "\n"
-            << "缺失: ";
-        for (size_t i=0;i<missing.size();++i) { if(i) oss<<", "; oss<<missing[i]; }
-        oss << "\n请执行:"
-            << "\n 1) ./docker/llvm-build/build-local.ps1 -Abi "
-            << (tripleBase.find("aarch64") != std::string::npos ? "arm64-v8a" : "x86_64")
-            << " -ApiLevel " << api
-            << "\n 2) ./tools/sync-llvm-build.ps1 -Abi "
-            << (tripleBase.find("aarch64") != std::string::npos ? "arm64-v8a" : "x86_64")
-            << "\n或从本机 NDK 复制上述文件到 assets/sysroot 相应目录后重试。";
-        const std::string msg = oss.str();
-        return env->NewStringUTF(msg.c_str());
-    }
-    
-    // 先构建所有字符串到 keep，避免 vector 扩容导致 c_str() 失效
-    std::vector<std::string> keep;
-    keep.reserve(20);  // 预分配空间
-    
-    keep.push_back("ld.lld");
-    keep.push_back("-pie");
-    keep.push_back("-z");
-    keep.push_back("now");
-    keep.push_back("-z");
-    keep.push_back("relro");
-    keep.push_back("-L");
-    keep.push_back(libDir);
-    // Also search triple root where NDK places libc++_shared.so (r23+)
-    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
-    // Library search paths (link-time)
-    keep.push_back("-L");
-    keep.push_back(libDirRoot);
-    // Do not inject rpath; rely on app-preloaded libc++_shared to avoid duplicate runtimes
-    // Explicit dynamic linker for Android
-    const char* dynLinker = (tripleBase.find("64") != std::string::npos) ? "/system/bin/linker64" : "/system/bin/linker";
-    keep.push_back("-dynamic-linker");
-    keep.push_back(dynLinker);
-    // Inputs and output
-    keep.push_back(crtBegin);
-    keep.push_back(objPath);
-    keep.push_back("-o");
-    keep.push_back(outExe);
-    if (isCxx) {
-        // 强制使用动态 C++ 运行时（由 NDK 链接脚本把 -lc++ 解析为 -lc++_shared）
-        keep.push_back("-lc++");
-    }
-    keep.push_back("-lc");
-    keep.push_back("-lm");
-    keep.push_back("-llog");
-    keep.push_back("-landroid");
-    keep.push_back(crtEnd);
-    
-    // 然后构建 args 指针数组
-    std::vector<const char*> args;
-    args.reserve(keep.size());
-    for (const auto& s : keep) {
-        args.push_back(s.c_str());
-    }
+    // 执行链接
+    auto result = linker::linkExecutable(objPath, outExe, options);
 
-    #if LLD_LINK_ENABLED
-    std::string diag;
-    llvm::raw_string_ostream os(diag);
-    // 调用打包库签名 (args, stdout, stderr, disableOutput, exitEarly)
-    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
-    os.flush();
-    if (!ok) return env->NewStringUTF(diag.c_str());
-    // chmod +x
-    chmod(outExe.c_str(), 0755);
-    return env->NewStringUTF("");
-    #else
-    // No fallback: dynamic-only mode requires shared LLD libraries present at build/runtime.
-    return env->NewStringUTF("UNAVAILABLE: In-process LLD disabled at build-time. Build liblldELF.a/liblldCommon.a (static) and resync build artifacts.");
-    #endif
-#endif
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
-// Link multiple objects to a PIE executable using in-process LLD
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkExeMany(
-        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jobjectArray jObjs, jstring jOut,
-        jstring jTarget, jboolean jIsCxx, jobjectArray jLibDirs, jobjectArray jLibs) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: LLD not available";
-    return env->NewStringUTF(msg);
-#elif !defined(LLD_LINK_ENABLED)
-    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string outExe  = toStr(jOut);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jobjectArray jObjs, jstring jOut, jstring jTarget,
+        jboolean jIsCxx, jobjectArray jLibDirs, jobjectArray jLibs) {
 
-    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
-    const std::string tripleBase = deriveTripleBase(target);
-    auto deriveApi = [&](const std::string& t){ std::string digits; for (auto it=t.rbegin(); it!=t.rend(); ++it){ if(!isdigit((unsigned char)*it)) break; digits.push_back(*it);} std::reverse(digits.begin(), digits.end()); return digits.empty()? std::string("24"):digits; };
-    const std::string api = deriveApi(target);
-    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::vector<std::string> objPaths = utils::jstringArrayToVector(env, jObjs);
+    std::string outExe = utils::jstringToUtf8(env, jOut);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    // Basic sysroot checks (same as single-object variant)
-    struct stat st;
-    if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        std::string err = "[TinaIDE] Sysroot library directory missing: "+libDir;
-        return env->NewStringUTF(err.c_str());
-    }
-    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
-    const std::string crtBegin = libDir + "/crtbegin_dynamic.o";
-    const std::string crtEnd   = libDir + "/crtend_android.o";
-    const std::string libcSo   = libDir + "/libc.so";
-    const std::string libmSo   = libDir + "/libm.so";
-    const std::string liblogSo = libDir + "/liblog.so";
-    const std::string libandroidSo = libDir + "/libandroid.so";
-    std::vector<std::string> missing;
-    if (!exists(crtBegin))      missing.push_back("crtbegin_dynamic.o");
-    if (!exists(crtEnd))        missing.push_back("crtend_android.o");
-    if (!exists(libcSo))        missing.push_back("libc.so");
-    if (!exists(libmSo))        missing.push_back("libm.so");
-    if (!exists(liblogSo))      missing.push_back("liblog.so");
-    if (!exists(libandroidSo))  missing.push_back("libandroid.so");
-    if (jIsCxx == JNI_TRUE) {
-        const std::string libcxxSharedApi  = libDir + "/libc++_shared.so";
-        const std::string libcxxSharedRoot = (sysroot+"/usr/lib/"+tripleBase) + "/libc++_shared.so";
-        if (!exists(libcxxSharedApi) && !exists(libcxxSharedRoot)) { missing.push_back("libc++_shared.so"); }
-    }
-    if (!missing.empty()) {
-        std::ostringstream oss; oss << "[TinaIDE] 链接所需的 NDK stub/crt 缺失于: " << libDir << "\n缺失: ";
-        for (size_t i=0;i<missing.size();++i){ if(i) oss<<", "; oss<<missing[i]; }
-        return env->NewStringUTF(oss.str().c_str());
-    }
+    // 构建链接选项
+    linker::LinkOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
+    options.libDirs = utils::jstringArrayToVector(env, jLibDirs);
+    options.libs = utils::jstringArrayToVector(env, jLibs);
 
-    std::vector<std::string> keep; keep.reserve(32);
-    keep.push_back("ld.lld");
-    keep.push_back("-pie"); keep.push_back("-z"); keep.push_back("now"); keep.push_back("-z"); keep.push_back("relro");
-    keep.push_back("-L"); keep.push_back(libDir);
-    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
-    keep.push_back("-L"); keep.push_back(libDirRoot);
-    // No rpath to sysroot runtime; ensure single C++ runtime in process
-    // Explicit dynamic linker for Android
-    const char* dynLinker = (tripleBase.find("64") != std::string::npos) ? "/system/bin/linker64" : "/system/bin/linker";
-    keep.push_back("-dynamic-linker");
-    keep.push_back(dynLinker);
-    keep.push_back(crtBegin);
+    // 执行链接
+    auto result = linker::linkExecutableMany(objPaths, outExe, options);
 
-    // Append all object files
-    if (jObjs != nullptr) {
-        jsize n = env->GetArrayLength(jObjs);
-        for (jsize i=0;i<n;++i) {
-            jstring s = (jstring)env->GetObjectArrayElement(jObjs, i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-
-    keep.push_back("-o"); keep.push_back(outExe);
-    if (isCxx) { keep.push_back("-lc++"); }
-    keep.push_back("-lc"); keep.push_back("-lm"); keep.push_back("-llog"); keep.push_back("-landroid");
-
-    // Extra lib search dirs
-    if (jLibDirs != nullptr) {
-        jsize n = env->GetArrayLength(jLibDirs);
-        for (jsize i=0;i<n;++i){
-            jstring s=(jstring)env->GetObjectArrayElement(jLibDirs,i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.push_back("-L"); keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-    // Extra libs, e.g. -lfoo
-    if (jLibs != nullptr) {
-        jsize n = env->GetArrayLength(jLibs);
-        for (jsize i=0;i<n;++i){
-            jstring s=(jstring)env->GetObjectArrayElement(jLibs,i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.emplace_back(std::string("-l")+c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-
-    keep.push_back(crtEnd);
-
-    std::vector<const char*> args; args.reserve(keep.size());
-    for (const auto& s : keep) args.push_back(s.c_str());
-
-    #if LLD_LINK_ENABLED
-    std::string diag; llvm::raw_string_ostream os(diag);
-    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
-    os.flush(); if (!ok) return env->NewStringUTF(diag.c_str());
-    chmod(outExe.c_str(), 0755);
-    return env->NewStringUTF("");
-    #else
-    return env->NewStringUTF("UNAVAILABLE: In-process LLD disabled at build-time. Build liblldELF.a/liblldCommon.a (static) and resync build artifacts.");
-    #endif
-#endif
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
-// Link a single object into a shared library (.so) for in-process loading
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkSo(
-        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jstring jObj, jstring jOutSo,
-        jstring jTarget, jboolean jIsCxx) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: LLD not available";
-    return env->NewStringUTF(msg);
-#elif !defined(LLD_LINK_ENABLED)
-    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string objPath = toStr(jObj);
-    const std::string outSo   = toStr(jOutSo);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jstring jObj, jstring jOutSo, jstring jTarget, jboolean jIsCxx) {
 
-    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
-    const std::string tripleBase = deriveTripleBase(target);
-    auto deriveApi = [&](const std::string& t){ std::string digits; for (auto it=t.rbegin(); it!=t.rend(); ++it){ if(!isdigit((unsigned char)*it)) break; digits.push_back(*it);} std::reverse(digits.begin(), digits.end()); return digits.empty()? std::string("24"):digits; };
-    const std::string api = deriveApi(target);
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::string objPath = utils::jstringToUtf8(env, jObj);
+    std::string outSo = utils::jstringToUtf8(env, jOutSo);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
-    struct stat st; if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        std::string err = "[TinaIDE] Sysroot library directory missing: "+libDir;
-        return env->NewStringUTF(err.c_str());
-    }
-    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
-    const std::string crtBegin = libDir + "/crtbegin_so.o";
-    const std::string crtEnd   = libDir + "/crtend_so.o";
-    if (!exists(crtBegin) || !exists(crtEnd)) {
-        std::string err = "[TinaIDE] Missing shared CRT objects: crtbegin_so.o/crtend_so.o in "+libDir;
-        return env->NewStringUTF(err.c_str());
-    }
+    // 构建链接选项
+    linker::LinkOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
 
-    std::vector<std::string> keep; keep.reserve(32);
-    keep.push_back("ld.lld");
-    keep.push_back("-shared");
-    // Library search paths
-    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
-    keep.push_back("-L"); keep.push_back(libDir);
-    keep.push_back("-L"); keep.push_back(libDirRoot);
-    // Avoid rpath; use global libc++_shared preloaded by app
-    // Inputs/outputs
-    keep.push_back(crtBegin);
-    keep.push_back(objPath);
-    keep.push_back("-o"); keep.push_back(outSo);
-    // Basic libs
-    if (isCxx) keep.push_back("-lc++");
-    keep.push_back("-lc"); keep.push_back("-lm"); keep.push_back("-llog"); keep.push_back("-landroid");
+    // 执行链接
+    auto result = linker::linkSharedLibrary(objPath, outSo, options);
 
-    std::vector<const char*> args; args.reserve(keep.size());
-    for (const auto& s : keep) args.push_back(s.c_str());
-
-    std::string diag; llvm::raw_string_ostream os(diag);
-    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
-    os.flush(); if (!ok) return env->NewStringUTF(diag.c_str());
-    // For .so not strictly necessary, but keep consistent perms
-    chmod(outSo.c_str(), 0755);
-    return env->NewStringUTF("");
-#endif
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
-// Link multiple objects into a shared library (.so)
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_linkSoMany(
-        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jobjectArray jObjs, jstring jOutSo,
-        jstring jTarget, jboolean jIsCxx, jobjectArray jLibDirs, jobjectArray jLibs) {
-#if !LLVM_HEADERS_AVAILABLE
-    const char* msg = "UNAVAILABLE: LLD not available";
-    return env->NewStringUTF(msg);
-#elif !defined(LLD_LINK_ENABLED)
-    const char* msg = "UNAVAILABLE: LLD link disabled at build time";
-    return env->NewStringUTF(msg);
-#else
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string sysroot = toStr(jSysroot);
-    const std::string outSo   = toStr(jOutSo);
-    const std::string target  = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSysroot, jobjectArray jObjs, jstring jOutSo, jstring jTarget,
+        jboolean jIsCxx, jobjectArray jLibDirs, jobjectArray jLibs) {
 
-    auto deriveTripleBase = [&](const std::string& t){ std::string r=t; while(!r.empty() && isdigit((unsigned char)r.back())) r.pop_back(); return r; };
-    const std::string tripleBase = deriveTripleBase(target);
-    auto deriveApi = [&](const std::string& t){ std::string digits; for (auto it=t.rbegin(); it!=t.rend(); ++it){ if(!isdigit((unsigned char)*it)) break; digits.push_back(*it);} std::reverse(digits.begin(), digits.end()); return digits.empty()? std::string("24"):digits; };
-    const std::string api = deriveApi(target);
-    const std::string libDir = sysroot+"/usr/lib/"+tripleBase+"/"+api;
+    // 转换参数
+    std::string sysroot = utils::jstringToUtf8(env, jSysroot);
+    std::vector<std::string> objPaths = utils::jstringArrayToVector(env, jObjs);
+    std::string outSo = utils::jstringToUtf8(env, jOutSo);
+    std::string target = utils::jstringToUtf8(env, jTarget);
+    bool isCxx = (jIsCxx == JNI_TRUE);
 
-    struct stat st; if (stat(libDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        std::string err = "[TinaIDE] Sysroot library directory missing: "+libDir;
-        return env->NewStringUTF(err.c_str());
-    }
-    auto exists = [](const std::string& p){ struct stat s; return stat(p.c_str(), &s) == 0 && S_ISREG(s.st_mode); };
-    const std::string crtBegin = libDir + "/crtbegin_so.o";
-    const std::string crtEnd   = libDir + "/crtend_so.o";
-    if (!exists(crtBegin) || !exists(crtEnd)) {
-        std::string err = "[TinaIDE] Missing shared CRT objects: crtbegin_so.o/crtend_so.o in "+libDir;
-        return env->NewStringUTF(err.c_str());
-    }
+    // 构建链接选项
+    linker::LinkOptions options;
+    options.sysroot = sysroot;
+    options.target = target;
+    options.isCxx = isCxx;
+    options.libDirs = utils::jstringArrayToVector(env, jLibDirs);
+    options.libs = utils::jstringArrayToVector(env, jLibs);
 
-    std::vector<std::string> keep; keep.reserve(48);
-    keep.push_back("ld.lld");
-    keep.push_back("-shared");
-    // Search paths
-    keep.push_back("-L"); keep.push_back(libDir);
-    const std::string libDirRoot = sysroot+"/usr/lib/"+tripleBase;
-    keep.push_back("-L"); keep.push_back(libDirRoot);
-    // No rpath here either to prevent duplicated libc++_shared in separate namespaces
+    // 执行链接
+    auto result = linker::linkSharedLibraryMany(objPaths, outSo, options);
 
-    keep.push_back(crtBegin);
-
-    // Append objects
-    if (jObjs != nullptr) {
-        jsize n = env->GetArrayLength(jObjs);
-        for (jsize i=0;i<n;++i) {
-            jstring s = (jstring)env->GetObjectArrayElement(jObjs, i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-
-    // Output and basic libs
-    keep.push_back("-o"); keep.push_back(outSo);
-    if (isCxx) keep.push_back("-lc++");
-    keep.push_back("-lc"); keep.push_back("-lm"); keep.push_back("-llog"); keep.push_back("-landroid");
-
-    // Extra lib search dirs
-    if (jLibDirs != nullptr) {
-        jsize n = env->GetArrayLength(jLibDirs);
-        for (jsize i=0;i<n;++i){
-            jstring s=(jstring)env->GetObjectArrayElement(jLibDirs,i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.push_back("-L"); keep.emplace_back(c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-    // Extra libs
-    if (jLibs != nullptr) {
-        jsize n = env->GetArrayLength(jLibs);
-        for (jsize i=0;i<n;++i){
-            jstring s=(jstring)env->GetObjectArrayElement(jLibs,i);
-            const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr;
-            if (c) { keep.emplace_back(std::string("-l")+c); env->ReleaseStringUTFChars(s,c); }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-
-    keep.push_back(crtEnd);
-
-    std::vector<const char*> args; args.reserve(keep.size());
-    for (const auto& s : keep) args.push_back(s.c_str());
-
-    std::string diag; llvm::raw_string_ostream os(diag);
-    bool ok = lld::elf::link(args, os, os, /*disableOutput=*/false, /*exitEarly=*/false);
-    os.flush(); if (!ok) return env->NewStringUTF(diag.c_str());
-    chmod(outSo.c_str(), 0755);
-    return env->NewStringUTF("");
-#endif
+    // 返回结果
+    return utils::utf8ToJstring(env, result.errorMessage);
 }
 
-// Load a shared library and call a no-arg entry symbol (e.g., run_main)
-static void tina_install_handlers_once() {
-    static bool done = false; if (done) return; done = true;
-    auto term = []() noexcept {
-        const std::type_info* t = abi::__cxa_current_exception_type();
-        const char* name = t ? t->name() : nullptr;
-        int status = 0;
-        char* dem = name ? abi::__cxa_demangle(name, nullptr, nullptr, &status) : nullptr;
-        const char* typeName = dem ? dem : (name ? name : "<unknown>");
-        // Logcat for developer visibility
-        LOGE("std::terminate: uncaught exception: %s", typeName);
-        // Also write to stderr so runSharedIsolated can capture it for UI
-        fprintf(stderr, "std::terminate: uncaught exception: %s\n", typeName);
-        if (dem) free(dem);
-        _Exit(134);
-    };
-    std::set_terminate(term);
+// ============================================================================
+// 执行功能
+// ============================================================================
 
-    auto siglog = [](int sig){ LOGE("caught signal %d", sig); _Exit(128+sig); };
-    struct sigaction sa; memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = siglog; sigemptyset(&sa.sa_mask);
-    sigaction(SIGABRT, &sa, nullptr);
-    sigaction(SIGSEGV, &sa, nullptr);
-    sigaction(SIGBUS,  &sa, nullptr);
-    sigaction(SIGILL,  &sa, nullptr);
-}
 extern "C" JNIEXPORT jint JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runShared(
         JNIEnv* env, jclass /*clazz*/, jstring jSoPath, jstring jSym) {
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string soPath = toStr(jSoPath);
-    const std::string sym    = toStr(jSym);
 
-    // Install terminate/signal handlers before touching user code
-    tina_install_handlers_once();
+    std::string soPath = utils::jstringToUtf8(env, jSoPath);
+    std::string symbolName = utils::jstringToUtf8(env, jSym);
 
-    void* handle = dlopen(soPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
-    if (!handle) {
-        const char* e = dlerror();
-        std::string err = std::string("dlopen failed: ") + (e?e:"unknown");
-        LOGW("%s", err.c_str());
-        return -127; // signal error
-    }
-    using EntryNoArg = int (*)();
-    using EntryWithArgs = int (*)(int, char**);
-
-    if (sym.empty()) {
-        LOGW("runShared: empty symbol name");
-        dlclose(handle);
-        return -125;
-    }
-
-    void* fp = dlsym(handle, sym.c_str());
-    if (!fp) {
-        const char* e = dlerror();
-        std::string err = std::string("dlsym failed: ") + (e?e:"unknown");
-        LOGW("%s", err.c_str());
-        dlclose(handle);
-        return -126;
-    }
-
-    int rc = -125;
-    try {
-        rc = reinterpret_cast<EntryNoArg>(fp)();
-    } catch (const std::bad_cast& e) {
-        LOGW("unhandled std::bad_cast: %s", e.what());
-        rc = -101;
-    } catch (const std::exception& e) {
-        LOGW("unhandled std::exception: %s", e.what());
-        rc = -102;
-    } catch (...) {
-        LOGW("unhandled non-std exception");
-        rc = -103;
-    }
-    dlclose(handle);
-    return rc;
+    return runner::runInProcess(soPath, symbolName);
 }
 
-// Isolated run: fork child to dlopen and run symbol; parent captures stdout/stderr and returns combined log with RC prefix
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_runSharedIsolated(
-        JNIEnv* env, jclass /*clazz*/, jstring jSoPath, jstring jSym, jint jTimeoutMs) {
-    auto toStr = [&](jstring s){ const char* c = s? env->GetStringUTFChars(s,nullptr):nullptr; std::string o=c?std::string(c):std::string(); if(c) env->ReleaseStringUTFChars(s,c); return o; };
-    const std::string soPath = toStr(jSoPath);
-    const std::string sym    = toStr(jSym);
-    int timeoutMs = jTimeoutMs <= 0 ? 15000 : jTimeoutMs;
+        JNIEnv* env, jclass /*clazz*/,
+        jstring jSoPath, jstring jSym, jint jTimeoutMs) {
 
-    int pipefd[2]; if (pipe(pipefd) != 0) {
-        std::string err = std::string("pipe failed: ")+strerror(errno);
-        return env->NewStringUTF(err.c_str());
-    }
-    pid_t pid = fork();
-    if (pid < 0) {
-        std::string err = std::string("fork failed: ")+strerror(errno);
-        close(pipefd[0]); close(pipefd[1]);
-        return env->NewStringUTF(err.c_str());
-    }
-    if (pid == 0) {
-        // Child
-        dup2(pipefd[1], STDOUT_FILENO);
-        dup2(pipefd[1], STDERR_FILENO);
-        close(pipefd[0]); close(pipefd[1]);
-        // Install handlers in child
-        tina_install_handlers_once();
-        // dlopen + dlsym + call
-        void* handle = dlopen(soPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
-        if (!handle) {
-            const char* e = dlerror();
-            fprintf(stderr, "dlopen failed: %s\n", e?e:"unknown");
-            _exit(127);
-        }
-        fprintf(stderr, "[tina] dlopen ok\n");
-        if (sym.empty()) {
-            fprintf(stderr, "runSharedIsolated: empty symbol name\n");
-            dlclose(handle); _exit(125);
-        }
-        void* fp = dlsym(handle, sym.c_str());
-        
-        // If symbol not found and it's "main", try common C++ mangled names
-        if (!fp && sym == "main") {
-            // Try C++ mangled names for main()
-            const char* mangled_names[] = {
-                "_Z4mainv",           // int main()
-                "_Z4mainiPPc",        // int main(int, char**)
-                "main",               // C linkage fallback
-                nullptr
-            };
-            for (int i = 0; mangled_names[i] && !fp; ++i) {
-                dlerror(); // clear error
-                fp = dlsym(handle, mangled_names[i]);
-                if (fp) {
-                    fprintf(stderr, "[tina] found main as: %s\n", mangled_names[i]);
-                    break;
-                }
-            }
-        }
-        
-        if (!fp) {
-            const char* e = dlerror();
-            fprintf(stderr, "dlsym failed: %s\n", e?e:"unknown");
-            dlclose(handle); _exit(126);
-        }
-        fprintf(stderr, "[tina] dlsym ok: %s\n", sym.c_str());
-        using EntryNoArg = int (*)();
-        int rc = -1;
-        try {
-            fprintf(stderr, "[tina] calling entry\n");
-            rc = reinterpret_cast<EntryNoArg>(fp)();
-            fprintf(stderr, "[tina] entry returned rc=%d\n", rc);
-        } catch (const std::bad_cast& e) {
-            // Provide a clearer hint for common RTTI/any_cast/dynamic_cast issues
-            fprintf(stderr, "unhandled std::bad_cast: %s\n", e.what());
-            rc = 101;
-        } catch (const std::exception& e) {
-            fprintf(stderr, "unhandled std::exception: %s\n", e.what());
-            rc = 102;
-        } catch (...) {
-            fprintf(stderr, "unhandled non-std exception\n");
-            rc = 103;
-        }
-        dlclose(handle);
-        _exit(rc);
-    }
-    // Parent
-    close(pipefd[1]);
-    std::string out;
-    out.reserve(4096);
+    std::string soPath = utils::jstringToUtf8(env, jSoPath);
+    std::string symbolName = utils::jstringToUtf8(env, jSym);
+    int timeoutMs = jTimeoutMs;
 
-    int rc = -1;
-    const int fd = pipefd[0];
-    int elapsed = 0;
-    char buf[1024];
-    while (true) {
-        struct pollfd pfd; pfd.fd = fd; pfd.events = POLLIN; pfd.revents = 0;
-        int to = 100; // 100ms step
-        int pr = poll(&pfd, 1, to);
-        if (pr > 0 && (pfd.revents & POLLIN)) {
-            ssize_t n = read(fd, buf, sizeof(buf));
-            if (n > 0) {
-                out.append(buf, buf + n);
-                continue;
-            }
-            if (n == 0) break; // EOF
-        }
-        elapsed += to;
-        int status = 0; pid_t w = waitpid(pid, &status, WNOHANG);
-        if (w == pid) {
-            if (WIFEXITED(status)) rc = WEXITSTATUS(status);
-            else if (WIFSIGNALED(status)) rc = 128 + WTERMSIG(status);
-            break;
-        }
-        if (elapsed >= timeoutMs) {
-            kill(pid, SIGKILL);
-            int status2 = 0; waitpid(pid, &status2, 0);
-            rc = 124; // timeout
-            break;
-        }
-    }
-    close(fd);
-    std::ostringstream oss; oss << "RC=" << rc << "\n";
-    if (!out.empty()) oss << out;
-    return env->NewStringUTF(oss.str().c_str());
+    auto result = runner::runIsolated(soPath, symbolName, timeoutMs);
+
+    return utils::utf8ToJstring(env, result.output);
 }
-
-// ---- Semantic Highlighting: getSemanticTokens ----
-// Returns JSON array of semantic tokens: [{"o":offset,"l":length,"t":type}, ...]
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_getSemanticTokens(
-        JNIEnv* env, jclass /*clazz*/, jstring jSysroot, jstring jSrcPath,
-        jstring jTarget, jboolean jIsCxx, jobjectArray jIncludeDirs) {
-#if !LLVM_HEADERS_AVAILABLE
-    // libclang not available
-    return env->NewStringUTF("[]");
-#else
-    auto toStr = [&](jstring s) {
-        const char* c = s ? env->GetStringUTFChars(s, nullptr) : nullptr;
-        std::string o = c ? std::string(c) : std::string();
-        if (c) env->ReleaseStringUTFChars(s, c);
-        return o;
-    };
-
-    const std::string sysroot = toStr(jSysroot);
-    const std::string srcPath = toStr(jSrcPath);
-    const std::string target = toStr(jTarget);
-    const bool isCxx = jIsCxx == JNI_TRUE;
-
-    // Check if source file exists
-    struct stat st;
-    if (stat(srcPath.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
-        LOGW("getSemanticTokens: source file not found: %s", srcPath.c_str());
-        return env->NewStringUTF("[]");
-    }
-    const unsigned fileSize = static_cast<unsigned>(st.st_size);
-
-    // Build command line arguments for libclang
-    std::vector<std::string> argStrings;
-    auto push = [&](const char* s) { argStrings.emplace_back(s); };
-    auto push2 = [&](const char* a, const std::string& b) { argStrings.emplace_back(a); argStrings.emplace_back(b); };
-
-    push("-x");
-    push(isCxx ? "c++" : "c");
-    if (isCxx) push("-std=c++17");
-    if (!target.empty()) {
-        push2("-target", target);
-    }
-    push("-DANDROID");
-    push("-D__ANDROID__");
-
-    if (!sysroot.empty()) {
-        push2("--sysroot", sysroot);
-        push2("-isystem", sysroot + "/usr/include");
-        // Derive triple base for arch-specific includes
-        std::string tripleBase = target;
-        while (!tripleBase.empty() && isdigit(static_cast<unsigned char>(tripleBase.back()))) {
-            tripleBase.pop_back();
-        }
-        if (!tripleBase.empty()) {
-            push2("-isystem", sysroot + "/usr/include/" + tripleBase);
-        }
-        push2("-I", sysroot + "/usr/include/c++/v1");
-        push2("-resource-dir", sysroot + "/lib/clang/17");
-    }
-
-    // Add user-specified include directories
-    if (jIncludeDirs != nullptr) {
-        jsize n = env->GetArrayLength(jIncludeDirs);
-        for (jsize i = 0; i < n; ++i) {
-            jstring s = (jstring)env->GetObjectArrayElement(jIncludeDirs, i);
-            std::string dir = toStr(s);
-            if (!dir.empty()) {
-                push2("-I", dir);
-            }
-            if (s) env->DeleteLocalRef(s);
-        }
-    }
-
-    // Convert to const char* array
-    std::vector<const char*> args;
-    args.reserve(argStrings.size());
-    for (const auto& s : argStrings) {
-        args.push_back(s.c_str());
-    }
-
-    // Create libclang index
-    CXIndex index = clang_createIndex(0, 0);
-    if (!index) {
-        LOGE("getSemanticTokens: clang_createIndex failed");
-        return env->NewStringUTF("[]");
-    }
-
-    // Parse the translation unit
-    CXTranslationUnit tu = clang_parseTranslationUnit(
-        index,
-        srcPath.c_str(),
-        args.data(),
-        static_cast<int>(args.size()),
-        nullptr, 0,
-        CXTranslationUnit_DetailedPreprocessingRecord | CXTranslationUnit_KeepGoing
-    );
-
-    if (!tu) {
-        LOGW("getSemanticTokens: clang_parseTranslationUnit failed for %s", srcPath.c_str());
-        clang_disposeIndex(index);
-        return env->NewStringUTF("[]");
-    }
-
-    // Get file handle and source range
-    CXFile file = clang_getFile(tu, srcPath.c_str());
-    if (!file) {
-        LOGW("getSemanticTokens: clang_getFile failed");
-        clang_disposeTranslationUnit(tu);
-        clang_disposeIndex(index);
-        return env->NewStringUTF("[]");
-    }
-
-    CXSourceLocation beginLoc = clang_getLocationForOffset(tu, file, 0);
-    CXSourceLocation endLoc = clang_getLocationForOffset(tu, file, fileSize);
-    CXSourceRange range = clang_getRange(beginLoc, endLoc);
-
-    // Tokenize
-    CXToken* tokens = nullptr;
-    unsigned numTokens = 0;
-    clang_tokenize(tu, range, &tokens, &numTokens);
-
-    // Build JSON result
-    std::ostringstream json;
-    json << "[";
-    bool first = true;
-
-    for (unsigned i = 0; i < numTokens; ++i) {
-        CXToken& token = tokens[i];
-        CXTokenKind tokenKind = clang_getTokenKind(token);
-
-        // Get token location and spelling
-        CXSourceLocation loc = clang_getTokenLocation(tu, token);
-        unsigned offset = 0, line = 0, column = 0;
-        CXFile tokenFile;
-        clang_getSpellingLocation(loc, &tokenFile, &line, &column, &offset);
-
-        CXString spelling = clang_getTokenSpelling(tu, token);
-        const char* sp = clang_getCString(spelling);
-        unsigned length = sp ? static_cast<unsigned>(strlen(sp)) : 0;
-
-        int type = -1;
-
-        if (tokenKind == CXToken_Keyword) {
-            type = TOKEN_KEYWORD;
-        } else if (tokenKind == CXToken_Comment) {
-            type = TOKEN_COMMENT;
-        } else if (tokenKind == CXToken_Literal) {
-            // Distinguish string vs number
-            if (sp && (sp[0] == '"' || sp[0] == '\'' || sp[0] == 'L' || sp[0] == 'u' || sp[0] == 'U' || sp[0] == 'R')) {
-                type = TOKEN_STRING;
-            } else {
-                type = TOKEN_NUMBER;
-            }
-        } else if (tokenKind == CXToken_Punctuation) {
-            type = TOKEN_OPERATOR;
-        } else if (tokenKind == CXToken_Identifier) {
-            // Get semantic information via cursor
-            CXCursor cursor = clang_getCursor(tu, loc);
-            CXCursor refCursor = clang_getCursorReferenced(cursor);
-            
-            if (!clang_Cursor_isNull(refCursor)) {
-                CXCursorKind refKind = clang_getCursorKind(refCursor);
-                type = cursorKindToTokenType(refKind);
-            }
-            
-            // If still unknown, try the cursor itself
-            if (type < 0) {
-                CXCursorKind cursorKind = clang_getCursorKind(cursor);
-                type = cursorKindToTokenType(cursorKind);
-            }
-            
-            // Default identifiers to variable
-            if (type < 0) {
-                type = TOKEN_VARIABLE;
-            }
-        }
-
-        clang_disposeString(spelling);
-
-        // Only emit tokens with valid types
-        if (type >= 0 && length > 0) {
-            if (!first) json << ",";
-            first = false;
-            json << "{\"o\":" << offset << ",\"l\":" << length << ",\"t\":" << type << "}";
-        }
-    }
-
-    json << "]";
-
-    // Cleanup
-    clang_disposeTokens(tu, tokens, numTokens);
-    clang_disposeTranslationUnit(tu);
-    clang_disposeIndex(index);
-
-    return env->NewStringUTF(json.str().c_str());
-#endif
-}
-
 
 // ============================================================================
-// ---- Clangd LSP Server Support (via dlopen/dlsym) ----
+// Clangd LSP 服务器功能
 // ============================================================================
-// This section provides JNI functions to start clangd as a shared library
-// and communicate with it via pipes for LSP protocol.
 
-// Global state for clangd server
-namespace {
-    struct ClangdState {
-        void* handle = nullptr;           // dlopen handle for libclangd.so
-        pthread_t thread;                 // Thread running clangd
-        std::atomic<bool> running{false}; // Is clangd running?
-        int stdin_pipe[2] = {-1, -1};     // Pipe for stdin (write end for Java)
-        int stdout_pipe[2] = {-1, -1};    // Pipe for stdout (read end for Java)
-        std::mutex mutex;                 // Protect state changes
-        std::string error;                // Last error message
-        
-        // Function pointer types for clangd entry points
-        using ClangdMainFn = int (*)(int argc, char** argv);
-        using ClangdRunFn = int (*)();
-        
-        ClangdMainFn clangd_main = nullptr;
-        ClangdRunFn clangd_run = nullptr;
-    };
-    
-    ClangdState g_clangd;
-    
-    // Thread function to run clangd
-    void* clangd_thread_func(void* arg) {
-        ClangdState* state = static_cast<ClangdState*>(arg);
-        
-        // Redirect stdin/stdout to pipes
-        int saved_stdin = dup(STDIN_FILENO);
-        int saved_stdout = dup(STDOUT_FILENO);
-        
-        dup2(state->stdin_pipe[0], STDIN_FILENO);   // Read from stdin pipe
-        dup2(state->stdout_pipe[1], STDOUT_FILENO); // Write to stdout pipe
-        
-        // Close unused pipe ends in this thread
-        close(state->stdin_pipe[1]);  // Close write end of stdin pipe
-        close(state->stdout_pipe[0]); // Close read end of stdout pipe
-        
-        LOGI("clangd_thread: starting clangd");
-        
-        int rc = -1;
-        if (state->clangd_run) {
-            // Use simplified entry with default args
-            rc = state->clangd_run();
-        } else if (state->clangd_main) {
-            // Use main entry with custom args
-            const char* argv[] = {
-                "clangd",
-                "--background-index=false",
-                "--clang-tidy=false",
-                "--completion-style=detailed",
-                "--pch-storage=memory",
-                "--log=error",
-                nullptr
-            };
-            int argc = 0;
-            while (argv[argc]) argc++;
-            rc = state->clangd_main(argc, const_cast<char**>(argv));
-        }
-        
-        LOGI("clangd_thread: clangd exited with rc=%d", rc);
-        
-        // Restore stdin/stdout
-        dup2(saved_stdin, STDIN_FILENO);
-        dup2(saved_stdout, STDOUT_FILENO);
-        close(saved_stdin);
-        close(saved_stdout);
-        
-        state->running.store(false);
-        return reinterpret_cast<void*>(static_cast<intptr_t>(rc));
-    }
-}
-
-// Start clangd server from shared library
-// Returns: empty string on success, error message on failure
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_startClangd(
         JNIEnv* env, jclass /*clazz*/, jstring jLibPath) {
-    std::lock_guard<std::mutex> lock(g_clangd.mutex);
-    
-    if (g_clangd.running.load()) {
-        return env->NewStringUTF("clangd is already running");
+
+    std::string libPath = utils::jstringToUtf8(env, jLibPath);
+
+    // 创建全局 Clangd 服务器实例（如果尚未创建）
+    if (!g_clangdServer) {
+        g_clangdServer = new lsp::ClangdServer();
     }
-    
-    std::string libPath = jstringToUtf8(env, jLibPath);
-    if (libPath.empty()) {
-        return env->NewStringUTF("libclangd.so path is empty");
-    }
-    
-    // Check if library exists
-    struct stat st;
-    if (stat(libPath.c_str(), &st) != 0) {
-        std::string err = "libclangd.so not found: " + libPath;
-        return env->NewStringUTF(err.c_str());
-    }
-    
-    // Create pipes
-    if (pipe(g_clangd.stdin_pipe) != 0) {
-        std::string err = std::string("Failed to create stdin pipe: ") + strerror(errno);
-        return env->NewStringUTF(err.c_str());
-    }
-    if (pipe(g_clangd.stdout_pipe) != 0) {
-        close(g_clangd.stdin_pipe[0]);
-        close(g_clangd.stdin_pipe[1]);
-        std::string err = std::string("Failed to create stdout pipe: ") + strerror(errno);
-        return env->NewStringUTF(err.c_str());
-    }
-    
-    // Set non-blocking on the Java-facing ends
-    fcntl(g_clangd.stdin_pipe[1], F_SETFL, O_NONBLOCK);  // Write end for Java
-    fcntl(g_clangd.stdout_pipe[0], F_SETFL, O_NONBLOCK); // Read end for Java
-    
-    // Load libclangd.so
-    g_clangd.handle = dlopen(libPath.c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (!g_clangd.handle) {
-        const char* err = dlerror();
-        std::string errMsg = std::string("dlopen failed: ") + (err ? err : "unknown");
-        close(g_clangd.stdin_pipe[0]); close(g_clangd.stdin_pipe[1]);
-        close(g_clangd.stdout_pipe[0]); close(g_clangd.stdout_pipe[1]);
-        return env->NewStringUTF(errMsg.c_str());
-    }
-    
-    // Find entry points
-    g_clangd.clangd_main = reinterpret_cast<ClangdState::ClangdMainFn>(
-        dlsym(g_clangd.handle, "clangd_main"));
-    g_clangd.clangd_run = reinterpret_cast<ClangdState::ClangdRunFn>(
-        dlsym(g_clangd.handle, "clangd_run"));
-    
-    if (!g_clangd.clangd_main && !g_clangd.clangd_run) {
-        const char* err = dlerror();
-        std::string errMsg = std::string("dlsym failed (no clangd_main or clangd_run): ") + (err ? err : "unknown");
-        dlclose(g_clangd.handle);
-        g_clangd.handle = nullptr;
-        close(g_clangd.stdin_pipe[0]); close(g_clangd.stdin_pipe[1]);
-        close(g_clangd.stdout_pipe[0]); close(g_clangd.stdout_pipe[1]);
-        return env->NewStringUTF(errMsg.c_str());
-    }
-    
-    LOGI("startClangd: loaded libclangd.so, clangd_main=%p, clangd_run=%p",
-         (void*)g_clangd.clangd_main, (void*)g_clangd.clangd_run);
-    
-    // Start clangd thread
-    g_clangd.running.store(true);
-    int rc = pthread_create(&g_clangd.thread, nullptr, clangd_thread_func, &g_clangd);
-    if (rc != 0) {
-        g_clangd.running.store(false);
-        dlclose(g_clangd.handle);
-        g_clangd.handle = nullptr;
-        close(g_clangd.stdin_pipe[0]); close(g_clangd.stdin_pipe[1]);
-        close(g_clangd.stdout_pipe[0]); close(g_clangd.stdout_pipe[1]);
-        std::string err = std::string("pthread_create failed: ") + strerror(rc);
-        return env->NewStringUTF(err.c_str());
-    }
-    
-    LOGI("startClangd: clangd thread started");
-    return env->NewStringUTF("");  // Success
+
+    // 启动服务器
+    std::string error = g_clangdServer->start(libPath);
+
+    return utils::utf8ToJstring(env, error);
 }
 
-// Stop clangd server
 extern "C" JNIEXPORT void JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_stopClangd(
         JNIEnv* /*env*/, jclass /*clazz*/) {
-    std::lock_guard<std::mutex> lock(g_clangd.mutex);
-    
-    if (!g_clangd.running.load()) {
-        LOGI("stopClangd: clangd is not running");
-        return;
+
+    if (g_clangdServer) {
+        g_clangdServer->stop();
+        delete g_clangdServer;
+        g_clangdServer = nullptr;
     }
-    
-    LOGI("stopClangd: stopping clangd");
-    
-    // Close pipes to signal EOF to clangd
-    if (g_clangd.stdin_pipe[1] >= 0) {
-        close(g_clangd.stdin_pipe[1]);
-        g_clangd.stdin_pipe[1] = -1;
-    }
-    
-    // Wait for thread to finish (with timeout)
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += 5;  // 5 second timeout
-    
-    int rc = pthread_timedjoin_np(g_clangd.thread, nullptr, &ts);
-    if (rc == ETIMEDOUT) {
-        LOGW("stopClangd: thread join timed out, cancelling");
-        pthread_cancel(g_clangd.thread);
-        pthread_join(g_clangd.thread, nullptr);
-    }
-    
-    // Close remaining pipes
-    if (g_clangd.stdin_pipe[0] >= 0) { close(g_clangd.stdin_pipe[0]); g_clangd.stdin_pipe[0] = -1; }
-    if (g_clangd.stdout_pipe[0] >= 0) { close(g_clangd.stdout_pipe[0]); g_clangd.stdout_pipe[0] = -1; }
-    if (g_clangd.stdout_pipe[1] >= 0) { close(g_clangd.stdout_pipe[1]); g_clangd.stdout_pipe[1] = -1; }
-    
-    // Unload library
-    if (g_clangd.handle) {
-        dlclose(g_clangd.handle);
-        g_clangd.handle = nullptr;
-    }
-    
-    g_clangd.clangd_main = nullptr;
-    g_clangd.clangd_run = nullptr;
-    g_clangd.running.store(false);
-    
-    LOGI("stopClangd: clangd stopped");
 }
 
-// Check if clangd is running
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_isClangdRunning(
         JNIEnv* /*env*/, jclass /*clazz*/) {
-    return g_clangd.running.load() ? JNI_TRUE : JNI_FALSE;
-}
 
-// Get file descriptor for writing to clangd stdin
-// Returns: fd >= 0 on success, -1 if not running
-extern "C" JNIEXPORT jint JNICALL
-Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_getClangdStdinFd(
-        JNIEnv* /*env*/, jclass /*clazz*/) {
-    if (!g_clangd.running.load()) {
-        return -1;
+    if (g_clangdServer && g_clangdServer->isRunning()) {
+        return JNI_TRUE;
     }
-    return g_clangd.stdin_pipe[1];  // Write end
+    return JNI_FALSE;
 }
 
-// Get file descriptor for reading from clangd stdout
-// Returns: fd >= 0 on success, -1 if not running
-extern "C" JNIEXPORT jint JNICALL
-Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_getClangdStdoutFd(
-        JNIEnv* /*env*/, jclass /*clazz*/) {
-    if (!g_clangd.running.load()) {
-        return -1;
-    }
-    return g_clangd.stdout_pipe[0];  // Read end
-}
-
-// Write data to clangd stdin
-// Returns: number of bytes written, or -1 on error
 extern "C" JNIEXPORT jint JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_writeToClangd(
         JNIEnv* env, jclass /*clazz*/, jbyteArray jData) {
-    if (!g_clangd.running.load() || g_clangd.stdin_pipe[1] < 0) {
+
+    if (!g_clangdServer) {
         return -1;
     }
-    
+
     jsize len = env->GetArrayLength(jData);
-    if (len <= 0) return 0;
-    
+    if (len <= 0) {
+        return 0;
+    }
+
     jbyte* data = env->GetByteArrayElements(jData, nullptr);
-    if (!data) return -1;
-    
-    ssize_t written = write(g_clangd.stdin_pipe[1], data, len);
-    env->ReleaseByteArrayElements(jData, data, JNI_ABORT);
-    
-    if (written < 0) {
-        LOGW("writeToClangd: write failed: %s", strerror(errno));
+    if (!data) {
         return -1;
     }
-    
+
+    std::vector<char> buffer(data, data + len);
+    env->ReleaseByteArrayElements(jData, data, JNI_ABORT);
+
+    int written = g_clangdServer->write(buffer);
     return static_cast<jint>(written);
 }
 
-// Read data from clangd stdout
-// Returns: byte array with data, or null if no data available or error
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_readFromClangd(
         JNIEnv* env, jclass /*clazz*/, jint maxBytes) {
-    if (!g_clangd.running.load() || g_clangd.stdout_pipe[0] < 0) {
+
+    if (!g_clangdServer) {
         return nullptr;
     }
-    
-    if (maxBytes <= 0) maxBytes = 8192;
-    
-    // Check if data is available (non-blocking)
-    struct pollfd pfd;
-    pfd.fd = g_clangd.stdout_pipe[0];
-    pfd.events = POLLIN;
-    pfd.revents = 0;
-    
-    int pr = poll(&pfd, 1, 0);  // Non-blocking poll
-    if (pr <= 0 || !(pfd.revents & POLLIN)) {
-        return nullptr;  // No data available
-    }
-    
-    std::vector<char> buf(maxBytes);
-    ssize_t n = read(g_clangd.stdout_pipe[0], buf.data(), buf.size());
-    
-    if (n <= 0) {
-        if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOGW("readFromClangd: read failed: %s", strerror(errno));
-        }
+
+    std::vector<char> data = g_clangdServer->read(maxBytes);
+    if (data.empty()) {
         return nullptr;
     }
-    
-    jbyteArray result = env->NewByteArray(static_cast<jsize>(n));
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(data.size()));
     if (result) {
-        env->SetByteArrayRegion(result, 0, static_cast<jsize>(n), 
-                                reinterpret_cast<jbyte*>(buf.data()));
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(data.size()),
+                                reinterpret_cast<jbyte*>(data.data()));
     }
     return result;
 }
 
-// Read data from clangd stdout with timeout
-// Returns: byte array with data, or null if timeout or error
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_wuxianggujun_tinaide_core_nativebridge_NativeCompiler_readFromClangdWithTimeout(
         JNIEnv* env, jclass /*clazz*/, jint maxBytes, jint timeoutMs) {
-    if (!g_clangd.running.load() || g_clangd.stdout_pipe[0] < 0) {
+
+    if (!g_clangdServer) {
         return nullptr;
     }
-    
-    if (maxBytes <= 0) maxBytes = 8192;
-    if (timeoutMs < 0) timeoutMs = 0;
-    
-    // Wait for data with timeout
-    struct pollfd pfd;
-    pfd.fd = g_clangd.stdout_pipe[0];
-    pfd.events = POLLIN;
-    pfd.revents = 0;
-    
-    int pr = poll(&pfd, 1, timeoutMs);
-    if (pr <= 0 || !(pfd.revents & POLLIN)) {
-        return nullptr;  // Timeout or error
-    }
-    
-    std::vector<char> buf(maxBytes);
-    ssize_t n = read(g_clangd.stdout_pipe[0], buf.data(), buf.size());
-    
-    if (n <= 0) {
+
+    std::vector<char> data = g_clangdServer->readWithTimeout(maxBytes, timeoutMs);
+    if (data.empty()) {
         return nullptr;
     }
-    
-    jbyteArray result = env->NewByteArray(static_cast<jsize>(n));
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(data.size()));
     if (result) {
-        env->SetByteArrayRegion(result, 0, static_cast<jsize>(n), 
-                                reinterpret_cast<jbyte*>(buf.data()));
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(data.size()),
+                                reinterpret_cast<jbyte*>(data.data()));
     }
     return result;
 }

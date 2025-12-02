@@ -5,9 +5,7 @@ Param(
   [string]$AppJniLibs = 'app/src/main/jniLibs',
   [string]$AppAssetsSysroot = 'app/src/main/assets/sysroot',
   [ValidateSet('none','zip','mirror')]
-  [string]$SysrootMode = 'zip',
-  [bool]$CopyLibcxxToJni = $true,
-  [bool]$CopyLlvmToJni   = $false
+  [string]$SysrootMode = 'zip'
 )
 
 $validAbis = @('arm64-v8a','x86_64')
@@ -30,9 +28,7 @@ function Invoke-SyncSingleAbi {
     '-BuildOutputRoot', $BuildOutputRoot,
     '-AppJniLibs', $AppJniLibs,
     '-AppAssetsSysroot', $AppAssetsSysroot,
-    '-SysrootMode', $SysrootMode,
-    "-CopyLibcxxToJni:$CopyLibcxxToJni",
-    "-CopyLlvmToJni:$CopyLlvmToJni"
+    '-SysrootMode', $SysrootMode
   )
   & pwsh -NoLogo @args
   if ($LASTEXITCODE -ne 0) {
