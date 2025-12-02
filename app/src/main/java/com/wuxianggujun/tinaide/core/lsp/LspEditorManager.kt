@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.core.lsp
 
 import android.content.Context
 import android.util.Log
+import com.wuxianggujun.tinaide.core.nativebridge.SysrootLibraryLoader
 import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.lsp.editor.LspProject
 import io.github.rosemoe.sora.widget.CodeEditor
@@ -46,7 +47,11 @@ class LspEditorManager private constructor(private val context: Context) {
 
     /**
      * 初始化 LSP 管理器
-     * @param sysrootDir sysroot 目录，clangd 应该在 sysroot/usr/bin/clangd
+     *
+     * 查找 libclangd.so 共享库，优先从 sysroot/usr/lib/<triple>/runtime/ 目录查找。
+     * 由于 Android 限制可执行文件，clangd 必须编译为共享库并通过 JNI/dlopen 加载。
+     *
+     * @param sysrootDir sysroot 目录
      */
     fun initialize(sysrootDir: File) {
         if (initialized) {
@@ -54,24 +59,44 @@ class LspEditorManager private constructor(private val context: Context) {
             return
         }
 
-        // 查找 clangd 二进制文件
-        val clangdFile = File(sysrootDir, "usr/bin/clangd")
+        // 使用 SysrootLibraryLoader 获取正确的 runtime 库目录
+        val libraryLoader = SysrootLibraryLoader.getInstance(context)
+        val runtimeLibDir = libraryLoader.runtimeLibDir
+        
+        // 查找 libclangd.so 共享库
+        val clangdSoFile = File(runtimeLibDir, "libclangd.so")
+        
+        // 也检查旧的可执行文件路径作为 fallback（未来可能支持独立进程模式）
+        val clangdBinFile = File(sysrootDir, "usr/bin/clangd")
         val clangdHostFile = File(sysrootDir, "usr/bin/clangd-host")
         
         clangdPath = when {
-            clangdFile.exists() -> clangdFile.absolutePath
-            clangdHostFile.exists() -> clangdHostFile.absolutePath
+            // 优先使用共享库（当前唯一支持的方式）
+            clangdSoFile.exists() -> {
+                Log.i(TAG, "Found libclangd.so at: ${clangdSoFile.absolutePath}")
+                clangdSoFile.absolutePath
+            }
+            // Fallback: 检查可执行文件（未来可能支持）
+            clangdBinFile.exists() && clangdBinFile.name.endsWith(".so") -> {
+                Log.i(TAG, "Found clangd .so at: ${clangdBinFile.absolutePath}")
+                clangdBinFile.absolutePath
+            }
+            clangdHostFile.exists() && clangdHostFile.name.endsWith(".so") -> {
+                Log.i(TAG, "Found clangd-host .so at: ${clangdHostFile.absolutePath}")
+                clangdHostFile.absolutePath
+            }
             else -> {
-                Log.w(TAG, "clangd not found in sysroot: ${sysrootDir.absolutePath}")
+                Log.w(TAG, "libclangd.so not found in runtime directory: ${runtimeLibDir.absolutePath}")
+                Log.w(TAG, "Please ensure libclangd.so is installed in sysroot/usr/lib/<triple>/runtime/")
                 null
             }
         }
 
         if (clangdPath != null) {
-            Log.i(TAG, "Found clangd at: $clangdPath")
-            // 确保可执行权限
-            File(clangdPath!!).setExecutable(true)
+            Log.i(TAG, "clangd path set to: $clangdPath")
             initialized = true
+        } else {
+            Log.e(TAG, "Failed to initialize LSP: libclangd.so not found")
         }
     }
 

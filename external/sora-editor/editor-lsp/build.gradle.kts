@@ -29,8 +29,11 @@ plugins {
 
 android {
     namespace = "io.github.rosemoe.sora.lsp"
+    compileSdk = 36
 
     defaultConfig {
+        minSdk = 26
+        targetSdk = 36
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -40,10 +43,18 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
-    compileOnly(projects.editor)
+    compileOnly(project(":sora-editor:editor"))
     implementation(libs.lsp4j)
     implementation(libs.kotlinx.coroutines)
 }

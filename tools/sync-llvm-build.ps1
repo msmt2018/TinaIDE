@@ -6,9 +6,7 @@ Param(
   [string]$AppJniLibs = 'app/src/main/jniLibs',
   [string]$AppAssetsSysroot = 'app/src/main/assets/sysroot',
   [ValidateSet('none','zip','mirror')]
-  [string]$SysrootMode = 'zip',
-  [bool]$CopyLibcxxToJni = $false,  # 使用 sysroot 中的 libc++_shared.so，避免重复
-  [bool]$CopyLlvmToJni   = $false
+  [string]$SysrootMode = 'zip'
 )
 
 $validAbis = @('arm64-v8a','x86_64')
@@ -52,6 +50,10 @@ if ($SysrootMode -eq 'none') {
   return
 }
 
+# Headers are ABI-agnostic, sync once up-front
+Write-Host "== Sync LLVM headers (ABI-independent) ==" -ForegroundColor Cyan
+& ./tools/sync-llvm-headers.ps1 -ApiLevel $ApiLevel
+
 $isMultiAbi = $targetAbis.Count -gt 1
 
 foreach ($abiEntry in $targetAbis) {
@@ -59,8 +61,6 @@ foreach ($abiEntry in $targetAbis) {
   if (-not $currentAbi) { continue }
   Write-Host "== Sync LLVM build artifacts (ABI=$currentAbi) ==" -ForegroundColor Cyan
 
-# 1) Headers (LLVM/Clang) for build-time
-& ./tools/sync-llvm-headers.ps1 -Abi $currentAbi -ApiLevel $ApiLevel
 
 # Mirror common headers到工程可引用的位置（external/llvm-build-libs/common-headers）
 $srcCommonHeaders = Join-Path $BuildOutputRoot 'common-headers'
@@ -73,100 +73,31 @@ if (Test-Path $srcCommonHeaders) {
   Write-Host "[w] Skip header sync: $srcCommonHeaders not found (run docker build first)" -ForegroundColor Yellow
 }
 
-# 2) Shared libraries to jniLibs
+# 2) Clean jniLibs (no LLVM/Clang runtime packaged in APK)
 $abiOutputRoot = Join-Path -Path $BuildOutputRoot -ChildPath $currentAbi
 $abiLibRoot = Join-Path -Path $abiOutputRoot -ChildPath 'libs'
 $srcLibDir = Join-Path -Path $abiLibRoot -ChildPath $currentAbi
 $dstLibDir = Join-Path -Path $AppJniLibs -ChildPath $currentAbi
-if (Test-Path $srcLibDir) {
-  New-Item -ItemType Directory -Force -Path $dstLibDir | Out-Null
-  # Pre-clean only our managed libraries to avoid leftovers; remove stale static archives as well
-  $patterns = @('libclang-cpp*.so','libLLVM*.so','liblld*.so','libc++_shared.so')
+if (Test-Path $dstLibDir) {
+  $patterns = @('libclang*.so','libLLVM*.so','liblld*.so','libc++_shared.so')
   foreach($pat in $patterns){
     Get-ChildItem -Path $dstLibDir -Filter $pat -File -ErrorAction SilentlyContinue | ForEach-Object {
-      Write-Host "Remove old: $($_.FullName)" -ForegroundColor DarkYellow
+      Write-Host "Remove stale jniLibs entry: $($_.FullName)" -ForegroundColor DarkYellow
       Remove-Item -Force $_.FullName
     }
   }
-  # Remove any static archives (*.a) accidentally present under jniLibs (APK 不需要 .a，且会膨胀体积)
   Get-ChildItem -Path $dstLibDir -Filter *.a -File -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "Remove static archive: $($_.FullName)" -ForegroundColor DarkYellow
+    Write-Host "Remove static archive from jniLibs: $($_.FullName)" -ForegroundColor DarkYellow
     Remove-Item -Force $_.FullName
   }
-  # Only copy shared objects into jniLibs
-  robocopy $srcLibDir $dstLibDir *.so /NFL /NDL /NJH /NJS /NP | Out-Null
-  # Optionally remove libc++_shared.so (we rely on sysroot-side dynamic runtime)
-  if (-not $CopyLibcxxToJni) {
-    Get-ChildItem -Path $dstLibDir -Filter libc++_shared.so -File -ErrorAction SilentlyContinue | ForEach-Object {
-      Write-Host "Remove libc++_shared from jniLibs (using sysroot version): $($_.FullName)" -ForegroundColor DarkYellow
-      Remove-Item -Force $_.FullName
-    }
+  if (-not (Get-ChildItem -Path $dstLibDir -File -ErrorAction SilentlyContinue)) {
+    Remove-Item -Recurse -Force $dstLibDir
+    Write-Host "Removed empty jniLibs/$currentAbi directory" -ForegroundColor DarkGray
+  } else {
+    Write-Host "jniLibs/$currentAbi retained (non-LLVM libs present)" -ForegroundColor DarkGray
   }
-  # Optionally remove LLVM/Clang runtime from jniLibs (we will load from sysroot runtime path)
-  if (-not $CopyLlvmToJni) {
-    foreach($pat in @('libLLVM*.so','libclang-cpp*.so')){
-      Get-ChildItem -Path $dstLibDir -Filter $pat -File -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Host "Remove LLVM runtime from jniLibs (using sysroot version): $($_.FullName)" -ForegroundColor DarkYellow
-        Remove-Item -Force $_.FullName
-      }
-    }
-  }
-  Write-Host "Copied .so libraries -> $dstLibDir" -ForegroundColor Green
-
-  # Ensure libc++_shared.so is present in jniLibs when requested, even if not provided by prebuilt libs
-  if ($CopyLibcxxToJni) {
-    $dstLibCxx = Join-Path $dstLibDir 'libc++_shared.so'
-    if (-not (Test-Path $dstLibCxx)) {
-      Write-Host "INFO: libc++_shared.so not found under $dstLibDir - attempting to copy from local NDK" -ForegroundColor Yellow
-      # Discover Android SDK/NDK roots
-      $repoRoot = (Resolve-Path '.').Path
-      $localPropsPath = Join-Path $repoRoot 'local.properties'
-      $SdkDir = $null; $NdkDir = $null
-      if (Test-Path $localPropsPath) {
-        Get-Content $localPropsPath | ForEach-Object {
-          if ($_ -match '^(sdk.dir)=(.*)$') { $SdkDir = $Matches[2].Trim() }
-          if ($_ -match '^(ndk.dir)=(.*)$') { $NdkDir = $Matches[2].Trim() }
-        }
-      }
-      if (-not $SdkDir) { $SdkDir = $env:ANDROID_SDK_ROOT }
-      if (-not $SdkDir) { $SdkDir = $env:ANDROID_HOME }
-      if (-not $NdkDir -and $SdkDir) {
-        $ndkParent = Join-Path $SdkDir 'ndk'
-        if (Test-Path $ndkParent) {
-          $cand = Get-ChildItem -Path $ndkParent -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
-          if ($cand) { $NdkDir = $cand.FullName }
-        }
-      }
-      $copied = $false
-      if ($NdkDir) {
-        # Primary location (NDK r21+): sources/cxx-stl/llvm-libc++/libs/<abi>/libc++_shared.so
-        $srcCxx = Join-Path (Join-Path $NdkDir 'sources/cxx-stl/llvm-libc++/libs') (Join-Path $currentAbi 'libc++_shared.so')
-        if (Test-Path $srcCxx) {
-          Copy-Item $srcCxx -Destination $dstLibCxx -Force
-          Write-Host "INFO: Copied libc++_shared.so from $srcCxx to $dstLibCxx" -ForegroundColor Green
-          $copied = $true
-        } else {
-          # Fallback (some layouts): toolchains/llvm/prebuilt/*/sysroot/usr/lib/<triple>/libc++_shared.so
-          $triple = if ($currentAbi -eq 'arm64-v8a') { 'aarch64-linux-android' } else { 'x86_64-linux-android' }
-          $preb = Get-ChildItem -Path (Join-Path $NdkDir 'toolchains/llvm/prebuilt') -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($preb) {
-            $cand1 = Join-Path $preb.FullName ("sysroot/usr/lib/$triple/libc++_shared.so")
-            if (Test-Path $cand1) {
-              Copy-Item $cand1 -Destination $dstLibCxx -Force
-              Write-Host "INFO: Copied libc++_shared.so from $cand1 to $dstLibCxx" -ForegroundColor Green
-              $copied = $true
-            }
-          }
-        }
-      }
-      if (-not $copied) {
-        Write-Host "[!] Unable to locate libc++_shared.so in prebuilt libs or local NDK. Ensure NDK installed and ANDROID_SDK_ROOT/ndk.dir set." -ForegroundColor Red
-      }
-    }
-  }
-
 } else {
-  Write-Host "Skip libs: $srcLibDir not found" -ForegroundColor DarkYellow
+  Write-Host "Skip jniLibs cleanup (directory missing): $dstLibDir" -ForegroundColor DarkGray
 }
 
   # 3) Sysroot to assets（可选）。当 SysrootMode=none 时，不打包也不镜像，并清理已存在的资产。
@@ -179,7 +110,7 @@ if (Test-Path $srcLibDir) {
       $prebuiltLibs = Join-Path $abiLibRoot $currentAbi
       if (Test-Path $prebuiltLibs) {
         New-Item -ItemType Directory -Force -Path $dstRuntime | Out-Null
-        $need = @('libclang-cpp.so', 'libclang.so')
+        $need = @('libclang-cpp.so', 'libclang.so', 'libclangd.so')
         $llvmSo = Get-ChildItem -LiteralPath $prebuiltLibs -Filter 'libLLVM-*.so' -File -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($llvmSo) { $need += $llvmSo.Name } else { Write-Host "[w] libLLVM-*.so not found under $prebuiltLibs" -ForegroundColor Yellow }
         # Do NOT include any LLD shared libs in sysroot runtime (LLD linked statically at build time)

@@ -4,7 +4,20 @@ project(native_compiler)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(native_compiler SHARED native_compiler.cpp)
+add_library(native_compiler SHARED
+    native_compiler.cpp
+    # Utils 模块
+    utils/jni_utils.cpp
+    utils/file_utils.cpp
+    # Compiler 模块
+    compiler/clang_compiler.cpp
+    # Linker 模块
+    linker/lld_linker.cpp
+    # Runner 模块
+    runner/shared_runner.cpp
+    # LSP 模块
+    lsp/clangd_server.cpp
+)
 # 允许共享库中存在由其他共享库在运行时解析的未定义符号
 # 修复在链接 lld 静态库时对 libLLVM-17.so 中符号的解析约束（禁用 -z defs 效果）
 target_link_options(native_compiler PRIVATE -Wl,--allow-shlib-undefined -Wl,--unresolved-symbols=ignore-in-shared-libs -Wl,-z,undefs)

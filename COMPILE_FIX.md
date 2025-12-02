@@ -56,11 +56,11 @@ fatal error: 'clang/Basic/DiagnosticCommonKinds.inc' file not found
 - ✅ `clang-generated/Sema/*.inc` - 语义分析生成文件（OpenCLBuiltins.inc）
 - ✅ 从 `docker/llvm-build/dev-work/build/android/x86_64-api21/tools/clang/` 复制
 
-### 5. 验证共享库存在
-- ✅ `jniLibs/x86_64/libclang-cpp.so`
-- ✅ `jniLibs/x86_64/libLLVM-17.so`
-- ✅ `jniLibs/arm64-v8a/libclang-cpp.so`
-- ✅ `jniLibs/arm64-v8a/libLLVM-17.so`
+### 5. 验证 sysroot 运行库存在
+- ✅ `docker/llvm-build/build-output/x86_64/sysroot/usr/lib/x86_64-linux-android/runtime/libclang-cpp.so`
+- ✅ `docker/llvm-build/build-output/x86_64/sysroot/usr/lib/x86_64-linux-android/runtime/libLLVM-17.so`
+- ✅ `docker/llvm-build/build-output/arm64-v8a/sysroot/usr/lib/aarch64-linux-android/runtime/libclang-cpp.so`
+- ✅ `docker/llvm-build/build-output/arm64-v8a/sysroot/usr/lib/aarch64-linux-android/runtime/libLLVM-17.so`
 
 ### 6. in‑process 编译参数修正
 - `-x` 与 `-std` 改为 joined 形式：`-x=c++`、`-std=c++17`，避免 `unknown argument: '-std'` 与 `invalid value '' in '-x '`。
