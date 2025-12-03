@@ -1,7 +1,6 @@
 package com.wuxianggujun.tinaide.core.nativebridge
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import java.io.File
 import java.util.Collections
@@ -42,27 +41,18 @@ class SysrootLibraryLoader private constructor(private val context: Context) {
         File(context.filesDir, "sysroot")
     }
     
-    // 当前设备的 triple
-    val triple: String by lazy {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-        when {
-            abi.contains("arm64", true) -> "aarch64-linux-android"
-            abi.contains("x86_64", true) -> "x86_64-linux-android"
-            abi.contains("armeabi", true) -> "arm-linux-androideabi"
-            abi.contains("x86", true) -> "i686-linux-android"
-            else -> "aarch64-linux-android"
-        }
-    }
-    
-    // 当前设备的 ABI
-    val abi: String by lazy {
-        Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
-    }
+    // 当前设备的 ABI 与 triple（与 SysrootInstaller 相同的 AbiResolver 逻辑）
+    private val resolvedAbi: Pair<String, String> by lazy { resolveAbiAndTriple() }
+
+    val abi: String
+        get() = resolvedAbi.first
+
+    val triple: String
+        get() = resolvedAbi.second
     
     // 运行时库目录
-    val runtimeLibDir: File by lazy {
-        File(sysrootBase, "usr/lib/$triple/runtime")
-    }
+    val runtimeLibDir: File
+        get() = File(sysrootBase, "usr/lib/$triple/runtime")
     
     // API 级别库目录（默认 API 28）
     fun apiLibDir(apiLevel: Int = 28): File {
@@ -260,5 +250,21 @@ class SysrootLibraryLoader private constructor(private val context: Context) {
         return msg.contains("already loaded", ignoreCase = true) ||
                (msg.contains("library \"", ignoreCase = true) && 
                 msg.contains("needed or already loaded", ignoreCase = true))
+    }
+
+    private fun resolveAbiAndTriple(): Pair<String, String> {
+        val nativeLibDir = context.applicationInfo.nativeLibraryDir
+        val candidates = AbiResolver.prioritizedAbis(nativeLibDir)
+        for (abiCandidate in candidates) {
+            val tripleCandidate = AbiResolver.abiToTargetTriple(abiCandidate)
+            val runtimeDir = File(sysrootBase, "usr/lib/$tripleCandidate/runtime")
+            if (runtimeDir.exists()) {
+                Log.d(TAG, "Using sysroot runtime for ABI=$abiCandidate triple=$tripleCandidate")
+                return abiCandidate to tripleCandidate
+            }
+        }
+        throw IllegalStateException(
+            "No sysroot runtime found under ${sysrootBase.absolutePath}; please reinstall sysroot assets"
+        )
     }
 }

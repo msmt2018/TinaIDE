@@ -48,6 +48,14 @@ pwsh ./tools/sync-llvm-build.ps1 -Abi arm64-v8a -ApiLevel 28
 ./gradlew installDebug
 ```
 
+> **多 ABI 构建（arm64 + x86_64）**
+>
+> 如果要打包同时包含 arm64-v8a 与 x86_64 的 native 库，可运行：
+> ```bash
+> ./gradlew assembleDebugAllAbi
+> ```
+> 该任务会先编译两个 ABI 的本地库，再生成 Debug APK。
+
 ### 3. 开始使用
 
 1. 启动应用（首次启动会自动解压 sysroot）
