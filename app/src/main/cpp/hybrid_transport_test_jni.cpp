@@ -6,6 +6,7 @@
 #include <android/log.h>
 #include <thread>
 #include <chrono>
+#include <string>
 #include "lsp/native_client/transport/control_channel.h"
 #include "lsp/native_client/transport/shared_memory_transport.h"
 
@@ -17,13 +18,27 @@ using namespace tinaide::lsp;
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_wuxianggujun_tinaide_core_lsp_HybridTransportTest_runIntegrationTest(
-    JNIEnv* env, jclass) {
+    JNIEnv* env, jclass, jstring jSocketPath) {
 
     LOGI("========== 开始混合传输集成测试 ==========");
 
     try {
+        if (jSocketPath == nullptr) {
+            LOGE("socketPath is null");
+            return JNI_FALSE;
+        }
+
+        const char* raw_path = env->GetStringUTFChars(jSocketPath, nullptr);
+        std::string socket_path = raw_path ? raw_path : "";
+        env->ReleaseStringUTFChars(jSocketPath, raw_path);
+
+        if (socket_path.empty()) {
+            LOGE("socketPath is empty");
+            return JNI_FALSE;
+        }
+
         ChannelConfig config;
-        config.socket_path = "/data/local/tmp/tinaide_hybrid_test.sock";
+        config.socket_path = socket_path;
 
         // 服务端线程
         std::thread server_thread([config]() {

@@ -1,17 +1,16 @@
 package com.wuxianggujun.tinaide.core.lsp
 
+import android.content.Context
 import android.util.Log
+import java.io.File
 
 /**
  * 混合传输测试 - 集成控制通道和共享内存
- *
- * 测试场景：
- * 1. 小数据（2KB）通过控制通道直接传输
- * 2. 大数据（50KB）通过共享内存 + FD 传递
  */
 object HybridTransportTest {
 
     private const val TAG = "HybridTransportTest"
+    private const val SOCKET_FILE_NAME = "tinaide_hybrid_test.sock"
 
     init {
         System.loadLibrary("native_compiler")
@@ -19,24 +18,25 @@ object HybridTransportTest {
 
     /**
      * 运行混合传输集成测试
-     * - 测试控制通道基本功能
-     * - 测试共享内存 FD 传递
-     * - 测试自动阈值切换
+     *
+     * @param socketPath 可读写目录下的 Unix Socket 路径
      */
-    external fun runIntegrationTest(): Boolean
+    external fun runIntegrationTest(socketPath: String): Boolean
 
     /**
      * 运行所有测试并返回结果
      */
-    fun runAllTests(): TestResult {
+    fun runAllTests(context: Context): TestResult {
         Log.i(TAG, "========== 开始混合传输测试 ==========")
+
+        val socketPath = File(context.cacheDir, SOCKET_FILE_NAME).absolutePath
+        Log.i(TAG, "控制通道 Socket 路径: $socketPath")
 
         val results = mutableListOf<Pair<String, Boolean>>()
 
-        // 测试：混合传输集成
         Log.i(TAG, "--- 混合传输集成测试 ---")
         val integrationResult = try {
-            runIntegrationTest()
+            runIntegrationTest(socketPath)
         } catch (e: Exception) {
             Log.e(TAG, "集成测试异常", e)
             false

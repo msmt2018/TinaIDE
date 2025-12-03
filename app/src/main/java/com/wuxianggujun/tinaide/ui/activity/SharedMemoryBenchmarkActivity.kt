@@ -132,7 +132,7 @@ class SharedMemoryBenchmarkActivity : AppCompatActivity() {
 
         scope.launch(Dispatchers.IO) {
             try {
-                val result = HybridTransportTest.runAllTests()
+                val result = HybridTransportTest.runAllTests(this@SharedMemoryBenchmarkActivity)
 
                 withContext(Dispatchers.Main) {
                     if (result.allPassed) {
