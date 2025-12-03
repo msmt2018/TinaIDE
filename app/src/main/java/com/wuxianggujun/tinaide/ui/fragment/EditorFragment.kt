@@ -10,6 +10,7 @@ import com.wuxianggujun.tinaide.core.lsp.ClangdServerDefinition
 import com.wuxianggujun.tinaide.core.lsp.LspEditorManager
 import com.wuxianggujun.tinaide.core.lsp.LspEditorManager.BuildType
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
+import com.wuxianggujun.tinaide.editor.language.cpp.CppTreeSitterLanguageProvider
 import com.wuxianggujun.tinaide.extensions.toastInfo
 import io.github.rosemoe.sora.lsp.editor.LspEditor
 import io.github.rosemoe.sora.widget.CodeEditor
@@ -95,6 +96,8 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             android.util.Log.d(TAG, "Not a C/C++ file: $path")
             return
         }
+
+        applyCppSyntaxHighlight()
         
         // 异步初始化语言支持
         CoroutineScope(Dispatchers.IO).launch {
@@ -262,6 +265,16 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
      */
     fun isUsingLsp(): Boolean {
         return lspEditor?.isConnected == true
+    }
+
+    private fun applyCppSyntaxHighlight() {
+        try {
+            val language = CppTreeSitterLanguageProvider.create(requireContext())
+            codeEditor.setEditorLanguage(language)
+            android.util.Log.i(TAG, "Applied Tree-sitter language for: $filePath")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to setup Tree-sitter highlighter", e)
+        }
     }
     
     override fun onDestroyView() {
