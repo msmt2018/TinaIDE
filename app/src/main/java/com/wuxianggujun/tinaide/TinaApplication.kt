@@ -12,6 +12,8 @@ import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootLibraryLoader
 import com.wuxianggujun.tinaide.core.nativebridge.NativeLoader
+import io.github.rosemoe.sora.lsp.requests.Timeout
+import io.github.rosemoe.sora.lsp.requests.Timeouts
 import com.wuxianggujun.tinaide.file.FileManager
 import com.wuxianggujun.tinaide.file.IFileManager
 
@@ -39,6 +41,9 @@ class TinaApplication : Application() {
         
         // 初始化 Native 库
         initializeNativeLibraries()
+
+        // 调整 LSP 请求超时时间，避免 hover/completion 频繁 2s 超时
+        configureLspTimeouts()
     }
     
     /**
@@ -128,5 +133,11 @@ class TinaApplication : Application() {
         
         // 打印已加载的库
         Log.i(TAG, "Loaded libraries: ${loader.getLoadedLibraries().size}")
+    }
+
+    private fun configureLspTimeouts() {
+        Timeout[Timeouts.HOVER] = 6000
+        Timeout[Timeouts.COMPLETION] = 5000
+        Timeout[Timeouts.SIGNATURE] = 6000
     }
 }

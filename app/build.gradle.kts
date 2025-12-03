@@ -38,6 +38,8 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared"
                 )
+                // 强制同时构建 arm64-v8a 与 x86_64，以便 APK 内始终包含两种 ABI
+                abiFilters += listOf("arm64-v8a", "x86_64")
             }
         }
 
@@ -165,4 +167,31 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+val buildAllAbiNative = tasks.register("buildAllAbiNative")
+
+afterEvaluate {
+    val arm64Task = tasks.findByName("buildCMakeDebug[arm64-v8a]")
+    val x86Task = tasks.findByName("buildCMakeDebug[x86_64]")
+    val mergeNativeTask = tasks.findByName("mergeDebugNativeLibs")
+
+    if (arm64Task != null && x86Task != null && mergeNativeTask != null) {
+        buildAllAbiNative.configure {
+            dependsOn(arm64Task, x86Task)
+        }
+        mergeNativeTask.dependsOn(buildAllAbiNative)
+    } else {
+        logger.warn(
+            "Native ABI build tasks not found (arm64=$arm64Task, x86=$x86Task). " +
+            "Gradle will only build ABIs requested by the current variant/device."
+        )
+    }
+}
+
+tasks.register("assembleDebugAllAbi") {
+    description = "Builds native libraries for arm64-v8a and x86_64, then assembles the debug APK."
+    group = "build"
+    dependsOn(buildAllAbiNative)
+    dependsOn("assembleDebug")
 }
