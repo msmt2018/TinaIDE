@@ -8,6 +8,8 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.min
+import kotlin.math.minOf
 
 /**
  * clangd 连接提供器
@@ -177,23 +179,23 @@ class ClangdConnectionProvider(
         private var buffer: ByteArray? = null
         private var bufferPos = 0
         private var bufferLen = 0
-        
+
         override fun read(): Int {
             val b = ByteArray(1)
             val n = read(b, 0, 1)
             return if (n <= 0) -1 else (b[0].toInt() and 0xFF)
         }
-        
+
         override fun read(b: ByteArray): Int {
             return read(b, 0, b.size)
         }
-        
+
         override fun read(b: ByteArray, off: Int, len: Int): Int {
             if (closed.get()) {
                 throw IOException("Stream is closed")
             }
             if (len == 0) return 0
-            
+
             // 先从缓冲区读取
             if (buffer != null && bufferPos < bufferLen) {
                 val available = bufferLen - bufferPos
@@ -207,29 +209,19 @@ class ClangdConnectionProvider(
                 }
                 return toRead
             }
-            
+
             // 从 JNI 读取新数据（带超时）
             if (!NativeCompiler.isClangdRunning()) {
                 return -1  // EOF
             }
-            
-            val data = NativeCompiler.readFromClangdWithTimeout(BUFFER_SIZE, 100)
+
+            // 优化: 使用更长的超时并减少忙等待
+            val data = NativeCompiler.readFromClangdWithTimeout(BUFFER_SIZE, 500)
             if (data == null || data.isEmpty()) {
                 // 没有数据可用，但 clangd 还在运行，返回 0 表示暂时没有数据
-                // 注意：这可能导致忙等待，但 LSP 客户端通常会处理这种情况
-                return if (NativeCompiler.isClangdRunning()) {
-                    // 阻塞等待数据
-                    val blockingData = NativeCompiler.readFromClangdWithTimeout(BUFFER_SIZE, 5000)
-                    if (blockingData == null || blockingData.isEmpty()) {
-                        if (NativeCompiler.isClangdRunning()) 0 else -1
-                    } else {
-                        processReadData(blockingData, b, off, len)
-                    }
-                } else {
-                    -1  // EOF
-                }
+                return 0
             }
-            
+
             return processReadData(data, b, off, len)
         }
         
