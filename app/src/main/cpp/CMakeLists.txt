@@ -20,6 +20,7 @@ add_library(native_compiler SHARED
     # LSP Native Client 模块（新增）
     lsp/native_client/transport/shared_memory_helper.cpp
     lsp/native_client/transport/shared_memory_transport.cpp
+    lsp/native_client/transport/control_channel.cpp
     # 共享内存测试 JNI
     shared_memory_test_jni.cpp
 )
