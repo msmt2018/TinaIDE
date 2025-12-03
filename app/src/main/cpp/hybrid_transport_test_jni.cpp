@@ -7,6 +7,7 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include <unistd.h>
 #include "lsp/native_client/transport/control_channel.h"
 #include "lsp/native_client/transport/shared_memory_transport.h"
 
@@ -54,24 +55,41 @@ Java_com_wuxianggujun_tinaide_core_lsp_HybridTransportTest_runIntegrationTest(
                 return;
             }
 
-            // 创建传输层
-            SharedMemoryTransport transport(server_channel);
+            bool inline_received = false;
+            bool shmem_received = false;
+            int attempts = 0;
 
-            // 接收消息
-            Message msg;
-            if (server_channel->receive(msg) != ChannelError::SUCCESS) {
-                LOGE("Receive失败");
-                return;
+            while (attempts < 4 && (!inline_received || !shmem_received)) {
+                Message msg;
+                if (server_channel->receive(msg) != ChannelError::SUCCESS) {
+                    LOGE("Receive失败");
+                    return;
+                }
+
+                attempts++;
+                LOGI("Server收到消息: type=%d, size=%u", msg.header.type, msg.header.payload_size);
+
+                if (msg.header.type == static_cast<uint16_t>(MessageType::DATA)) {
+                    inline_received = true;
+                    LOGI("收到控制通道数据: request_id=%llu, size=%u",
+                         static_cast<unsigned long long>(msg.header.request_id),
+                         msg.header.payload_size);
+                } else if (msg.header.type == static_cast<uint16_t>(MessageType::SHARED_MEMORY_FD)) {
+                    shmem_received = true;
+                    LOGI("收到共享内存FD: %d, request_id=%llu",
+                         msg.fd,
+                         static_cast<unsigned long long>(msg.header.request_id));
+                    if (msg.fd >= 0) {
+                        ::close(msg.fd);
+                    }
+                } else {
+                    LOGI("忽略未知类型: %u", msg.header.type);
+                }
             }
 
-            LOGI("Server收到消息: type=%d, size=%u", msg.header.type, msg.header.payload_size);
-
-            if (msg.header.type == static_cast<uint16_t>(MessageType::SHARED_MEMORY_FD)) {
-                LOGI("收到共享内存FD: %d", msg.fd);
-                // 从共享内存读取数据...
-            }
-
-            LOGI("Server测试成功");
+            LOGI("Server测试完成 inline=%s shmem=%s",
+                 inline_received ? "true" : "false",
+                 shmem_received ? "true" : "false");
         });
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
