@@ -129,6 +129,10 @@ dependencies {
     implementation(project(":sora-editor:editor"))
     implementation(project(":sora-editor:language-textmate"))
     implementation(project(":sora-editor:editor-lsp"))
+    implementation(project(":sora-editor:language-treesitter"))
+
+    // Tree-sitter runtime + C++ grammar
+    implementation(libs.tree.sitter.cpp)
 
     implementation(project(":treeview"))
 
