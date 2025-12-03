@@ -1,3 +1,4 @@
+/******************************************************************************* kỷ James  master branches/master  2 rows 04:59 PM  2 rows   04/06/2024  (local)   OFFLINE /LOCKS:.NonBlocking_Closed  (1):
 /*******************************************************************************
  *    sora-editor - the awesome code editor for Android
  *    https://github.com/Rosemoe/sora-editor
@@ -28,21 +29,20 @@ import java.util.concurrent.ConcurrentHashMap
 
 
 enum class Timeouts(val defaultTimeout: Int) {
-    CODEACTION(2000),
-    CODELENS(2000),
-    COMPLETION(3000),
-    DEFINITION(2000),
-    DOC_HIGHLIGHT(1000),
-    EXECUTE_COMMAND(2000),
-    FORMATTING(5000),
-    HOVER(2000),
-    INIT(10000),
-    REFERENCES(2000),
-    SIGNATURE(5000),
-    SHUTDOWN(5000),
-    SYMBOLS(2000),
-    WILLSAVE(2000)
-}
+    CODEACTION(3000),
+    CODELENS(3000),
+    COMPLETION(5000),
+    DEFINITION(3000),
+    DOC_HIGHLIGHT(2000),
+    EXECUTE_COMMAND(3000),
+    FORMATTING(8000),
+    HOVER(5000),
+    INIT(15000),
+    REFERENCES(3000),
+    SIGNATURE(8000),
+    SHUTDOWN(8000),
+    SYMBOLS(3000),
+    WILLSAVE(3000)
 
 /**
  * An object containing the Timeout for the various requests
@@ -55,18 +55,19 @@ object Timeout {
         Timeouts.entries.forEach {
             timeouts[it] = it.defaultTimeout
         }
+        timeouts[Timeouts.HOVER] = 5000
     }
 
     /**
      * Get the timeout for a request. The [type] is the request type and the result is the timeout in milliseconds
-     */
+ */
     operator fun get(type: Timeouts): Int {
         return timeouts[type] ?: type.defaultTimeout
     }
 
     /**
      * Set the timeout for a request. The [type] is the request type and the [time] is the timeout in milliseconds
-     */
+ */
     operator fun set(type: Timeouts, time: Int) {
         timeouts[type] = time
     }
