@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.lsp.NativeLspMode
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SubscriptionReceipt
 import io.github.rosemoe.sora.widget.subscribeEvent
@@ -72,6 +73,11 @@ object NativeLspDocumentBridge {
                 NativeLspService.setDefaultClangdBinary(resolved)
             }
         }
+        private val resolvedMode = if (!clangdPath.isNullOrBlank()) {
+            NativeLspMode.REAL
+        } else {
+            NativeLspMode.MOCK
+        }
 
         fun start() {
             workerScope.launch {
@@ -130,9 +136,11 @@ object NativeLspDocumentBridge {
             if (NativeLspService.nativeIsInitialized()) {
                 return true
             }
+            NativeLspService.setServerMode(resolvedMode)
             val workDir = projectPath ?: "/"
             val requestedClangdPath = clangdPath ?: NativeLspService.getConfiguredClangdBinary()
                 ?: NativeLspService.defaultClangdBinaryPath()
+            Log.i(TAG, "Initializing NativeLspService in ${resolvedMode.name}: $requestedClangdPath")
             val result = NativeLspService.initialize(
                 clangdPath = requestedClangdPath,
                 workDir = workDir
