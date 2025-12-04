@@ -285,8 +285,9 @@ object NativeLspService {
         applyServerMode(mode, socketPath)
         val effectiveClangdPath = resolveClangdPath(clangdPath)
         val success = nativeInitialize(effectiveClangdPath, workDir)
-        notifyInitializationListeners(success && nativeIsInitialized())
-        return success
+        val initialized = nativeIsInitialized()
+        notifyInitializationListeners(initialized)
+        return success || initialized
     }
 
     /**
