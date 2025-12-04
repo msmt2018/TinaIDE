@@ -43,9 +43,9 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
     private lateinit var navigationCount: TextView
     private lateinit var navigationAdapter: NativeNavigationResultAdapter
     
-    private val editorManager: IEditorManager by lazy {
-        ServiceLocator.get<IEditorManager>()
-    }
+    // EditorManager 只管理数据，Fragment 管理由本 Fragment 负责
+    private val editorManager: IEditorManager
+        get() = ServiceLocator.get<IEditorManager>()
     
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)

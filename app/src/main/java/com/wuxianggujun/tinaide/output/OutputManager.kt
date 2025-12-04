@@ -121,5 +121,16 @@ class OutputManager(private val context: Context) : IOutputManager {
     
     companion object {
         private const val TAG = "OutputManager"
+        
+        @Volatile
+        private var logView: LogView? = null
+        
+        fun setLogView(view: LogView?) {
+            logView = view
+        }
+        
+        fun appendLog(level: LogLevel, message: String) {
+            logView?.appendLog(level, message)
+        }
     }
 }

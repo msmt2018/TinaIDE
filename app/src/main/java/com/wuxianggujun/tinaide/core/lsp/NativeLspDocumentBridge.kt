@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.wuxianggujun.tinaide.lsp.NativeLspService
 import com.wuxianggujun.tinaide.lsp.NativeLspMode
+import com.wuxianggujun.tinaide.lsp.LspDebugPanel
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SubscriptionReceipt
 import io.github.rosemoe.sora.widget.subscribeEvent
@@ -30,6 +31,7 @@ object NativeLspDocumentBridge {
     private val sessions = ConcurrentHashMap<String, Session>()
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     fun bind(context: Context, editor: CodeEditor, filePath: String, projectPath: String?): Handle? {
+        NativeLspHealthMonitor.start(context)
         val absolutePath = File(filePath).absolutePath
         dispose(absolutePath)
 
@@ -86,6 +88,7 @@ object NativeLspDocumentBridge {
                     return@launch
                 }
                 val content = readEditorText()
+                LspDebugPanel.onDocumentOpened(fileUri)
                 val openedResult = runCatching {
                     NativeLspService.nativeDidOpenTextDocument(fileUri, content)
                 }
@@ -113,6 +116,7 @@ object NativeLspDocumentBridge {
                 delay(300)
                 val snapshot = readEditorText()
                 val nextVersion = incrementVersion()
+                LspDebugPanel.onDocumentChanged(fileUri, nextVersion)
                 val changeResult = runCatching {
                     NativeLspService.nativeDidChangeTextDocument(fileUri, snapshot, nextVersion)
                 }
@@ -141,10 +145,16 @@ object NativeLspDocumentBridge {
             val requestedClangdPath = clangdPath ?: NativeLspService.getConfiguredClangdBinary()
                 ?: NativeLspService.defaultClangdBinaryPath()
             Log.i(TAG, "Initializing NativeLspService in ${resolvedMode.name}: $requestedClangdPath")
+            LspDebugPanel.onLspInitializing(requestedClangdPath, workDir)
             val result = NativeLspService.initialize(
                 clangdPath = requestedClangdPath,
                 workDir = workDir
             )
+            if (result) {
+                LspDebugPanel.onLspInitialized()
+            } else {
+                LspDebugPanel.onLspInitFailed("initialize returned false")
+            }
             if (!result) {
                 Log.w(TAG, "Failed to initialize NativeLspService for $workDir")
             }
@@ -159,6 +169,7 @@ object NativeLspDocumentBridge {
             }
             workerScope.launch {
                 if (opened) {
+                    LspDebugPanel.onDocumentClosed(fileUri)
                     val closeResult = runCatching {
                         NativeLspService.nativeDidCloseTextDocument(fileUri)
                     }

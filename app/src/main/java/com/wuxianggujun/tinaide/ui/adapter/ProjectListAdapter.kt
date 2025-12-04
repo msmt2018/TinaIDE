@@ -9,7 +9,8 @@ import com.wuxianggujun.tinaide.R
 import java.io.File
 
 class ProjectListAdapter(
-    private val onClick: (File) -> Unit
+    private val onClick: (File) -> Unit,
+    private val onLongClick: (File) -> Unit
 ) : RecyclerView.Adapter<ProjectListAdapter.VH>() {
 
     private val items = mutableListOf<File>()
@@ -37,6 +38,7 @@ class ProjectListAdapter(
         fun bind(dir: File) {
             titleView.text = dir.name
             itemView.setOnClickListener { onClick(dir) }
+            itemView.setOnLongClickListener { onLongClick(dir); true }
         }
     }
 }

@@ -30,22 +30,27 @@
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- 主内容区域：编辑器和终端的分割布局 -->
-        <LinearLayout
+        <!-- 主内容区域：编辑器和底部面板 -->
+        <FrameLayout
             android:id="@+id/content_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <!-- 编辑器区域（全屏显示） -->
+            <!-- 编辑器区域 -->
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/editor_container"
                 android:name="com.wuxianggujun.tinaide.ui.fragment.EditorContainerFragment"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-        </LinearLayout>
+            <!-- 底部日志面板容器 -->
+            <FrameLayout
+                android:id="@+id/bottom_panel_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </FrameLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

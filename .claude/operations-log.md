@@ -110,6 +110,21 @@ Claude Code
 - `fragment_editor_container` 新增底部导航面板，`NativeNavigationResultAdapter` 负责渲染 `Location` 列表并支持复用 `openLocation()`。
 - `EditorFragment` 不再弹出 Material Dialog，而是将 Definition/References 结果推送给容器，提供可持久展示/收起的 Sora 风格体验。
 
+# Stage 4 筹备记录
+
+## 执行时间
+2025-12-05 21:45 - 21:55
+
+## 内容
+- ✅ 宣布 Stage3 交付完成，文档移除“剩余任务”描述。
+- ✅ 制定 Stage4 目标表：clangd 共享内存、智能预加载策略、Native-only Health 监控、实机自检脚本。
+- ➡️ Benchmark Activity 不再扩展，今后统一纳入 Stage4 的“实机自检”任务。
+
+## 下一步
+1. 设计 NativeLspHealthMonitor，承接 transport error / 初始化失败事件并展示 UI 反馈。
+2. 落地 instrumentation/monkey 脚本或简化版守护任务，生成 30+ 分钟运行报告。
+3. 调研 clangd 共享内存/插件机制，评估定制补丁与上游 PR 成本。
+
 ## 验证
 - `./gradlew.bat :app:compileDebugKotlin`
 
@@ -117,3 +132,26 @@ Claude Code
 1. 将 Native Definition/References 的结果注入 Sora 内建跳转面板，支持二次操作。
 2. 扩展 Benchmark/monkey 测试脚本，沉淀 Native-only 模式下的长期稳定性指标。
 3. 构建 Native-only 运行监控（transport error、自恢复提示等），完善 Stage3 监控闭环。
+
+# Stage 4 ç¨³å®šæ€§åŠ å›ºæ—¥å¿—
+
+## æ‰§è¡Œæ—¶é—´
+2025-12-06 10:10 - 10:45
+
+## æ‰§è¡Œè€…
+Claude Code
+
+## å®Œæˆçš„å·¥ä½œ
+1. **NativeLspService åˆå§‹åŒ–ä¸²è¡ŒåŒ–** âœ…  
+   - å¼•å…¥ ReentrantLock + Condition å°† `initialize()` å¹¶å‘æŽ¥å£ç®¡ç†ä¸ºå•æ ‡è®°ï¼Œå¢žåŠ  `initializingNativeClient` çŠ¶æ€ï¼Œæ‰“æ–­ DocumentBridge/RequestBridge åŒæ—¶è¯·æ±‚å¯¼è‡´çš„é‡å¤ init/segfaultã€‚
+2. **NativeLspClient lifecycle é”** âœ…  
+   - C++ ç«¯å¢žåŠ  `std::mutex lifecycle_mutex_` å¹¶å°† `initialize()/shutdown()` æ•´ä¸ªç”Ÿå‘½å‘¨æœŸå—æŽ§ï¼Œé˜²æ­¢ JNI å¹¶å‘å†…å†™å¯¼è‡´ clangd å��å¤¹å¯åŠ¨ã€‚
+3. **æ–‡æ¡£ä¸Žæ—¥å¿—åŒæ­¥** âœ…  
+   - Stage4 æ–‡æ¡£å¢žåŠ â€œNative åˆå§‹åŒ–ä¸²è¡ŒåŒ–ä¸Ž lifecycle é”â€�è¡¨å¤´æŒ‡æ ‡ï¼Œå¹¶åœ¨ operations log è®°å½•æœ¬æ¬¡å¼€å�‘ã€‚
+
+## éªŒè¯
+- `./gradlew.bat :app:compileDebugKotlin`
+
+## ä¸‹ä¸€æ­¥
+1. æŽ¢ç´¢ transport error åŽç”± Native å‘¨æœŸå³æ—¶é”€æ¯/é‡å¯ç®¡çº¿çš„ UI æµï¼Œå¤„ç†å¤šæ¬¡å¤±è´¥çš„è‡ªåŠ¨å›žè°ƒã€‚
+2. åœ¨ Stage4 æŒ‰çº¦ Native-only health æç¤ºç›‘æŽ§ä¸Ž monkey æµ‹è¯•åŸºçº¿ã€‚
