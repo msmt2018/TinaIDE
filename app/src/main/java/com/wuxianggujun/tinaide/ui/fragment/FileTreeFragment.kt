@@ -2,9 +2,10 @@ package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.TextView
+import android.widget.HorizontalScrollView
+import android.widget.PopupMenu
 import androidx.lifecycle.lifecycleScope
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.wuxianggujun.tinaide.base.BaseBindingFragment
 import com.wuxianggujun.tinaide.databinding.FragmentFileTreeBinding
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,8 @@ import com.wuxianggujun.tinaide.treeview.TreeNode
 import com.wuxianggujun.tinaide.treeview.TreeView
 import com.wuxianggujun.tinaide.ui.adapter.FileNodeViewFactory
 import com.wuxianggujun.tinaide.ui.adapter.FileNodeViewBinder
-import com.wuxianggujun.tinaide.ui.dialog.FileContextMenuDialog
+import com.wuxianggujun.tinaide.ui.file.TreeUtil
+import com.wuxianggujun.tinaide.ui.file.model.TreeFile
 import java.io.File
 
 /**
@@ -29,9 +31,9 @@ import java.io.File
 class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     FragmentFileTreeBinding::inflate
 ) {
-    private lateinit var treeViewContainer: FrameLayout
-    private lateinit var emptyView: TextView
-    private var treeView: TreeView<File>? = null
+    private var treeView: TreeView<TreeFile>? = null
+    private lateinit var refreshLayout: SwipeRefreshLayout
+    private lateinit var horizontalScrollView: HorizontalScrollView
 
     private fun fileManagerOrNull(): IFileManager? = try {
         ServiceLocator.get(IFileManager::class.java)
@@ -40,8 +42,16 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        treeViewContainer = binding.fileTreeRecycler
-        emptyView = binding.emptyView
+        refreshLayout = binding.refreshLayout
+        horizontalScrollView = binding.horizontalScrollView
+
+        // 设置下拉刷新
+        refreshLayout.setOnRefreshListener {
+            partialRefresh {
+                refreshLayout.isRefreshing = false
+                treeView?.refreshTreeView()
+            }
+        }
 
         // 推迟到首帧后加载，避免进入页面首帧阻塞导致黑屏
         view.post { loadProject() }
@@ -51,15 +61,11 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
         val fm = fileManagerOrNull()
         if (fm == null) {
             try { requireContext().toastError("Service IFileManager 未注册") } catch (_: Throwable) {}
-            showEmptyView()
             return
         }
         val project = fm.getCurrentProject()
 
-        if (project == null) {
-            showEmptyView()
-        } else {
-            hideEmptyView()
+        if (project != null) {
             loadProjectFiles(project.rootPath)
         }
     }
@@ -67,9 +73,8 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     private fun loadProjectFiles(rootPath: String) {
         val rootDir = File(rootPath)
         if (rootDir.exists() && rootDir.isDirectory) {
-            FileNodeViewBinder.resetLoadedDirectoriesCache()
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                val root = buildFileTree(rootDir)
+                val root = TreeNode.root(TreeUtil.getNodes(rootDir))
 
                 withContext(Dispatchers.Main) {
                     setupTreeView(root)
@@ -79,66 +84,55 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     }
 
     /**
-     * 构建文件树（只加载顶层文件）
-     */
-    private fun buildFileTree(rootDir: File): TreeNode<File> {
-        val root = TreeNode.root<File>()
-
-        val files = try {
-            rootDir.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() })) ?: emptyList()
-        } catch (_: Throwable) {
-            emptyList<File>()
-        }
-
-        for (file in files) {
-            val node = TreeNode(file, 1)
-            // 只添加顶层节点，不递归加载子目录
-            // 子目录将在用户点击展开时由 FileNodeViewBinder 懒加载
-            root.addChild(node)
-        }
-
-        return root
-    }
-
-    /**
      * 设置 TreeView
      */
-    private fun setupTreeView(root: TreeNode<File>) {
+    private fun setupTreeView(root: TreeNode<TreeFile>) {
         // 创建 TreeView
         val tv = TreeView(requireContext(), root)
 
         // 创建 ViewFactory
-        val factory = FileNodeViewFactory(
-            onFileClick = { file ->
-                handleFileClick(file)
-            },
-            onFileLongClick = { file ->
-                handleFileLongClick(file)
-                true
+        val factory = FileNodeViewFactory(object : FileNodeViewBinder.TreeFileNodeListener {
+            override fun onNodeToggled(treeNode: TreeNode<TreeFile>?, expanded: Boolean) {
+                if (treeNode?.isLeaf() == true) {
+                    val file = treeNode.value?.file
+                    if (file?.isFile == true) {
+                        openFileInEditor(file)
+                    }
+                }
             }
-        )
+
+            override fun onNodeLongClicked(
+                view: View?,
+                treeNode: TreeNode<TreeFile>?,
+                expanded: Boolean
+            ): Boolean {
+                if (view != null && treeNode != null) {
+                    showFileContextMenu(view, treeNode)
+                }
+                return true
+            }
+        })
 
         tv.setAdapter(factory)
 
         // 添加到容器
-        treeViewContainer.removeAllViews()
-        treeViewContainer.addView(tv.getView())
+        horizontalScrollView.removeAllViews()
+        horizontalScrollView.addView(
+            tv.getView(),
+            android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
 
         this.treeView = tv
-    }
-
-    private fun handleFileClick(file: File) {
-        if (!file.isDirectory) {
-            // 打开文件
-            openFileInEditor(file)
-        }
     }
 
     private fun openFileInEditor(file: File) {
         // 获取 EditorContainerFragment 并打开文件
         val activity = requireActivity()
         val editorContainer = activity.supportFragmentManager.findFragmentById(R.id.editor_container)
-            as? com.wuxianggujun.tinaide.ui.fragment.EditorContainerFragment
+            as? EditorContainerFragment
 
         if (editorContainer != null) {
             editorContainer.openFile(file)
@@ -147,38 +141,36 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
         }
     }
 
-    private fun handleFileLongClick(file: File): Boolean {
-        // 显示上下文菜单
-        showFileContextMenu(file)
-        return true
+    private fun showFileContextMenu(view: View, treeNode: TreeNode<TreeFile>) {
+        val file = treeNode.value?.file ?: return
+        val popupMenu = PopupMenu(requireContext(), view)
+        
+        // TODO: 添加菜单项
+        // 这里可以根据需要添加文件操作菜单
+        
+        popupMenu.show()
     }
 
-    private fun showFileContextMenu(file: File) {
-        val fm = fileManagerOrNull() ?: return
-        val dialog = FileContextMenuDialog(file, fm) {
-            // 刷新文件树
-            refresh()
+    private fun partialRefresh(callback: () -> Unit) {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val allNodes = treeView?.getAllNodes() ?: emptyList()
+            if (allNodes.isNotEmpty()) {
+                val node = allNodes[0]
+                TreeUtil.updateNode(node)
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        callback()
+                    }
+                }
+            }
         }
-        dialog.show(childFragmentManager, "FileContextMenu")
-    }
-
-    private fun showEmptyView() {
-        if (!::treeViewContainer.isInitialized || !::emptyView.isInitialized) return
-        treeViewContainer.visibility = View.GONE
-        emptyView.visibility = View.VISIBLE
-    }
-
-    private fun hideEmptyView() {
-        if (!::treeViewContainer.isInitialized || !::emptyView.isInitialized) return
-        treeViewContainer.visibility = View.VISIBLE
-        emptyView.visibility = View.GONE
     }
 
     /**
      * 刷新文件树
      */
     fun refresh() {
-        if (!isAdded || !::treeViewContainer.isInitialized) return
+        if (!isAdded) return
         loadProject()
     }
 }

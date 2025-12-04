@@ -18,6 +18,7 @@ JavaVM* g_java_vm = nullptr;
 jclass g_nativeServiceClass = nullptr;
 jclass g_diagnosticItemClass = nullptr;
 jmethodID g_handleDiagnosticsMethod = nullptr;
+jmethodID g_handleHealthMethod = nullptr;
 jmethodID g_diagnosticItemCtor = nullptr;
 } // namespace
 
@@ -305,6 +306,42 @@ void dispatchDiagnosticsToJava(const ProtocolHandler::DiagnosticsResult& result)
     }
 }
 
+const char* toHealthEventTypeString(NativeLspClient::HealthEventType type) {
+    switch (type) {
+        case NativeLspClient::HealthEventType::INIT_FAILURE:
+            return "INIT_FAILURE";
+        case NativeLspClient::HealthEventType::CHANNEL_ERROR:
+            return "CHANNEL_ERROR";
+        case NativeLspClient::HealthEventType::TRANSPORT_ERROR:
+            return "TRANSPORT_ERROR";
+        case NativeLspClient::HealthEventType::CLANGD_EXIT:
+            return "CLANGD_EXIT";
+    }
+    return "TRANSPORT_ERROR";
+}
+
+void dispatchHealthEventToJava(NativeLspClient::HealthEventType type, const std::string& message) {
+    if (!g_java_vm || !g_nativeServiceClass || !g_handleHealthMethod) {
+        return;
+    }
+    JNIEnv* env = nullptr;
+    bool need_detach = false;
+    if (g_java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            return;
+        }
+        need_detach = true;
+    }
+    jstring type_str = stringToJstring(env, toHealthEventTypeString(type));
+    jstring msg_str = stringToJstring(env, message);
+    env->CallStaticVoidMethod(g_nativeServiceClass, g_handleHealthMethod, type_str, msg_str);
+    env->DeleteLocalRef(type_str);
+    env->DeleteLocalRef(msg_str);
+    if (need_detach) {
+        g_java_vm->DetachCurrentThread();
+    }
+}
+
 } // anonymous namespace
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
@@ -331,6 +368,15 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         "(Ljava/lang/String;[Lcom/wuxianggujun/tinaide/lsp/model/DiagnosticItem;)V"
     );
     if (!g_handleDiagnosticsMethod) {
+        return JNI_ERR;
+    }
+
+    g_handleHealthMethod = env->GetStaticMethodID(
+        g_nativeServiceClass,
+        "handleNativeHealthEvent",
+        "(Ljava/lang/String;Ljava/lang/String;)V"
+    );
+    if (!g_handleHealthMethod) {
         return JNI_ERR;
     }
 
@@ -369,6 +415,7 @@ extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void*) {
         }
     }
     g_handleDiagnosticsMethod = nullptr;
+    g_handleHealthMethod = nullptr;
     g_diagnosticItemCtor = nullptr;
     g_java_vm = nullptr;
 }
@@ -394,6 +441,9 @@ Java_com_wuxianggujun_tinaide_lsp_NativeLspService_nativeInitialize(
     if (success) {
         client->setDiagnosticsCallback([](const ProtocolHandler::DiagnosticsResult& result) {
             dispatchDiagnosticsToJava(result);
+        });
+        client->setHealthCallback([](const NativeLspClient::HealthEvent& event) {
+            dispatchHealthEventToJava(event.type, event.message);
         });
     }
 

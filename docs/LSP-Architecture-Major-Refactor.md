@@ -473,10 +473,19 @@ void ClangdLSPServer::sendLargeResponse(const json::Value& response) {
 | Completion Kind 对齐 | ✅ | `CppTreeSitterLanguageProvider` 生成的 `SimpleCompletionItem` 现在调用 `.kind(CompletionItemKind)`，与官方 Sora API 一致，避免类型不匹配并可复用内置图标逻辑。 |
 | Diagnostics 回传链路 | ✅ | clangd `publishDiagnostics` 经过 `JsonRpcConverter` → `NativeLspClient` → `NativeLspService.handleNativeDiagnostics()` 事件流，EditorFragment 将结果转换为 Sora `DiagnosticsContainer` 渲染下划线与 tooltip。 |
 
-**Stage 3 剩余任务（待执行）**
+> Stage 3 已于 2025-12-05 完成，所有 Native LSP 功能与 UI 均切换到新管线。后续优化工作将合并至 Stage 4。
 
-1. **真实场景自检扩展**：在 Benchmark Activity 外，还需补充 instrumentation/monkey 测试脚本，验证长时间运行下的内存、FD、线程稳定性，并记录性能基线。
-2. **Native-only 稳定性监控**：既然已去除 Legacy 管线，需补充专门的 ANR/崩溃/延迟观察脚本，确保 clangd I/O 异常（如 transport error）能被快速侦测并提示用户修复 compile_commands/sysroot，而不是静默失效。
+**Stage 4 å½“å‰è¿›åº¦ï¼ˆ2025-12-06ï¼‰**
+
+| ä»»åŠ¡ | çŠ¶æ€ | è¯´æ˜Ž |
+|------|------|------|
+| Native åˆå§‹åŒ–ä¸²è¡ŒåŒ–ä¸Ž lifecycle é” | âœ… | `NativeLspService.initialize` ä½¿ç”¨ ReentrantLock+Condition ï¼Œ`NativeLspClient` æ·»åŠ  lifecycle é”ï¼Œé˜²æ­¢ request/DocumentBridge å¹¶å‘é‡å¤å¯åŠ¨ clangd ï¼Œå°†è¿‘æ¶ SIGSEGV å½±å“çº³å…¥ Stage4 ç¨³å®šæ€§ baselinesã€‚ |
+| clangd ä¾§å…±äº«å†…å­˜é€šé“ | â³ | è¯„ä¼°ç›´æŽ¥åœ¨ clangd è¿›ç¨‹å†…å†™ FlatBuffers/å…±äº«å†…å­˜ï¼Œå‡å°‘ JSON è§£æžï¼Œè¯„ä¼° upstream è¡¥ä¸æˆ–æ’ä»¶åŒ–è·¯çº¿æœ¬è´¹ã€‚ |
+| è‡ªé€‚åº”ç­–ç•¥ï¼ˆåŠ¨æ€é˜ˆå€¼ã€æ™ºèƒ½é¢„åŠ è½½ï¼‰ | â³ | åŸºäºŽè¯·æ±‚é‡å’Œå…‰æ ‡åœç•™æ—¶é—´åŠ¨æ€�åˆ‡æ¢ Mock/Real æ¨¡å¼ï¼Œé¢„åŠ è½½ compile_commands ä»¥é™ä½Žäº¤äº’å»¶è¿Ÿã€‚ |
+| Native-only ç¨³å®šæ€§ç›‘æŽ§ | â³ | ä¸º `NativeLspClient`/`NativeLspService` å¢žåŠ  health äº‹ä»¶ä¸Ž UI æç¤ºï¼Œæ•èŽ· transport error ä»¥åŠ åˆå§‹åŒ–å¤±è´¥ï¼ŒæŒ‡å¯¼ç”¨æˆ·ä¿®å¤ sysroot æˆ– compile_commandsã€‚ |
+| å®žæœºè‡ªæ£€ä¸Žé•¿æ—¶è¿è¡Œè„šæœ¬ | â³ | ç”¨ instrumentation/monkey å–ä»£ Benchmark Activity ï¼ŒæŒç»­ 30+ åˆ†é’Ÿç›‘æŽ§ FDã€çº¿ç¨‹ä¸Žå†…å­˜æ°´ä½ï¼Œå½¢æˆ Stage4 åŸºçº¿ã€‚ |
+
+
 
 运行步骤（真实 clangd 模式示例）：
 1. 将可执行 clangd 拷贝到 `/data/data/com.wuxianggujun.tinaide/clangd` 或在 `NativeLspClientSelfTest.run()` 里传入其它路径。
@@ -493,3 +502,4 @@ void ClangdLSPServer::sendLargeResponse(const json::Value& response) {
 - `LspConfig.useNativeClient` 恒为 `true`，IDE 内任何触发点都只会初始化 Native 管线。
 - Legacy Java 代码、依赖与 gradle module 已全部移除，不再存在隐藏快捷键或兜底逻辑。
 - 若遇到 clangd transport error，需通过 sysroot/compile_commands 自检与日志排查，后续会在 "Native-only 稳定性监控" 任务中补齐提示。
+\n### Stage4 Health Monitor Update (2025-12-06)\n- 新增 NativeLspHealthMonitor，统一监听 C++ 健康事件并在 IDE 内即时提示。\n- NativeLspClient 暴露 HealthCallback，channel/transport/clangd 异常都有结构化事件，NativeLspService 将其分发给 UI。

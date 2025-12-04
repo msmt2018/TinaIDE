@@ -22,4 +22,9 @@
     
     <!-- Dropdown colors -->
     <color name="dropdown_background">#2D2D2D</color>
+    
+    <!-- LSP Status colors -->
+    <color name="lsp_status_connected">#4CAF50</color>
+    <color name="lsp_status_disconnected">#F44336</color>
+    <color name="lsp_status_initializing">#FFC107</color>
 </resources>

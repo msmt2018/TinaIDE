@@ -56,14 +56,17 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePaddingRelative
 class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::inflate) {
 
-    // 用于在 ServiceLocator 中隔离与本 Activity 绑定的服务
-    private val serviceScope = "MainActivity_${hashCode()}"
+    companion object {
+        // 使用固定的作用域名称，确保 Activity 重建时服务可以正确注册和清理
+        private const val SERVICE_SCOPE = "MainActivity"
+    }
 
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var toolbar: MaterialToolbar
     private lateinit var uiManager: IUIManager
     private lateinit var outputManager: IOutputManager
     private lateinit var compilerViewModel: CompilerViewModel
+    private lateinit var bottomLogPanel: com.wuxianggujun.tinaide.ui.BottomLogPanel
 
     private var navHeaderBinding: IncludeFileTreeHeaderBinding? = null
 
@@ -122,6 +125,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
         }
         drawerLayout = binding.drawerLayout
         setupFileTreeHeader()
+        setupBottomPanel()
 
         uiManager.restoreLayoutState()
         refreshFileTree()
@@ -147,23 +151,25 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
     }
     private fun initializeServices() {
         if (!ServiceLocator.isRegistered(IConfigManager::class.java)) {
-            // ConfigManager 使用 applicationContext，作为应用级服务
             val configManager = ConfigManager(applicationContext)
             ServiceLocator.register<IConfigManager>(configManager)
         }
-        // UIManager 绑定当前 Activity 生命周期，注册为作用域服务
+        
+        // UIManager 绑定当前 Activity 生命周期
         uiManager = UIManager(this)
-        ServiceLocator.registerScoped(serviceScope, IUIManager::class.java, uiManager)
+        ServiceLocator.registerScoped(SERVICE_SCOPE, IUIManager::class.java, uiManager)
 
         if (!ServiceLocator.isRegistered(IFileManager::class.java)) {
             ServiceLocator.registerSingleton<IFileManager> { FileManager(applicationContext) }
         }
 
-        // EditorManager 同样与当前 Activity 绑定，注册为作用域服务
-        val editorManager = EditorManager(this, supportFragmentManager)
-        ServiceLocator.registerScoped(serviceScope, IEditorManager::class.java, editorManager)
+        // EditorManager 为应用级单例，使用 ApplicationContext
+        if (!ServiceLocator.isRegistered(IEditorManager::class.java)) {
+            ServiceLocator.registerSingleton<IEditorManager> { 
+                EditorManager(applicationContext) 
+            }
+        }
         
-        // 注册输出管理器（应用级）
         if (!ServiceLocator.isRegistered(IOutputManager::class.java)) {
             outputManager = OutputManager(applicationContext)
             ServiceLocator.register<IOutputManager>(outputManager)
@@ -178,6 +184,14 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
         fileTreeFragment?.refresh()
         updateProjectHeaderName()
     }
+    private fun setupBottomPanel() {
+        bottomLogPanel = com.wuxianggujun.tinaide.ui.BottomLogPanel(
+            container = binding.bottomPanelContainer,
+            onCompile = { onCompileProject() },
+            onStop = { /* TODO: 实现停止功能 */ }
+        )
+    }
+
     private fun setupFileTreeHeader() {
         val header = navHeaderBinding ?: return
         header.btnAddFile.setOnClickListener {
@@ -242,15 +256,15 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
     }
     override fun onDestroy() {
         super.onDestroy()
-        // 清理与本 Activity 作用域绑定的服务（如 UIManager、EditorManager）
-        ServiceLocator.clearScope(serviceScope)
+        // 只清理 Activity 级服务（UIManager），EditorManager 为应用级单例不清理
+        ServiceLocator.clearScope(SERVICE_SCOPE)
     }
 
     private fun onCompileProject() {
-        // 清空之前的输出
-        outputManager.clearOutput()
-        // 显示输出窗口
-        outputManager.showOutput()
+        // 清空日志
+        bottomLogPanel.clearLog()
+        // 展开底部面板
+        bottomLogPanel.expand()
         // 交给 ViewModel + UseCase 在后台线程编译
         compilerViewModel.compile()
     }

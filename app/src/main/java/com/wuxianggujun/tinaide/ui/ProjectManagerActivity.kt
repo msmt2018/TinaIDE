@@ -54,9 +54,10 @@ class ProjectManagerActivity : BaseActivity<ProjectManagerFragmentBinding>(Proje
 
         recycler = binding.projectsRecycler
         recycler.layoutManager = LinearLayoutManager(this)
-        adapter = ProjectListAdapter { dir ->
-            openProject(dir)
-        }
+        adapter = ProjectListAdapter(
+            onClick = { dir -> openProject(dir) },
+            onLongClick = { dir -> showDeleteProjectDialog(dir) }
+        )
         recycler.adapter = adapter
 
         // 设置下拉刷新：下拉即重新加载项目列表
@@ -139,6 +140,30 @@ class ProjectManagerActivity : BaseActivity<ProjectManagerFragmentBinding>(Proje
         } else {
             recycler.visibility = View.VISIBLE
             emptyProjects.visibility = View.GONE
+        }
+    }
+
+    private fun showDeleteProjectDialog(dir: File) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("删除项目")
+            .setMessage("确定要删除项目 \"${dir.name}\" 吗？\n\n此操作将永久删除项目文件夹及其所有内容，无法恢复。")
+            .setPositiveButton("删除") { _, _ ->
+                deleteProject(dir)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun deleteProject(dir: File) {
+        try {
+            if (dir.deleteRecursively()) {
+                toastSuccess("项目已删除")
+                reloadProjects()
+            } else {
+                toastError("删除失败")
+            }
+        } catch (e: Exception) {
+            handleErrorWithToast(e, "删除失败")
         }
     }
 

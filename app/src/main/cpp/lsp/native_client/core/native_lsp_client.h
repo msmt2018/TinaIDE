@@ -124,6 +124,18 @@ public:
 
     using DiagnosticsCallback = std::function<void(const ProtocolHandler::DiagnosticsResult&)>;
     void setDiagnosticsCallback(DiagnosticsCallback callback);
+    enum class HealthEventType {
+        INIT_FAILURE,
+        CHANNEL_ERROR,
+        TRANSPORT_ERROR,
+        CLANGD_EXIT
+    };
+    struct HealthEvent {
+        HealthEventType type;
+        std::string message;
+    };
+    using HealthCallback = std::function<void(const HealthEvent&)>;
+    void setHealthCallback(HealthCallback callback);
 
     // ========================================================================
     // 结果获取接口（非阻塞）
@@ -198,6 +210,7 @@ private:
     std::unique_ptr<LspResultCache> result_cache_;
     std::unique_ptr<ClangdProcess> clangd_process_;
     ChannelConfig channel_config_;
+    std::mutex lifecycle_mutex_;
 
     // ========================================================================
     // 线程模型
@@ -251,6 +264,7 @@ private:
     bool extractPayloadFromMessage(const Message& msg, std::vector<uint8_t>& payload);
     bool sendNotificationPacket(uint64_t request_id, const std::vector<uint8_t>& data);
     std::string resolveSocketPath(const std::string& work_dir) const;
+    void reportHealthEvent(HealthEventType type, const std::string& message);
 
     // ========================================================================
     // 文件映射（URI <-> ID）
@@ -268,6 +282,8 @@ private:
     std::atomic<uint64_t> next_request_id_{1};
     DiagnosticsCallback diagnostics_callback_;
     std::mutex diagnostics_mutex_;
+    std::mutex health_mutex_;
+    HealthCallback health_callback_;
 
     uint64_t generateRequestId() {
         return next_request_id_.fetch_add(1, std::memory_order_relaxed);

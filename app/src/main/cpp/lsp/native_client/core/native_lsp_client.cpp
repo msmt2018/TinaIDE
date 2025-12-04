@@ -68,6 +68,7 @@ NativeLspClient::~NativeLspClient() {
 // ============================================================================
 
 bool NativeLspClient::initialize(const std::string& clangd_path, const std::string& work_dir) {
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mutex_);
     if (initialized_.load()) {
         LOGD("Already initialized");
         return true;
@@ -91,11 +92,13 @@ bool NativeLspClient::initialize(const std::string& clangd_path, const std::stri
         clangd_process_ = std::make_unique<ClangdProcess>();
         if (!clangd_process_->start(clangd_path, work_dir, channel_config_)) {
             LOGW("ClangdProcess failed to start, will attempt to connect anyway");
+            reportHealthEvent(HealthEventType::CLANGD_EXIT, "Failed to start clangd process");
         }
 
         control_channel_ = std::make_shared<ControlChannel>(channel_config_);
         ChannelError connect_err = control_channel_->connect(channel_config_.send_timeout_ms);
         if (connect_err != ChannelError::SUCCESS) {
+            reportHealthEvent(HealthEventType::CHANNEL_ERROR, control_channel_->getLastError());
             LOGE("Unable to connect control channel (%s)", control_channel_->getLastError().c_str());
             return false;
         }
@@ -120,11 +123,13 @@ bool NativeLspClient::initialize(const std::string& clangd_path, const std::stri
 
     } catch (const std::exception& e) {
         LOGE("Initialization failed: %s", e.what());
+        reportHealthEvent(HealthEventType::INIT_FAILURE, e.what());
         return false;
     }
 }
 
 void NativeLspClient::shutdown() {
+    std::lock_guard<std::mutex> lifecycle_lock(lifecycle_mutex_);
     if (!initialized_.load()) {
         return;
     }
@@ -350,6 +355,23 @@ void NativeLspClient::cancelRequest(uint64_t request_id) {
 void NativeLspClient::setDiagnosticsCallback(DiagnosticsCallback callback) {
     std::lock_guard<std::mutex> lock(diagnostics_mutex_);
     diagnostics_callback_ = std::move(callback);
+}
+
+void NativeLspClient::setHealthCallback(HealthCallback callback) {
+    std::lock_guard<std::mutex> lock(health_mutex_);
+    health_callback_ = std::move(callback);
+}
+
+void NativeLspClient::reportHealthEvent(HealthEventType type, const std::string& message) {
+    HealthCallback callback_copy;
+    {
+        std::lock_guard<std::mutex> lock(health_mutex_);
+        callback_copy = health_callback_;
+    }
+    if (!callback_copy) {
+        return;
+    }
+    callback_copy(HealthEvent{type, message});
 }
 
 // ============================================================================
@@ -602,6 +624,7 @@ void NativeLspClient::ioThreadFunc() {
         if (err != ChannelError::SUCCESS) {
             LOGE("Control channel receive failed: %s",
                  control_channel_->getLastError().c_str());
+            reportHealthEvent(HealthEventType::CHANNEL_ERROR, control_channel_->getLastError());
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
@@ -635,6 +658,7 @@ void NativeLspClient::workerThreadFunc() {
         if (!transport_) {
             LOGE("Transport not initialized, dropping request %llu",
                  (unsigned long long)entry.request_id);
+            reportHealthEvent(HealthEventType::TRANSPORT_ERROR, "Transport not initialized");
             request_manager_->markAsError(entry.request_id);
             removePendingRequest(entry.request_id);
             continue;
@@ -651,6 +675,7 @@ void NativeLspClient::workerThreadFunc() {
             LOGE("Failed to send request %llu: %s",
                  (unsigned long long)entry.request_id,
                  error_msg.c_str());
+            reportHealthEvent(HealthEventType::TRANSPORT_ERROR, error_msg);
             request_manager_->markAsError(entry.request_id);
             removePendingRequest(entry.request_id);
         }

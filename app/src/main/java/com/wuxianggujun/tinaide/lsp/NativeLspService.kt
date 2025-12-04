@@ -15,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArraySet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import com.wuxianggujun.tinaide.lsp.LspDebugPanel
 
 enum class NativeLspMode {
     MOCK,
@@ -351,6 +352,36 @@ object NativeLspService {
 
     fun interface DiagnosticsListener {
         fun onDiagnostics(fileUri: String, diagnostics: List<DiagnosticItem>)
+    }
+
+    // ========================================================================
+    // Health Monitoring
+    // ========================================================================
+
+    enum class HealthEventType {
+        INIT_FAILURE,
+        CHANNEL_ERROR,
+        TRANSPORT_ERROR,
+        CLANGD_EXIT
+    }
+
+    data class HealthEvent(
+        val type: HealthEventType,
+        val message: String
+    )
+
+    fun interface HealthListener {
+        fun onHealthEvent(event: HealthEvent)
+    }
+
+    private val healthListeners = CopyOnWriteArraySet<HealthListener>()
+
+    fun addHealthListener(listener: HealthListener) {
+        healthListeners.add(listener)
+    }
+
+    fun removeHealthListener(listener: HealthListener) {
+        healthListeners.remove(listener)
     }
 
     fun addDiagnosticsListener(listener: DiagnosticsListener) {
