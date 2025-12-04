@@ -106,6 +106,10 @@ Claude Code
 - `NativeLspClient` 通过 JNI 回调 `NativeLspService.handleNativeDiagnostics()`，Kotlin 端维护缓存与订阅。
 - `EditorFragment` 将 diagnostics 转换为 `DiagnosticsContainer`，实时在 CodeEditor 中绘制下划线、tooltip。
 
+### 6. Native 跳转面板 ✅
+- `fragment_editor_container` 新增底部导航面板，`NativeNavigationResultAdapter` 负责渲染 `Location` 列表并支持复用 `openLocation()`。
+- `EditorFragment` 不再弹出 Material Dialog，而是将 Definition/References 结果推送给容器，提供可持久展示/收起的 Sora 风格体验。
+
 ## 验证
 - `./gradlew.bat :app:compileDebugKotlin`
 

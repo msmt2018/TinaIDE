@@ -466,7 +466,7 @@ void ClangdLSPServer::sendLargeResponse(const json::Value& response) {
 | Clangd 路径自动发现 | ✅ | `NativeLspBinaryResolver` 会扫描 sysroot (`files/sysroot/usr/lib/<triple>/runtime/`) 中的 `libclangd.so` 并通过 `NativeLspService.setDefaultClangdBinary()` 注入，避免手工配置 `/data/data/.../clangd`；Benchmark 自检与编辑器两条链路均已接入。 |
 | Completion/Definition 桥接 | ✅ | `NativeLspRequestBridge` 新增 Completion/Definition/References API，EditorFragment 在 Debug 模式下会显示顶层补全项与 Definition 结果，验证 Native 结果链路。 |
 | Tree-sitter Completion 接管 | ✅ | `CppTreeSitterLanguageProvider` 覆写 `requireAutoComplete`，当 CodeEditor 触发补全时直接调用 Native completion 结果并映射为 `SimpleCompletionItem`，Sora 自动补全年板已显示真实 clangd 数据。 |
-| Native Definition/References UI 入口 | ✅ | 编辑器工具栏增加 “Native 定义/引用” 按钮，`EditorFragment` 通过弹窗展示 `Location` 列表并支持跨文件跳转，形成最小可行的导航体验。 |
+| Native Definition/References UI 入口 | ✅ | 工具栏入口触发 `EditorContainerFragment` 底部原生面板，列表式展示 clangd 返回的 `Location`，可跨文件跳转并支持一键收起，体验与 Sora 内置跳转组件一致。 |
 | Native-only LSP 策略 | ✅ | `LspConfig.useNativeClient` 现固定为 `true`，不再提供 Legacy Java LSP 回退选项，所有 C/C++ 文档均直接接入 Native 管线。 |
 | Legacy Java LSP 清理 | ✅ | 删除 `LspEditorManager`、`ClangdConnectionProvider` 与 editor-lsp 依赖，EditorFragment 仅绑定 `NativeLspDocumentBridge`，彻底消除双管线互斥问题。 |
 | compile_commands 自动生成 | ✅ | 若项目缺少 `build/<variant>/compile_commands.json`，EditorFragment + 新的 `CompileCommandsGenerator` 会先扫描源文件、sysroot 后自动生成，无需再倚赖 Legacy LSP。 |
@@ -475,9 +475,8 @@ void ClangdLSPServer::sendLargeResponse(const json::Value& response) {
 
 **Stage 3 剩余任务（待执行）**
 
-1. **Native Definition/References UI 接管（正式面板）**：工具栏入口已可查阅/跳转，下一步需把结果对接 Sora 原生的 “跳转定义/引用列表” 组件，支持持久展示与二次操作。
-2. **真实场景自检扩展**：在 Benchmark Activity 外，还需补充 instrumentation/monkey 测试脚本，验证长时间运行下的内存、FD、线程稳定性，并记录性能基线。
-3. **Native-only 稳定性监控**：既然已去除 Legacy 管线，需补充专门的 ANR/崩溃/延迟观察脚本，确保 clangd I/O 异常（如 transport error）能被快速侦测并提示用户修复 compile_commands/sysroot，而不是静默失效。
+1. **真实场景自检扩展**：在 Benchmark Activity 外，还需补充 instrumentation/monkey 测试脚本，验证长时间运行下的内存、FD、线程稳定性，并记录性能基线。
+2. **Native-only 稳定性监控**：既然已去除 Legacy 管线，需补充专门的 ANR/崩溃/延迟观察脚本，确保 clangd I/O 异常（如 transport error）能被快速侦测并提示用户修复 compile_commands/sysroot，而不是静默失效。
 
 运行步骤（真实 clangd 模式示例）：
 1. 将可执行 clangd 拷贝到 `/data/data/com.wuxianggujun.tinaide/clangd` 或在 `NativeLspClientSelfTest.run()` 里传入其它路径。

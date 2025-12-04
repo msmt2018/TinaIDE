@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.lifecycleScope
 import com.wuxianggujun.tinaide.BuildConfig
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.base.BaseBindingFragment
 import com.wuxianggujun.tinaide.databinding.FragmentEditorBinding
@@ -37,6 +36,7 @@ import kotlinx.coroutines.withContext
 import io.github.rosemoe.sora.lang.diagnostic.DiagnosticDetail
 import io.github.rosemoe.sora.lang.diagnostic.DiagnosticRegion
 import io.github.rosemoe.sora.lang.diagnostic.DiagnosticsContainer
+import com.wuxianggujun.tinaide.ui.fragment.EditorContainerFragment
 
 /**
  * 编辑器 Fragment
@@ -260,7 +260,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             if (locations.isNullOrEmpty()) {
                 requireContext().toastInfo("未找到定义")
             } else {
-                showLocationDialog(
+                showNavigationResults(
                     title = getString(R.string.native_definition_results),
                     locations = locations
                 )
@@ -288,7 +288,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             if (locations.isNullOrEmpty()) {
                 requireContext().toastInfo("未找到引用")
             } else {
-                showLocationDialog(
+                showNavigationResults(
                     title = getString(R.string.native_references_results),
                     locations = locations
                 )
@@ -304,34 +304,12 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
         }
     }
 
-    private fun showLocationDialog(title: String, locations: List<Location>) {
-        val displayItems = locations.map { formatLocation(it) }.toTypedArray()
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(title)
-            .setItems(displayItems) { _, index ->
-                locations.getOrNull(index)?.let { navigateToLocation(it) }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun formatLocation(location: Location): String {
-        val fileName = java.io.File(location.filePath).name
-        val line = location.startLine + 1
-        val column = location.startCharacter + 1
-        return "$fileName:$line:$column"
-    }
-
-    private fun navigateToLocation(location: Location) {
-        if (location.filePath == filePath) {
-            jumpToLocation(location)
-            return
-        }
+    private fun showNavigationResults(title: String, locations: List<Location>) {
         val host = parentFragment as? EditorContainerFragment
         if (host != null) {
-            host.openLocation(location)
+            host.showNativeNavigationResults(title, locations)
         } else {
-            requireContext().toastWarning("无法打开 ${location.filePath}")
+            requireContext().toastWarning("无法展示导航结果")
         }
     }
 

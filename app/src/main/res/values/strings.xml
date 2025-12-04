@@ -61,4 +61,6 @@
   <!-- Native LSP UI -->
   <string name="native_definition_results">Native 定义列表</string>
   <string name="native_references_results">Native 引用列表</string>
+  <string name="native_navigation_close">收起结果面板</string>
+  <string name="native_navigation_empty">没有可展示的跳转结果</string>
 </resources>
