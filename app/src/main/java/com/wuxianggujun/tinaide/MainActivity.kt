@@ -54,6 +54,7 @@ import kotlinx.coroutines.withContext
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePaddingRelative
+import androidx.core.view.GravityCompat
 class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::inflate) {
 
     companion object {
@@ -74,14 +75,8 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
         super.onCreate(savedInstanceState)  // BaseActivity 已处理主题和沉浸式状态栏
 
         // 绑定侧边栏头部
-        try {
-            val nav = binding.navView
-            val headerView = if (nav.headerCount > 0) nav.getHeaderView(0) else null
-            if (headerView != null) {
-                navHeaderBinding = IncludeFileTreeHeaderBinding.bind(headerView)
-                applyDrawerHeaderInsets()
-            }
-        } catch (_: Throwable) { }
+        navHeaderBinding = binding.fileTreeHeader
+        applyDrawerHeaderInsets()
 
         initializeServices()
 
@@ -255,6 +250,9 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
         )
     }
     override fun onDestroy() {
+        if (::bottomLogPanel.isInitialized) {
+            bottomLogPanel.destroy()
+        }
         super.onDestroy()
         // 只清理 Activity 级服务（UIManager），EditorManager 为应用级单例不清理
         ServiceLocator.clearScope(SERVICE_SCOPE)
@@ -318,7 +316,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             android.R.id.home -> {
-                drawerLayout.openDrawer(binding.navView)
+                drawerLayout.openDrawer(GravityCompat.START)
                 true
             }
             R.id.action_run -> { onCompileProject(); true }

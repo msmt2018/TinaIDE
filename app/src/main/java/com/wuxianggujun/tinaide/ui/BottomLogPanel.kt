@@ -6,9 +6,11 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.wuxianggujun.tinaide.R
+import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.databinding.BottomSheetLogPanelBinding
 import com.wuxianggujun.tinaide.lsp.LspDebugPanel
 import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.output.IOutputManager
 import com.wuxianggujun.tinaide.output.LogLevel
 import com.wuxianggujun.tinaide.output.OutputManager
 
@@ -29,6 +31,12 @@ class BottomLogPanel(
     
     private val binding: BottomSheetLogPanelBinding
     private val bottomSheetBehavior: BottomSheetBehavior<*>
+    private val outputManager: IOutputManager? = try {
+        ServiceLocator.get(IOutputManager::class.java)
+    } catch (_: Throwable) {
+        null
+    }
+    private var outputListener: IOutputManager.OutputListener? = null
     
     init {
         // 加载布局
@@ -49,8 +57,30 @@ class BottomLogPanel(
         
         setupToolbar()
         setupLspStatus()
+
+        // 绑定输出流，保持 Activity 重建后的历史日志
+        outputListener = object : IOutputManager.OutputListener {
+            override fun onOutputAppended(text: String) {
+                binding.logView.post {
+                    binding.logView.appendLog(text)
+                }
+            }
+
+            override fun onOutputCleared() {
+                binding.logView.post {
+                    binding.logView.clearLog()
+                }
+            }
+        }
+        outputManager?.let { manager ->
+            val existing = manager.getOutput()
+            if (existing.isNotEmpty()) {
+                binding.logView.appendLog(existing)
+            }
+            outputListener?.let { manager.addOutputListener(it) }
+        }
         
-        // 将日志输出重定向到面板
+        // 将日志输出重定向到面板，供 OutputManager.appendLog 使用
         OutputManager.setLogView(binding.logView)
     }
     
@@ -139,6 +169,13 @@ class BottomLogPanel(
     
     fun isExpanded(): Boolean {
         return bottomSheetBehavior.state == BottomSheetBehavior.STATE_EXPANDED
+    }
+
+    fun destroy() {
+        outputListener?.let { listener ->
+            outputManager?.removeOutputListener(listener)
+        }
+        OutputManager.setLogView(null)
     }
     
     private fun Int.dpToPx(): Int {

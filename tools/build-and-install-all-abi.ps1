@@ -68,15 +68,113 @@ function Clean-NativeOutputs {
 
 Clean-NativeOutputs
 
-$adbDir = "D:\Programs\Android\Sdk\platform-tools"
-$adbExe = Join-Path $adbDir "adb.exe"
-if (-not (Test-Path $adbExe)) {
-    Write-Host "adb not found at $adbExe" -ForegroundColor Red
+function Resolve-AdbExecutable {
+    param([string[]]$CandidateDirs)
+    foreach ($dir in $CandidateDirs) {
+        if ([string]::IsNullOrWhiteSpace($dir)) { continue }
+        $adbPath = Join-Path $dir "adb.exe"
+        if (Test-Path $adbPath) {
+            return [PSCustomObject]@{
+                Dir = $dir
+                Path = $adbPath
+            }
+        }
+    }
+    return $null
+}
+
+$candidateDirs = @(
+    "D:\Program Files\Microvirt\MEmu",
+    "D:\Programs\Android\Sdk\platform-tools"
+)
+if ($env:ANDROID_HOME) {
+    $candidateDirs += (Join-Path $env:ANDROID_HOME "platform-tools")
+}
+if ($env:ANDROID_SDK_ROOT) {
+    $candidateDirs += (Join-Path $env:ANDROID_SDK_ROOT "platform-tools")
+}
+$adbInfo = Resolve-AdbExecutable -CandidateDirs $candidateDirs
+if (-not $adbInfo) {
+    Write-Host "adb executable not found in any of the expected locations:" -ForegroundColor Red
+    $candidateDirs | ForEach-Object { if ($_){ Write-Host " - $_" -ForegroundColor Yellow } }
     exit 1
 }
+$adbDir = $adbInfo.Dir
+$adbExe = $adbInfo.Path
+$script:usingMemuAdb = $adbDir -like "*Microvirt*MEmu*"
+Write-Host "Using adb from $adbDir" -ForegroundColor DarkGreen
 if (-not ($env:Path -split ";" | ForEach-Object { $_.Trim() } | Where-Object { $_ -eq $adbDir })) {
     $env:Path = "$adbDir;$env:Path"
 }
+
+function Get-AdbDevices {
+    $output = & $adbExe devices
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to query adb devices." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    $entries = @()
+    foreach ($rawLine in $output) {
+        $line = $rawLine.Trim()
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if ($line.StartsWith("List of devices")) { continue }
+        if ($line.StartsWith("* daemon")) { continue }
+        $parts = $line -split "\s+"
+        if ($parts.Length -ge 2) {
+            $entries += [PSCustomObject]@{
+                Id    = $parts[0]
+                State = $parts[-1]
+            }
+        }
+    }
+    return $entries
+}
+
+function Try-ConnectMemuEmulators {
+    if (-not $script:usingMemuAdb) {
+        return
+    }
+    $memuPorts = @(21503, 21513, 21523, 21533, 21543, 21553)
+    Write-Host "Attempting to connect to running MEmu instances..." -ForegroundColor Yellow
+    foreach ($port in $memuPorts) {
+        $target = "127.0.0.1:$port"
+        $output = & $adbExe connect $target 2>&1
+        if ($output) {
+            $output | ForEach-Object {
+                Write-Host "adb connect $target -> $_" -ForegroundColor DarkGray
+            }
+        }
+    }
+}
+
+function Ensure-AdbDeviceAvailable {
+    Write-Host "Checking connected adb devices..." -ForegroundColor Cyan
+    $devices = Get-AdbDevices
+    $onlineDevices = $devices | Where-Object { $_.State -eq "device" }
+
+    if ((($onlineDevices | Measure-Object).Count -eq 0) -and $script:usingMemuAdb) {
+        Try-ConnectMemuEmulators
+        $devices = Get-AdbDevices
+        $onlineDevices = $devices | Where-Object { $_.State -eq "device" }
+    }
+
+    if (-not $onlineDevices -or $onlineDevices.Count -eq 0) {
+        if ($devices.Count -gt 0) {
+            $states = ($devices | ForEach-Object { "$($_.Id) [$($_.State)]" }) -join ", "
+            Write-Host "adb detected devices but none are online: $states" -ForegroundColor Red
+        } else {
+            Write-Host "No adb devices detected. Please connect a device or start an emulator." -ForegroundColor Red
+            if ($script:usingMemuAdb) {
+                Write-Host "Tip: ensure the MEmu multi-instance manager has a running device or manually run 'adb connect 127.0.0.1:21503' before retrying." -ForegroundColor Yellow
+            }
+        }
+        exit 1
+    }
+    $ids = $onlineDevices | ForEach-Object { $_.Id }
+    Write-Host "Using adb device(s): $($ids -join ', ')" -ForegroundColor DarkGreen
+}
+
+Ensure-AdbDeviceAvailable
 
 function Get-GradleTask {
     param([string]$variant)
@@ -97,8 +195,15 @@ if (-not (Test-Path $apkPath)) {
 
 Write-Host "Installing $apkPath via adb..." -ForegroundColor Cyan
 & $adbExe install -r $apkPath | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "adb install failed. See output above." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
 
 Write-Host "Launching com.wuxianggujun.tinaide/.ui.ProjectManagerActivity" -ForegroundColor Cyan
 & $adbExe shell am start -n com.wuxianggujun.tinaide/.ui.ProjectManagerActivity | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to launch application via adb." -ForegroundColor Yellow
+}
 
 Write-Host "Build and install completed." -ForegroundColor Green

@@ -55,15 +55,29 @@
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
     <!-- 文件树侧边栏 -->
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view"
-        android:layout_width="280dp"
+    <LinearLayout
+        android:id="@+id/drawer_sidebar"
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:fitsSystemWindows="true"
-        android:clipToPadding="false"
         android:background="?android:attr/colorBackground"
-        app:insetForeground="@android:color/transparent"
-        app:headerLayout="@layout/nav_drawer_content" />
+        android:fitsSystemWindows="true"
+        android:orientation="vertical"
+        android:clipToPadding="false">
+
+        <include
+            android:id="@+id/file_tree_header"
+            layout="@layout/include_file_tree_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/file_tree_container"
+            android:name="com.wuxianggujun.tinaide.ui.fragment.FileTreeFragment"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+    </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>

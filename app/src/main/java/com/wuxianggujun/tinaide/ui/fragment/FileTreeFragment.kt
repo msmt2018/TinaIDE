@@ -34,6 +34,7 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     private var treeView: TreeView<TreeFile>? = null
     private lateinit var refreshLayout: SwipeRefreshLayout
     private lateinit var horizontalScrollView: HorizontalScrollView
+    private var pendingRefresh = false
 
     private fun fileManagerOrNull(): IFileManager? = try {
         ServiceLocator.get(IFileManager::class.java)
@@ -54,7 +55,25 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
         }
 
         // 推迟到首帧后加载，避免进入页面首帧阻塞导致黑屏
-        view.post { loadProject() }
+        pendingRefresh = true
+        triggerPendingLoad()
+    }
+
+    private fun triggerPendingLoad() {
+        if (!isAdded) {
+            return
+        }
+        val fragmentView = view ?: return
+        if (!pendingRefresh) {
+            return
+        }
+        fragmentView.post {
+            if (!isAdded) {
+                return@post
+            }
+            pendingRefresh = false
+            loadProject()
+        }
     }
 
     private fun loadProject() {
@@ -73,10 +92,14 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
     private fun loadProjectFiles(rootPath: String) {
         val rootDir = File(rootPath)
         if (rootDir.exists() && rootDir.isDirectory) {
-            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val owner = view?.let { viewLifecycleOwner } ?: return
+            owner.lifecycleScope.launch(Dispatchers.IO) {
                 val root = TreeNode.root(TreeUtil.getNodes(rootDir))
 
                 withContext(Dispatchers.Main) {
+                    if (!isAdded || view == null) {
+                        return@withContext
+                    }
                     setupTreeView(root)
                 }
             }
@@ -170,7 +193,11 @@ class FileTreeFragment : BaseBindingFragment<FragmentFileTreeBinding>(
      * 刷新文件树
      */
     fun refresh() {
-        if (!isAdded) return
-        loadProject()
+        if (!isAdded) {
+            pendingRefresh = true
+            return
+        }
+        pendingRefresh = true
+        triggerPendingLoad()
     }
 }
