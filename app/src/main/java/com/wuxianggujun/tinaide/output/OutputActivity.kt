@@ -38,13 +38,7 @@ class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding
         // 获取输出管理器
         outputManager = ServiceLocator.get<IOutputManager>()
         
-        // 加载已有的输出内容
-        val existingOutput = outputManager.getOutput()
-        if (existingOutput.isNotEmpty()) {
-            outputEditor.setText(existingOutput)
-        }
-        
-        // 监听新的输出
+        // 监听新的输出（活动每次打开从空白开始）
         outputManager.addOutputListener(this)
     }
     
