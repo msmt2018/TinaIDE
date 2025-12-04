@@ -2,23 +2,26 @@ package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
 import android.view.View
-import com.wuxianggujun.tinaide.base.BaseBindingFragment
-import com.wuxianggujun.tinaide.databinding.FragmentEditorContainerBinding
-import androidx.viewpager2.adapter.FragmentStateAdapter
+import android.widget.TextView
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
-import com.wuxianggujun.tinaide.extensions.*
-import com.wuxianggujun.tinaide.utils.FileUtils
-import com.wuxianggujun.tinaide.utils.Logger
 import com.wuxianggujun.tinaide.R
-import com.wuxianggujun.tinaide.ui.dialog.MaterialDialogBuilder
+import com.wuxianggujun.tinaide.base.BaseBindingFragment
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.get
+import com.wuxianggujun.tinaide.databinding.FragmentEditorContainerBinding
 import com.wuxianggujun.tinaide.editor.EditorTab
 import com.wuxianggujun.tinaide.editor.IEditorManager
-import com.wuxianggujun.tinaide.ui.adapter.EditorTabAdapter
+import com.wuxianggujun.tinaide.extensions.*
 import com.wuxianggujun.tinaide.lsp.model.Location
+import com.wuxianggujun.tinaide.ui.adapter.EditorTabAdapter
+import com.wuxianggujun.tinaide.ui.adapter.NativeNavigationResultAdapter
+import com.wuxianggujun.tinaide.ui.dialog.MaterialDialogBuilder
+import com.wuxianggujun.tinaide.utils.Logger
 import java.io.File
 
 /**
@@ -35,6 +38,10 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
     private var tabLayoutMediator: TabLayoutMediator? = null
     private lateinit var editorToolbar: View
     private var emptyView: View? = null  // 改为可空类型，延迟加载
+    private lateinit var navigationPanel: View
+    private lateinit var navigationTitle: TextView
+    private lateinit var navigationCount: TextView
+    private lateinit var navigationAdapter: NativeNavigationResultAdapter
     
     private val editorManager: IEditorManager by lazy {
         ServiceLocator.get<IEditorManager>()
@@ -46,6 +53,7 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
         tabLayout = binding.tabLayout
         viewPager = binding.viewPager
         editorToolbar = binding.editorToolbar
+        setupNavigationPanel()
         // emptyView 不在这里初始化，延迟到需要时再加载
 
         setupViewPager()
@@ -91,6 +99,24 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
         binding.btnSave.setOnClickListener {
             saveCurrentFile()
         }
+    }
+
+    private fun setupNavigationPanel() {
+        navigationPanel = binding.navigationResultsPanel
+        navigationTitle = binding.navigationResultsTitle
+        navigationCount = binding.navigationResultsCount
+        navigationAdapter = NativeNavigationResultAdapter { location ->
+            hideNativeNavigationResults()
+            openLocation(location)
+        }
+        binding.navigationResultsList.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = navigationAdapter
+            addItemDecoration(
+                DividerItemDecoration(context, DividerItemDecoration.VERTICAL)
+            )
+        }
+        binding.btnNavigationResultsClose.setOnClickListener { hideNativeNavigationResults() }
     }
     
     private fun getCurrentEditorFragment(): com.wuxianggujun.tinaide.ui.fragment.EditorFragment? {
@@ -160,6 +186,9 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
         tabLayout.visibility = if (hasFiles) View.VISIBLE else View.GONE
         editorToolbar.visibility = if (hasFiles) View.VISIBLE else View.GONE
         viewPager.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        if (!hasFiles) {
+            hideNativeNavigationResults()
+        }
 
         // 懒加载空状态视图
         if (!hasFiles) {
@@ -262,6 +291,23 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
         viewPager.post {
             getCurrentEditorFragment()?.jumpToLocation(location)
         }
+    }
+
+    fun showNativeNavigationResults(title: String, locations: List<Location>) {
+        if (locations.isEmpty()) {
+            requireContext().toastInfo(getString(R.string.native_navigation_empty))
+            hideNativeNavigationResults()
+            return
+        }
+        navigationPanel.isVisible = true
+        navigationTitle.text = title
+        navigationCount.text = locations.size.toString()
+        navigationAdapter.submitList(locations)
+    }
+
+    fun hideNativeNavigationResults() {
+        navigationPanel.isVisible = false
+        navigationAdapter.submitList(emptyList())
     }
     
     /**
