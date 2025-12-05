@@ -118,11 +118,8 @@ object LogcatMonitor {
                 else -> LogLevel.INFO
             }
             
-            // 格式化日志消息
-            val formattedMessage = "[$timestamp] $tag: $message"
-            
-            // 转发到 BottomLogBuffer
-            BottomLogBuffer.append(logLevel, formattedMessage)
+            // 转发结构化日志到 BottomLogBuffer
+            BottomLogBuffer.append(logLevel, timestamp.trim(), tag.trim(), message)
             
         } catch (e: Exception) {
             // 解析失败时静默忽略（避免日志循环）

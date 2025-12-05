@@ -6,7 +6,15 @@
     <!-- 显示相关 -->
     <PreferenceCategory
         android:key="editor_display"
-        android:title="@string/settings_cat_editor_display">
+        android:title="@string/settings_cat_editor_display"
+        app:iconSpaceReserved="false">
+
+        <!-- 自定义字体 -->
+        <Preference
+            android:key="editor_font_path"
+            android:title="自定义字体"
+            android:summary="使用默认字体"
+            app:iconSpaceReserved="false" />
 
         <!-- 字体大小 -->
         <SeekBarPreference
@@ -39,7 +47,8 @@
     <!-- 编辑行为相关 -->
     <PreferenceCategory
         android:key="editor_behavior"
-        android:title="@string/settings_cat_editor_behavior">
+        android:title="@string/settings_cat_editor_behavior"
+        app:iconSpaceReserved="false">
 
         <!-- 自动缩进 -->
         <SwitchPreferenceCompat

@@ -36,7 +36,8 @@ class BottomPanelManager(
     private val onCompile: () -> Unit = {},
     private val onStop: () -> Unit = {},
     private val onOpenOutput: () -> Unit = {},
-    private val onDiagnosticClick: (Diagnostic) -> Unit = {}
+    private val onDiagnosticClick: (Diagnostic) -> Unit = {},
+    private val onSymbolClick: (String) -> Unit = {}
 ) {
     
     private val binding: BottomSheetPanelV2Binding
@@ -120,8 +121,7 @@ class BottomPanelManager(
      */
     private fun setupSymbolBar() {
         binding.symbolInputBar.setOnSymbolClickListener { symbol ->
-            // TODO: 插入符号到编辑器光标位置
-            android.util.Log.d("BottomPanelManager", "Symbol clicked: $symbol")
+            onSymbolClick(symbol)
         }
     }
     

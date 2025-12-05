@@ -129,8 +129,6 @@ add_library(native_compiler SHARED
     lsp/native_client/core/lsp_result_cache.cpp
     # LSP JNI 接口
     lsp/native_lsp_jni.cpp
-    # 共享内存测试 JNI
-    shared_memory_test_jni.cpp
     # 混合传输测试 JNI
     hybrid_transport_test_jni.cpp
 )

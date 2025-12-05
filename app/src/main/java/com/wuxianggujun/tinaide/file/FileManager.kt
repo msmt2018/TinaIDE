@@ -9,6 +9,7 @@ import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.config.ConfigKeys
 import com.wuxianggujun.tinaide.core.get
+import com.wuxianggujun.tinaide.ui.BottomLogBuffer
 import java.io.File
 
 /**
@@ -43,6 +44,9 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
         require(projectDir.exists() && projectDir.isDirectory) { "Invalid project path: $path" }
 
         closeProject()
+        
+        // 切换项目时开始新的日志会话
+        BottomLogBuffer.startNewSession(projectDir.name)
 
         // 避免在主线程递归扫描整个项目目录，先仅加载顶层文件，文件树按需懒加载
         val files = projectDir.listFiles()?.toList() ?: emptyList()

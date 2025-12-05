@@ -15,6 +15,7 @@ import com.wuxianggujun.tinaide.core.nativebridge.NativeLoader
 import com.wuxianggujun.tinaide.file.FileManager
 import com.wuxianggujun.tinaide.file.IFileManager
 import com.wuxianggujun.tinaide.utils.LogcatMonitor
+import com.wuxianggujun.tinaide.ui.BottomLogBuffer
 
 class TinaApplication : Application() {
 
@@ -28,6 +29,9 @@ class TinaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        
+        // 初始化日志缓冲区（在 LogcatMonitor 之前）
+        BottomLogBuffer.init(this)
         
         // 启动 Logcat 监听（自动捕获所有 Android Log 输出）
         LogcatMonitor.start(packageName)
@@ -134,5 +138,10 @@ class TinaApplication : Application() {
         // 打印已加载的库
         Log.i(TAG, "Loaded libraries: ${loader.getLoadedLibraries().size}")
     }
-
+    
+    override fun onTerminate() {
+        super.onTerminate()
+        BottomLogBuffer.shutdown()
+        LogcatMonitor.stop()
+    }
 }
