@@ -88,7 +88,7 @@ class GeneralLogFragment : Fragment() {
     private fun bindLogs() {
         logListener = BottomLogBuffer.LogListener { entry ->
             binding.generalLogView.post {
-                binding.generalLogView.appendLog(entry.level, entry.message)
+                binding.generalLogView.appendLog(entry.level, entry.timestamp, entry.tag, entry.message)
             }
         }
         logListener?.let { listener ->

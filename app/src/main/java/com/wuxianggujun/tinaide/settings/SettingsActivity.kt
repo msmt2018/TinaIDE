@@ -81,7 +81,6 @@ class SettingsActivity :
             fragmentClassName
         )
         fragment.arguments = args
-        fragment.setTargetFragment(caller, 0)
 
         supportFragmentManager.beginTransaction()
             .replace(R.id.settings_container, fragment)

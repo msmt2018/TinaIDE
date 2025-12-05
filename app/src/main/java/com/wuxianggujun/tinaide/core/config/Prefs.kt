@@ -65,6 +65,13 @@ object Prefs {
     val editorAutoIndent: Boolean
         get() = sharedPrefs.getBoolean("editor_auto_indent", true)
 
+    /** 
+     * 自定义字体路径。空字符串表示使用默认字体。
+     * 存储于默认 SharedPreferences 中，键为 "editor_font_path"。
+     */
+    val editorFontPath: String
+        get() = sharedPrefs.getString("editor_font_path", "") ?: ""
+
     // ========== 编译器配置（按需扩展） ==========
 
     /** 编译优化等级，例如 "O0" / "O2" 等。 */
@@ -95,6 +102,10 @@ object Prefs {
 
     fun setEditorAutoIndent(enabled: Boolean) {
         sharedPrefs.edit().putBoolean("editor_auto_indent", enabled).apply()
+    }
+
+    fun setEditorFontPath(path: String) {
+        sharedPrefs.edit().putString("editor_font_path", path).apply()
     }
 
 }

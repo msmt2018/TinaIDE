@@ -125,6 +125,16 @@ class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBindi
         return tab?.let { adapter.getFragment(it) }
     }
     
+    /**
+     * 在当前编辑器光标位置插入文本
+     */
+    fun insertTextAtCursor(text: String) {
+        val fragment = getCurrentEditorFragment()
+        if (fragment != null) {
+            fragment.insertTextAtCursor(text)
+        }
+    }
+    
     private fun showFindDialog() {
         val fragment = getCurrentEditorFragment()
         if (fragment != null) {

@@ -3,7 +3,6 @@ package com.wuxianggujun.tinaide.core.lsp
 import android.net.Uri
 import android.util.Log
 import com.wuxianggujun.tinaide.lsp.NativeLspService
-import com.wuxianggujun.tinaide.lsp.model.CompletionResult
 import com.wuxianggujun.tinaide.lsp.model.HoverResult
 import com.wuxianggujun.tinaide.lsp.model.Location
 import kotlinx.coroutines.CoroutineScope
@@ -19,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * 面向编辑器的 Native LSP 请求桥接层。
  *
- * 当前支持 Hover / Completion / Definition / References 四种请求，并在内部确保
+ * 当前支持 Hover / Definition / References 三种请求，并在内部确保
  * NativeLspService 已初始化、请求串行化以及取消后释放资源。
  */
 object NativeLspRequestBridge {
@@ -27,7 +26,6 @@ object NativeLspRequestBridge {
     private const val TAG = "NativeLspRequestBridge"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val hoverJobs = ConcurrentHashMap<String, Job>()
-    private val completionJobs = ConcurrentHashMap<String, Job>()
     private val definitionJobs = ConcurrentHashMap<String, Job>()
     private val referenceJobs = ConcurrentHashMap<String, Job>()
 
@@ -47,25 +45,6 @@ object NativeLspRequestBridge {
             methodLabel = "Hover",
             delayMs = 150,
             request = { NativeLspService.requestHoverAsync(fileUri, line, column) },
-            onResult = onResult
-        )
-    }
-
-    fun requestCompletion(
-        filePath: String,
-        line: Int,
-        column: Int,
-        workDir: String?,
-        onResult: (CompletionResult?) -> Unit
-    ) {
-        val fileUri = buildUri(filePath)
-        val key = buildKey(fileUri, line, column)
-        launchRequest(
-            key = key,
-            jobs = completionJobs,
-            workDir = workDir,
-            methodLabel = "Completion",
-            request = { NativeLspService.requestCompletionAsync(fileUri, line, column) },
             onResult = onResult
         )
     }

@@ -196,8 +196,21 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
             onDiagnosticClick = { diagnostic ->
                 // TODO: 跳转到诊断对应的代码位置
                 toastInfo("诊断: ${diagnostic.message} (${diagnostic.uri}:${diagnostic.range.start.line + 1})")
+            },
+            onSymbolClick = { symbol ->
+                // 插入符号到当前编辑器光标位置
+                insertSymbolToEditor(symbol)
             }
         )
+    }
+    
+    /**
+     * 插入符号到当前编辑器光标位置
+     */
+    private fun insertSymbolToEditor(symbol: String) {
+        val editorContainerFragment = supportFragmentManager
+            .findFragmentById(R.id.editor_container) as? com.wuxianggujun.tinaide.ui.fragment.EditorContainerFragment
+        editorContainerFragment?.insertTextAtCursor(symbol)
     }
 
     private fun setupFileTreeHeader() {
@@ -346,12 +359,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
                 true
             }
             R.id.action_generate_compile_commands -> onGenerateCompileCommands()
-            R.id.action_shared_memory_test -> {
-                // 打开共享内存性能测试界面
-                val intent = Intent(this, com.wuxianggujun.tinaide.ui.activity.SharedMemoryBenchmarkActivity::class.java)
-                startActivity(intent)
-                true
-            }
             else -> super.onOptionsItemSelected(item)
         }
     }
