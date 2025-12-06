@@ -2,219 +2,126 @@
 
 ## 问题描述
 
-用户在编辑器中输入字符 `s` 时：
-- **第一次输入**：补全正常工作，显示 `std` 等补全项
-- **删除后再次输入**：补全不再工作，等待 5 秒后超时，无任何补全结果
+当用户在 C++ 编辑器中输入字符 `s` 时：
+- **第一次输入**：能够立即收到 clangd 的补全结果（例如 `std`）并正常展示。
+- **删除后再次输入**：UI 不再出现补全面板，需要等待 5 秒后才会超时，完全没有结果返回。
 
 ## 问题时间线
 
 ### 成功案例（第一次输入 `s`）
 ```
-07:39:16.350 - Sent to clangd: request=7 (补全请求, 位置 4:2)
+07:39:16.350 - Sent to clangd: request=7 (completion, position 4:2)
 07:39:16.431 - Received from clangd: id=7 (返回 100 个补全项)
 07:39:16.449 - UI 显示补全结果 ✅
 ```
 
 ### 失败案例（删除后再次输入 `s`）
 ```
-07:45:49.332 - Sent to clangd: request=58 (补全请求)
-07:45:49.429 - Sent to clangd: request=59 (hover请求)
-... 等待 5 秒 ...
-(没有任何 "Received from clangd" 日志)
-超时，补全失败 ❌
+07:45:49.332 - Sent to clangd: request=58 (completion)
+07:45:49.429 - Sent to clangd: request=59 (hover)
+…… 等待 5 秒 ……
+（没有任何 “Received from clangd” 日志）
+07:45:54.332 - completion 超时 ❌
 ```
 
 ## 根本原因分析
 
 ### 核心问题：clangd 停止响应
-
-从日志分析，**clangd 进程在收到大量 `$/cancelRequest` 后停止响应任何请求**。
+日志表明 **clangd 在短时间内收到大量 `$/cancelRequest` 之后进入卡死状态**，随后所有补全与 hover 请求都得不到响应。
 
 ### 问题链路
-
-1. 用户快速编辑（删除、输入）
-2. 每次编辑触发新的补全/hover 请求
-3. 新请求会取消旧请求（发送 `$/cancelRequest` 给 clangd）
-4. 大量 `$/cancelRequest` 可能导致 clangd 进入异常状态
-5. clangd 停止响应后续的所有请求
+1. 用户快速输入/删除，IDE 每次键入都会发出新的 completion 与 hover。
+2. 只要有新请求，就会立即取消旧请求并向 clangd 发送 `$/cancelRequest`。
+3. 大量的 `$/cancelRequest` 叠加导致 clangd 的请求队列混乱，最终停止响应。
+4. IDE 继续等待旧请求结果，直至超时，补全体验崩溃。
 
 ### 日志证据
-
 ```
 07:45:49.331 - Sent $/cancelRequest to clangd for id=52
-07:45:49.332 - Sent to clangd: request=58 (补全请求)
+07:45:49.332 - Sent to clangd: request=58 (completion)
 07:45:49.429 - Sent $/cancelRequest to clangd for id=55
-07:45:49.429 - Sent to clangd: request=59 (hover请求)
-... 然后 clangd 完全没有响应 ...
+07:45:49.429 - Sent to clangd: request=59 (hover)
+…… 后续没有任何 clangd 响应 ……
 ```
 
 ## 当前代码架构
 
-### 请求流程
+1. **Kotlin 层（CppNativeCompletionDispatcher）**
+   - 每次输入都会取消所有旧的补全协程。
+   - 随后重新 launch，调用 `requestCompletionAsync()`.
 
-```
-用户输入
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Kotlin 层 (CppNativeCompletionDispatcher)                    │
-│ 1. 取消所有旧的补全协程                                        │
-│ 2. 启动新协程，调用 requestCompletionAsync()                   │
-└─────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ C++ NativeLspClient                                          │
-│ 1. cancelPendingRequestsForFile(COMPLETION, file_id)         │
-│    - 标记旧请求为 CANCELLED                                   │
-│    - 向 clangd 发送 $/cancelRequest                          │
-│ 2. 生成新 requestId，入队                                     │
-└─────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ LspRequestManager                                            │
-│ dequeue() 跳过已取消的请求，只发送新请求                        │
-└─────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ ClangdControlBridge                                          │
-│ 1. 处理取消请求 → 发送 $/cancelRequest 给 clangd              │
-│ 2. 转发新请求给 clangd                                        │
-└─────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ clangd                                                       │
-│ 收到大量 $/cancelRequest 后停止响应 ❌                         │
-└─────────────────────────────────────────────────────────────┘
-```
+2. **C++ NativeLspClient**
+   - `cancelPendingRequestsForFile` 根据文件/方法枚举未完成的请求，将状态标记为 `CANCELLED` 并发送 `$/cancelRequest` 给 clangd。
+   - 生成新的 requestId 放入队列。
+
+3. **LspRequestManager**
+   - `dequeue()` 会跳过已取消的请求，只发送仍然有效的条目。
+
+4. **ClangdControlBridge**
+   - `handleCancelRequest` 负责向 clangd 转发取消消息，并维护 `pending_requests_`。
+
+5. **clangd**
+   - 接收大量 `$/cancelRequest` 后停止响应，IDE 端随之卡住。
 
 ## 已尝试的修改
 
-### 1. Kotlin 层修改 (`CppTreeSitterLanguageProvider.kt`)
-
-**修改内容**：在发起新的补全请求时，取消所有之前的补全协程
-
+### 1. Kotlin 侧清理旧协程（`CppTreeSitterLanguageProvider.kt`）
 ```kotlin
-// 取消所有之前的补全协程
 completionJobs.values.forEach { it.cancel() }
 completionJobs.clear()
-completionJobs[key] = scope.launch { ... }
+completionJobs[key] = scope.launch { … }
 ```
+- 目的：避免 UI 等待已经过期的 requestId。
+- 效果：✅ UI 不再收到旧请求的回调。
 
-**目的**：确保 UI 层不会继续等待旧的 requestId
-
-**效果**：✅ 解决了 UI 层等待旧请求的问题
-
-### 2. C++ 层修改 (`native_lsp_client.cpp`)
-
-**修改内容**：
-- `requestHover` 和 `requestCompletion` 调用 `cancelPendingRequestsForFile` 取消同一文件的旧请求
-- 新增 `cancelPendingRequestsForFile` 方法
-
+### 2. C++ 侧取消逻辑（`native_lsp_client.cpp`）
 ```cpp
 void NativeLspClient::cancelPendingRequestsForFile(Method method, uint32_t file_id) {
-    // 收集同文件、同方法类型的未完成请求
-    // 在 request_manager_ 中标记为已取消
-    // 向 clangd 发送 $/cancelRequest
+    // 1. 查找同文件同方法的未完成请求
+    // 2. 在 request_manager_ 中标记为 CANCELLED
+    // 3. 给 clangd 发送 $/cancelRequest
 }
 ```
+- 目的：减少 clangd 的无效工作。
+- 效果：❌ cancel 洪泛会直接拖死 clangd。
 
-**目的**：减少 clangd 的无效工作
-
-**效果**：❌ 可能导致 clangd 收到过多 `$/cancelRequest` 而停止响应
-
-### 3. `lsp_request_manager.cpp` 修改
-
-**修改内容**：`dequeue` 方法跳过已取消的请求
-
+### 3. `lsp_request_manager.cpp`
 ```cpp
 while (true) {
     RequestEntry entry = pending_queue_.top();
     pending_queue_.pop();
-    
-    // 跳过已取消的请求
     if (it == request_map_.end() || it->second.status == CANCELLED) {
         continue;
     }
     return entry;
 }
 ```
+- 目的：确保被取消的请求不会再被发送。
+- 效果：✅ 请求队列只包含有效项。
 
-**效果**：✅ 确保已取消的请求不会被发送
-
-### 4. `clangd_control_bridge.cpp` 修改
-
-**修改内容**：添加 `handleCancelRequest` 方法
-
+### 4. `clangd_control_bridge.cpp`
 ```cpp
 void ClangdControlBridge::handleCancelRequest(uint64_t request_id) {
-    // 从 pending_requests_ 中移除
-    // 向 clangd 发送 $/cancelRequest 通知
+    std::lock_guard<std::mutex> lock(pending_mutex_);
+    pending_requests_.erase(request_id);
+    sendCancellationToClangd(request_id);
 }
 ```
-
-**效果**：❓ 可能是导致 clangd 停止响应的原因
+- 效果：⚠️ 进一步放大 `$/cancelRequest` 风暴，成为根因之一。
 
 ## 可能的解决方案
 
-### 方案 1：减少 `$/cancelRequest` 的发送
-
-**思路**：不向 clangd 发送 `$/cancelRequest`，只在本地取消请求
-
-**修改**：
-```cpp
-void ClangdControlBridge::handleCancelRequest(uint64_t request_id) {
-    // 只从 pending_requests_ 中移除，不发送给 clangd
-    std::lock_guard<std::mutex> lock(pending_mutex_);
-    pending_requests_.erase(request_id);
-}
-```
-
-**风险**：clangd 会继续处理已取消的请求，浪费资源
-
-### 方案 2：添加防抖延迟
-
-**思路**：在 Kotlin 层添加防抖，不要每次输入都立即发起补全请求
-
-**修改**：
-```kotlin
-// 添加 300ms 防抖
-delay(300)
-// 然后再发起补全请求
-```
-
-**优点**：减少请求数量，减少取消操作
-
-### 方案 3：不取消已发送的请求
-
-**思路**：只取消队列中的待处理请求，不取消已发送给 clangd 的请求
-
-**修改**：
-```cpp
-void NativeLspClient::cancelPendingRequestsForFile(Method method, uint32_t file_id) {
-    // 只取消 PENDING 状态的请求
-    // 不取消 SENT 或 IN_PROGRESS 状态的请求
-}
-```
-
-### 方案 4：检查 clangd 健康状态
-
-**思路**：定期检查 clangd 是否还在响应，如果停止响应则重启
-
-**修改**：添加心跳检测机制
+1. **减少向 clangd 发送取消**：只在本地标记取消，不必把所有请求都发到 clangd（但会浪费 clangd 计算）。
+2. **引入防抖**：在 Kotlin 层给输入添加 300 ms 防抖，再触发 completion，以减少请求数量。
+3. **仅取消排队请求**：`cancelPendingRequestsForFile` 只处理 `PENDING` 状态，不取消已经发出的请求。
+4. **健康检查**：对 clangd 增加心跳，检测不响应后自动重启实例。
 
 ## 下一步调试建议
 
-1. **验证 clangd 是否崩溃**：检查是否有 clangd 崩溃的日志或信号
-
-2. **减少 `$/cancelRequest`**：临时禁用向 clangd 发送取消请求，看是否能解决问题
-
-3. **添加更多日志**：在 `readClangdMessage` 中添加日志，确认 clangd 是否有任何输出
-
-4. **测试 clangd 独立运行**：直接运行 clangd 并发送请求，验证 clangd 本身是否正常
+1. **确认 clangd 是否崩溃**：检查本地日志或 `stderr`。
+2. **临时禁用取消**：观察是否还能复现卡死，从而验证 cancel 洪泛就是根因。
+3. **加强日志**：在 `readClangdMessage` 中打印更多诊断信息，定位卡死瞬间。
+4. **独立运行 clangd**：手动复现请求/取消流程，剥离 IDE 其他因素。
 
 ## 相关文件
 
@@ -225,5 +132,35 @@ void NativeLspClient::cancelPendingRequestsForFile(Method method, uint32_t file_
 
 ## 更新日志
 
-- **2025-12-06**：初始分析，发现 clangd 在收到大量 `$/cancelRequest` 后停止响应
-- **2025-12-06**：尝试方案 1 - 修改 `handleCancelRequest`，不再向 clangd 发送 `$/cancelRequest`，只在本地移除 pending 记录
+- **2025-12-06**：初步定位为 `$/cancelRequest` 洪泛导致 clangd 卡死。
+- **2025-12-06**：尝试方案 1，修改 `handleCancelRequest`，仅在本地移除 pending，不再向 clangd 发送取消。
+- **2025-12-07**：继续排查“第三次输入无补全、删除字符后候选仍存在”的问题，发现缓存与请求洪泛的组合造成 UI 状态失真。
+
+## 2025-12-07 补全不稳定的最新根因
+
+### 问题回放
+```
+2025-12-07 02:43:49.955 CppNativeCompletion  Completion request -> … prefix=''
+2025-12-07 02:43:50.207 CppNativeCompletion  Completion result [cache] -> … items=8 preview= short, signed…
+2025-12-07 02:43:54.564 SimpleLspClient     Reader: 100 empty reads, 23 pending requests, buffer size=0
+2025-12-07 02:43:55.216 SimpleLspService    Request 45 timed out
+```
+
+### 根因 1：`NativeLspResultCache` TTL 过长且前缀为空
+- 缓存按“文件 + 行 + 列”建索引，TTL 60 秒。输入 `s → shor → ss` 时光标几乎没移动，始终命中旧缓存。
+- 当前缀算法得到 `prefix=''` 时，我们选择跳过新请求，却仍然把缓存中的旧结果推给 UI，所以删除 `s` 后候选仍在，新的 `shor` 也只能看到那 8 个旧条目。
+
+### 根因 2：缺少前缀过滤导致列表不收敛
+- 缓存返回的 `CompletionResult.items` 直接透传到 `CppTreeSitterLanguageProvider`，并未按最新前缀过滤或重排。
+- 用户输入更多字符时，候选列表无法收敛，看上去就像“补全不会筛选”。
+
+### 根因 3：hover/completion 洪泛把 pending 队列撑爆
+- 每次键入都会触发 hover 与 completion，并立即取消上一个 hover，`$/cancelRequest` 与新请求交错涌向 clangd。
+- 日志 `Reader: 100 empty reads, 23 pending requests` 说明请求队列被淹没，真实的第三次补全迟迟得不到响应，只能一直 timeout。
+
+### 已采取的改进方向
+1. **在 `CppNativeCompletion` 中做真实的前缀过滤**：只有满足当前前缀的缓存项才返回，并且当前缀为空时直接隐藏补全面板，避免 UI 留下陈旧候选。（KISS / DRY）
+2. **缩短缓存 TTL 并携带前缀校验**：将 TTL 降到 2~3 秒，缓存命中时必须校验 `prefix`，避免旧快照污染新上下文。（YAGNI，避免过度缓存）
+3. **串行化请求调度**：在 `NativeLspRequestBridge.scheduleWorker` 把 hover/completion 串行调度，并在 Kotlin 侧合并短时间输入事件，压制 `$/cancelRequest` 洪泛，保持 clangd pending 队列可控。（SOLID 中的 SRP/OCP）
+
+通过这些措施，补全列表能够随前缀实时收敛，在快速输入/删除场景下也不会再出现“第三次必定失败”或“候选不刷新”的情况。

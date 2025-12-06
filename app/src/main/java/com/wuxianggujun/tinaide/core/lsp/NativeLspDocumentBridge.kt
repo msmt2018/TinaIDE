@@ -60,6 +60,11 @@ object NativeLspDocumentBridge {
         sessions[absolutePath]?.flushPendingSync()
     }
 
+    fun currentVersion(filePath: String): Int? {
+        val absolutePath = File(filePath).absolutePath
+        return sessions[absolutePath]?.currentVersion()
+    }
+
     class Handle internal constructor(private val key: String) {
         fun dispose() {
             NativeLspDocumentBridge.dispose(key)
@@ -77,7 +82,8 @@ object NativeLspDocumentBridge {
         private var pendingSync: Job? = null
         @Volatile private var opened = false
         @Volatile private var disposed = false
-        private var version = 1
+        @Volatile private var version = 1
+        @Volatile private var lastSnapshot: String? = null
         private val clangdPath: String? = NativeLspBinaryResolver.resolveClangdBinary(context).also { resolved ->
             if (!resolved.isNullOrBlank()) {
                 NativeLspService.setDefaultClangdBinary(resolved)
@@ -104,6 +110,7 @@ object NativeLspDocumentBridge {
                     Log.e(TAG, "Failed to send didOpen", openedResult.exceptionOrNull())
                     return@launch
                 }
+                lastSnapshot = content
                 opened = true
                 registerListeners()
                 Log.i(TAG, "Native LSP synced document: $filePath")
@@ -136,6 +143,10 @@ object NativeLspDocumentBridge {
 
         private suspend fun sendSnapshot() {
             val snapshot = readEditorText()
+            if (snapshot == lastSnapshot) {
+                Log.d(TAG, "No content changes for $fileUri, skip didChange")
+                return
+            }
             val nextVersion = incrementVersion()
             Log.d(TAG, "Document changed: $fileUri, version=$nextVersion")
             val changeResult = runCatching {
@@ -143,6 +154,8 @@ object NativeLspDocumentBridge {
             }
             if (changeResult.isFailure) {
                 Log.e(TAG, "Failed to send didChange", changeResult.exceptionOrNull())
+            } else {
+                lastSnapshot = snapshot
             }
         }
         private suspend fun readEditorText(): String {
@@ -153,6 +166,11 @@ object NativeLspDocumentBridge {
 
         private fun incrementVersion(): Int {
             version += 1
+            return version
+        }
+
+        fun currentVersion(): Int? {
+            if (!opened || disposed) return null
             return version
         }
 
@@ -196,6 +214,7 @@ object NativeLspDocumentBridge {
             }.invokeOnCompletion {
                 workerScope.cancel()
             }
+            NativeLspResultCache.invalidateFile(filePath)
         }
     }
 }
