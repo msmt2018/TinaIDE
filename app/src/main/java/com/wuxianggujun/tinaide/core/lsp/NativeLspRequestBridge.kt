@@ -3,13 +3,14 @@ package com.wuxianggujun.tinaide.core.lsp
 import android.net.Uri
 import android.util.Log
 import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.lsp.model.CompletionResult
 import com.wuxianggujun.tinaide.lsp.model.HoverResult
 import com.wuxianggujun.tinaide.lsp.model.Location
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -25,7 +26,15 @@ object NativeLspRequestBridge {
 
     private const val TAG = "NativeLspRequestBridge"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val hoverJobs = ConcurrentHashMap<String, Job>()
+    private class WorkerState<T> {
+        var job: Job? = null
+        var identity: String? = null
+        var requestId: Long = 0
+        val callbacks = mutableListOf<(T?) -> Unit>()
+    }
+
+    private val hoverWorkers = ConcurrentHashMap<String, WorkerState<HoverResult?>>()
+    private val completionWorkers = ConcurrentHashMap<String, WorkerState<CompletionResult?>>()
     private val definitionJobs = ConcurrentHashMap<String, Job>()
     private val referenceJobs = ConcurrentHashMap<String, Job>()
 
@@ -37,14 +46,37 @@ object NativeLspRequestBridge {
         onResult: (HoverResult?) -> Unit
     ) {
         val fileUri = buildUri(filePath)
-        val key = buildKey(fileUri, line, column)
-        launchRequest(
-            key = key,
-            jobs = hoverJobs,
-            workDir = workDir,
-            methodLabel = "Hover",
-            delayMs = 150,
-            request = { NativeLspService.requestHoverAsync(fileUri, line, column) },
+        scheduleWorker(
+            workers = hoverWorkers,
+            key = fileUri,
+            label = "Hover",
+            identity = buildIdentity(filePath, line, column),
+            block = {
+            if (!ensureNativeClient(workDir)) return@scheduleWorker null
+            NativeLspService.requestHoverAsync(fileUri, line, column)
+            },
+            onResult = onResult
+        )
+    }
+
+    fun requestCompletion(
+        filePath: String,
+        line: Int,
+        column: Int,
+        workDir: String?,
+        onResult: (CompletionResult?) -> Unit
+    ) {
+        val fileUri = buildUri(filePath)
+        scheduleWorker(
+            workers = completionWorkers,
+            key = fileUri,
+            label = "Completion",
+            identity = buildIdentity(filePath, line, column),
+            block = {
+            if (!ensureNativeClient(workDir)) return@scheduleWorker null
+            NativeLspDocumentBridge.flushPendingSync(filePath)
+            NativeLspService.requestCompletionAsync(fileUri, line, column)
+            },
             onResult = onResult
         )
     }
@@ -100,12 +132,90 @@ object NativeLspRequestBridge {
     private fun buildKey(fileUri: String, line: Int, column: Int): String =
         "$fileUri:$line:$column"
 
+    private fun buildIdentity(filePath: String, line: Int, column: Int): String {
+        val version = NativeLspDocumentBridge.currentVersion(filePath) ?: -1
+        return "$line:$column:$version"
+    }
+
+    private fun <T> scheduleWorker(
+        workers: ConcurrentHashMap<String, WorkerState<T>>,
+        key: String,
+        label: String,
+        identity: String,
+        block: suspend () -> T?,
+        onResult: (T?) -> Unit
+    ) {
+        val state = workers.computeIfAbsent(key) { WorkerState<T>() }
+        val previousJob: Job?
+        val requestId: Long
+        synchronized(state) {
+            if (state.job?.isActive == true && state.identity == identity) {
+                state.callbacks.add(onResult)
+                Log.d(TAG, "$label request deduped for key=$key identity=$identity")
+                return
+            }
+            previousJob = state.job
+            state.identity = identity
+            state.requestId += 1
+            requestId = state.requestId
+            state.callbacks.clear()
+            state.callbacks.add(onResult)
+        }
+        previousJob?.cancel()
+        val job = scope.launch {
+            val result = try {
+                block()
+            } catch (cancelled: CancellationException) {
+                Log.d(TAG, "$label request cancelled for key=$key")
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.e(TAG, "$label request failed for key=$key", t)
+                null
+            }
+            withContext(Dispatchers.Main) {
+                val callbacks = synchronized(state) {
+                    if (state.requestId != requestId) {
+                        state.callbacks.clear()
+                        null
+                    } else {
+                        state.callbacks.toList().also { state.callbacks.clear() }
+                    }
+                }
+                if (callbacks.isNullOrEmpty()) {
+                    Log.d(TAG, "$label result dropped for stale request key=$key id=$requestId")
+                    return@withContext
+                }
+                if (result == null) {
+                    Log.d(TAG, "$label result is null for key=$key")
+                } else {
+                    Log.d(TAG, "$label result ready for key=$key")
+                }
+                callbacks.forEach { callback -> callback(result) }
+            }
+        }
+        synchronized(state) { state.job = job }
+        job.invokeOnCompletion {
+            val shouldRemove = synchronized(state) {
+                if (state.job === job) {
+                    state.job = null
+                    state.identity = null
+                    state.callbacks.clear()
+                    true
+                } else {
+                    false
+                }
+            }
+            if (shouldRemove) {
+                workers.remove(key)
+            }
+        }
+    }
+
     private fun <T> launchRequest(
         key: String,
         jobs: ConcurrentHashMap<String, Job>,
         workDir: String?,
         methodLabel: String,
-        delayMs: Long = 0L,
         request: suspend () -> T?,
         onResult: (T?) -> Unit
     ) {
@@ -117,9 +227,6 @@ object NativeLspRequestBridge {
                     Log.w(TAG, "Native client unavailable for $methodLabel key=$key")
                     withContext(Dispatchers.Main) { onResult(null) }
                     return@launch
-                }
-                if (delayMs > 0) {
-                    delay(delayMs)
                 }
                 val result = runCatching { request() }
                     .onFailure {
