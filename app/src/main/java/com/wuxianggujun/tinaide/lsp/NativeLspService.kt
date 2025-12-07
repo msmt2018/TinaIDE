@@ -121,7 +121,7 @@ object NativeLspService {
     }
     
     enum class HealthEventType {
-        INIT_FAILURE, CHANNEL_ERROR, TRANSPORT_ERROR, CLANGD_EXIT
+        INIT_FAILURE, CHANNEL_ERROR, TRANSPORT_ERROR, CLANGD_EXIT, IO_ERROR
     }
     
     data class HealthEvent(val type: HealthEventType, val message: String)

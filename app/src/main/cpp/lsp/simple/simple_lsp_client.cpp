@@ -586,6 +586,26 @@ void SimpleLspClient::cancelRequest(uint64_t request_id) {
     }
 }
 
+void SimpleLspClient::notifyRequestTimeout(uint64_t request_id) {
+    std::string method;
+    {
+        std::lock_guard<std::mutex> lock(pending_mutex_);
+        auto it = pending_requests_.find(request_id);
+        if (it != pending_requests_.end()) {
+            method = it->second.method;
+            pending_requests_.erase(it);
+        }
+    }
+    if (!method.empty()) {
+        LOGW("Request %llu (%s) reported timeout by Kotlin layer",
+             static_cast<unsigned long long>(request_id), method.c_str());
+        recordTimeout(method);
+    } else {
+        LOGW("Timeout notification for unknown request %llu",
+             static_cast<unsigned long long>(request_id));
+    }
+}
+
 // ============================================================================
 // 回调设置
 // ============================================================================
@@ -637,6 +657,39 @@ void SimpleLspClient::sendCancelNotification(uint64_t request_id) {
     params << R"({"id":)" << request_id << "}";
     std::string notification = buildNotification("$/cancelRequest", params.str());
     sendJson(notification);
+}
+
+void SimpleLspClient::recordTimeout(const std::string& method) {
+    if (method.empty()) {
+        return;
+    }
+    int streak = 0;
+    {
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        auto& stats = method_stats_[method];
+        stats.total_timeouts++;
+        stats.consecutive_timeouts++;
+        streak = stats.consecutive_timeouts;
+    }
+    if (streak >= kTimeoutThreshold) {
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            method_stats_[method].consecutive_timeouts = 0;
+        }
+        std::string message = method + " timed out " + std::to_string(streak) + " times consecutively";
+        reportHealthEvent(HealthEventType::IO_ERROR, message);
+    }
+}
+
+void SimpleLspClient::resetTimeoutStats(const std::string& method) {
+    if (method.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(stats_mutex_);
+    auto it = method_stats_.find(method);
+    if (it != method_stats_.end()) {
+        it->second.consecutive_timeouts = 0;
+    }
 }
 
 // ============================================================================
@@ -837,6 +890,7 @@ void SimpleLspClient::handleResponse(const std::string& json) {
                     if (!it->second.cancelled) {
                         it->second.result = json;
                         it->second.completed = true;
+                        resetTimeoutStats(it->second.method);
                         LOGD("Response stored for request %llu", (unsigned long long)request_id);
                     } else {
                         LOGD("Response for cancelled request %llu, ignoring", (unsigned long long)request_id);

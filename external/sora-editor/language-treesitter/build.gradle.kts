@@ -58,7 +58,8 @@ android {
 
 dependencies {
     compileOnly(project(":sora-editor:editor"))
-    api(libs.tree.sitter)
+    // Tree-sitter bindings are now included directly in this module
+    // (com.wuxianggujun.tinaide.treesitter package)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso)

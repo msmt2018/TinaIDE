@@ -18,6 +18,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -59,9 +61,14 @@ object SimpleLspService {
     private val initializationListeners = CopyOnWriteArraySet<InitializationListener>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val restartMutex = Mutex()
 
     @Volatile
     private var overrideClangdPath: String? = null
+    @Volatile
+    private var lastWorkDir: String = "/"
+    @Volatile
+    private var lastClangdPath: String = DEFAULT_CLANGD_PATH
 
     // Native 方法
     @JvmStatic private external fun nativeOnLoad(): Int
@@ -77,6 +84,7 @@ object SimpleLspService {
     @JvmStatic private external fun nativeDidChange(fileUri: String, content: String, version: Int)
     @JvmStatic private external fun nativeDidClose(fileUri: String)
     @JvmStatic private external fun nativeCancelRequestInternal(requestId: Long)
+    @JvmStatic private external fun nativeNotifyRequestTimeout(requestId: Long)
 
     // Native 回调
     @JvmStatic
@@ -84,9 +92,12 @@ object SimpleLspService {
         Log.d(TAG, "Health event: $type - $message")
         mainHandler.post {
             healthListeners.forEach { it.onHealthEvent(type, message) }
-            if (type == "INIT_FAILURE" || type == "CLANGD_EXIT") {
+            if (type == "INIT_FAILURE" || type == "CLANGD_EXIT" || type == "IO_ERROR") {
                 initializationListeners.forEach { it.onInitializationChanged(false) }
             }
+        }
+        if (type == "IO_ERROR") {
+            scheduleRestart(message)
         }
     }
 
@@ -111,6 +122,8 @@ object SimpleLspService {
     // 生命周期
     fun initialize(clangdPath: String = DEFAULT_CLANGD_PATH, workDir: String = "/"): Boolean {
         val effectivePath = overrideClangdPath ?: clangdPath
+        lastWorkDir = workDir
+        lastClangdPath = effectivePath
         Log.i(TAG, "Initializing: clangdPath=$effectivePath, workDir=$workDir")
         val success = try {
             nativeInitialize(effectivePath, workDir)
@@ -213,6 +226,7 @@ object SimpleLspService {
             delay(10)
         }
         Log.w(TAG, "Request $requestId timed out")
+        notifyNativeTimeout(requestId)
         return null
     }
 
@@ -247,6 +261,24 @@ object SimpleLspService {
         if (requestId == 0L) return
         runCatching { nativeCancelRequestInternal(requestId) }
             .onFailure { Log.w(TAG, "cancelRequest failed for id=$requestId", it) }
+    }
+
+    private fun notifyNativeTimeout(requestId: Long) {
+        if (requestId == 0L) return
+        runCatching { nativeNotifyRequestTimeout(requestId) }
+            .onFailure { Log.w(TAG, "Failed to notify native timeout for id=$requestId", it) }
+    }
+
+    private fun scheduleRestart(reason: String) {
+        serviceScope.launch {
+            restartMutex.withLock {
+                Log.w(TAG, "Restarting clangd due to: $reason")
+                runCatching { nativeShutdown() }.onFailure { Log.e(TAG, "nativeShutdown failed", it) }
+                delay(200)
+                val success = initialize(lastClangdPath, lastWorkDir)
+                Log.i(TAG, "Restart completed, success=$success")
+            }
+        }
     }
 
 

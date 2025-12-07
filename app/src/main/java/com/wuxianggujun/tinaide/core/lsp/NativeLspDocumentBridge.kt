@@ -28,6 +28,22 @@ object NativeLspDocumentBridge {
 
     private val sessions = ConcurrentHashMap<String, Session>()
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    @Volatile
+    private var hasSeenInitialization = false
+
+    init {
+        NativeLspService.addInitializationListener { initialized ->
+            if (initialized) {
+                if (hasSeenInitialization) {
+                    sessions.values.forEach { it.resendSnapshotAfterRestart() }
+                } else {
+                    hasSeenInitialization = true
+                }
+            } else {
+                hasSeenInitialization = false
+            }
+        }
+    }
     fun bind(context: Context, editor: CodeEditor, filePath: String, projectPath: String?): Handle? {
         NativeLspHealthMonitor.start(context)
         val absolutePath = File(filePath).absolutePath
@@ -139,6 +155,27 @@ object NativeLspDocumentBridge {
             sendSnapshot()
             // 给 clangd 一点时间处理 didChange
             delay(50)
+        }
+
+        fun resendSnapshotAfterRestart() {
+            if (disposed || !opened) return
+            workerScope.launch {
+                if (!ensureNativeClient()) {
+                    Log.w(TAG, "Native client unavailable when resending $fileUri")
+                    return@launch
+                }
+                val snapshot = lastSnapshot ?: readEditorText()
+                Log.d(TAG, "Resending snapshot after restart: $fileUri")
+                val reopen = runCatching {
+                    NativeLspService.nativeDidOpenTextDocument(fileUri, snapshot)
+                }
+                if (reopen.isFailure) {
+                    Log.e(TAG, "Failed to resend didOpen for $fileUri", reopen.exceptionOrNull())
+                    return@launch
+                }
+                version = 1
+                lastSnapshot = snapshot
+            }
         }
 
         private suspend fun sendSnapshot() {

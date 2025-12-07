@@ -338,3 +338,13 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeCancelRequestInternal(
     auto* client = SimpleLspClient::getInstance();
     client->cancelRequest(static_cast<uint64_t>(requestId));
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeNotifyRequestTimeout(
+    JNIEnv* env,
+    jclass clazz,
+    jlong requestId
+) {
+    auto* client = SimpleLspClient::getInstance();
+    client->notifyRequestTimeout(static_cast<uint64_t>(requestId));
+}

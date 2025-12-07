@@ -133,6 +133,11 @@ public:
      * 取消请求
      */
     void cancelRequest(uint64_t request_id);
+    
+    /**
+     * 由 Kotlin 层通知的超时
+     */
+    void notifyRequestTimeout(uint64_t request_id);
 
     // ========================================================================
     // 诊断回调
@@ -197,6 +202,14 @@ private:
     std::mutex pending_mutex_;
     std::map<uint64_t, PendingRequest> pending_requests_;
     std::atomic<uint64_t> next_request_id_{1};
+    
+    struct MethodStats {
+        int total_timeouts = 0;
+        int consecutive_timeouts = 0;
+    };
+    std::mutex stats_mutex_;
+    std::map<std::string, MethodStats> method_stats_;
+    static constexpr int kTimeoutThreshold = 3;
 
     // ========================================================================
     // 响应读取线程
@@ -236,6 +249,9 @@ private:
     uint64_t generateRequestId() {
         return next_request_id_.fetch_add(1, std::memory_order_relaxed);
     }
+    
+    void recordTimeout(const std::string& method);
+    void resetTimeoutStats(const std::string& method);
 };
 
 } // namespace lsp

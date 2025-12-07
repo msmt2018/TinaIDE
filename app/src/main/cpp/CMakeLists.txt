@@ -26,15 +26,26 @@ add_library(native_compiler SHARED
     lsp/clangd_server.cpp
     lsp/simple/simple_lsp_client.cpp
     lsp/simple/simple_lsp_jni.cpp
+    # Tree-sitter 核心库（使用 lib.c 单文件版本）
+    treesitter/lib/src/lib.c
+    # Tree-sitter 核心 JNI 绑定
+    treesitter/core/ts_jni.cpp
+    treesitter/core/ts_node_jni.cpp
+    treesitter/core/ts_query_jni.cpp
     # Tree-sitter CMake parser
     treesitter/cmake/parser.c
     treesitter/cmake/scanner.c
     treesitter/cmake/cmake_jni.cpp
+    # Tree-sitter C++ parser
+    treesitter/cpp/parser.c
+    treesitter/cpp/scanner.c
+    treesitter/cpp/cpp_jni.cpp
 )
 
-# Tree-sitter 公共头文件路径（所有语言共享）
+# Tree-sitter 头文件路径
 target_include_directories(native_compiler PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/treesitter/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/treesitter/lib/src
 )
 
 # 允许共享库中存在由其他共享库在运行时解析的未定义符号
