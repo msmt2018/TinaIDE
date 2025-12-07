@@ -320,12 +320,27 @@ object SimpleLspService {
 
     private fun parseCompletionItem(obj: JSONObject): CompletionItem? {
         return try {
+            val label = obj.getString("label")
+            val kind = obj.optInt("kind", 1)
+            
+            // 优先使用 textEdit.newText，其次是 insertText，最后是 label
+            var insertText = obj.optJSONObject("textEdit")?.optString("newText", "")
+                ?.ifEmpty { null }
+                ?: obj.optString("insertText", "").ifEmpty { null }
+                ?: label
+            
+            // 对于方法(2)、函数(3)、构造函数(4)类型，如果 insertText 不包含括号，自动添加
+            val isCallable = kind in listOf(2, 3, 4)
+            if (isCallable && !insertText.contains("(") && !insertText.contains(")")) {
+                insertText = "$insertText()"
+            }
+            
             CompletionItem(
-                obj.getString("label"),
+                label,
                 obj.optString("detail", ""),
-                obj.optString("insertText", "").ifEmpty { obj.optString("label", "") },
+                insertText,
                 parseDocumentation(obj.opt("documentation")),
-                obj.optInt("kind", 1),
+                kind,
                 obj.optBoolean("deprecated", false)
             )
         } catch (e: Exception) { null }
