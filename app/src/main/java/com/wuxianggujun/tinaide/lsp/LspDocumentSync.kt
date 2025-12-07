@@ -1,41 +1,44 @@
-package com.wuxianggujun.tinaide.core.lsp
+package com.wuxianggujun.tinaide.lsp
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.wuxianggujun.tinaide.lsp.NativeLspService
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SubscriptionReceipt
-import io.github.rosemoe.sora.widget.subscribeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
+import io.github.rosemoe.sora.widget.subscribeEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.cancel
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 将 CodeEditor 的文本更新同步到 NativeLspService，确保 clangd 拥有最新文档。
+ * LSP 文档同步
+ * 
+ * 将 CodeEditor 的文本更新同步到 LspService，确保 clangd 拥有最新文档。
  */
-object NativeLspDocumentBridge {
+object LspDocumentSync {
 
-    private const val TAG = "NativeLspDocBridge"
+    private const val TAG = "LspDocumentSync"
+    private const val SYNC_DELAY_MS = 300L
 
     private val sessions = ConcurrentHashMap<String, Session>()
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    @Volatile
-    private var hasSeenInitialization = false
+    
+    @Volatile private var hasSeenInitialization = false
 
     init {
-        NativeLspService.addInitializationListener { initialized ->
+        LspService.addInitializationListener { initialized ->
             if (initialized) {
                 if (hasSeenInitialization) {
-                    sessions.values.forEach { it.resendSnapshotAfterRestart() }
+                    // clangd 重启后，重新发送所有文档
+                    sessions.values.forEach { it.resendAfterRestart() }
                 } else {
                     hasSeenInitialization = true
                 }
@@ -44,8 +47,12 @@ object NativeLspDocumentBridge {
             }
         }
     }
+
+    /**
+     * 绑定编辑器到 LSP 文档同步
+     */
     fun bind(context: Context, editor: CodeEditor, filePath: String, projectPath: String?): Handle? {
-        NativeLspHealthMonitor.start(context)
+        LspHealthMonitor.start(context)
         val absolutePath = File(filePath).absolutePath
         
         val existingSession = sessions[absolutePath]
@@ -66,26 +73,40 @@ object NativeLspDocumentBridge {
         return Handle(absolutePath)
     }
 
-    fun dispose(filePath: String) {
+    /**
+     * 解绑文档
+     */
+    fun unbind(filePath: String) {
         val absolutePath = File(filePath).absolutePath
         sessions.remove(absolutePath)?.dispose()
     }
 
+    /**
+     * 立即同步待处理的更改
+     */
     suspend fun flushPendingSync(filePath: String) {
         val absolutePath = File(filePath).absolutePath
         sessions[absolutePath]?.flushPendingSync()
     }
 
+    /**
+     * 获取当前文档版本
+     */
     fun currentVersion(filePath: String): Int? {
         val absolutePath = File(filePath).absolutePath
         return sessions[absolutePath]?.currentVersion()
     }
 
+    /**
+     * 文档句柄
+     */
     class Handle internal constructor(private val key: String) {
-        fun dispose() {
-            NativeLspDocumentBridge.dispose(key)
-        }
+        fun dispose() = unbind(key)
     }
+
+    /**
+     * 文档会话
+     */
     private class Session(
         private val context: Context,
         private val editor: CodeEditor,
@@ -96,13 +117,15 @@ object NativeLspDocumentBridge {
         private val fileUri = Uri.fromFile(File(filePath)).toString()
         private var subscription: SubscriptionReceipt<ContentChangeEvent>? = null
         private var pendingSync: Job? = null
+        
         @Volatile private var opened = false
         @Volatile private var disposed = false
         @Volatile private var version = 1
         @Volatile private var lastSnapshot: String? = null
-        private val clangdPath: String? = NativeLspBinaryResolver.resolveClangdBinary(context).also { resolved ->
+        
+        private val clangdPath: String? = LspBinaryResolver.resolve(context).also { resolved ->
             if (!resolved.isNullOrBlank()) {
-                NativeLspService.setDefaultClangdBinary(resolved)
+                LspService.setClangdBinary(resolved)
             }
         }
 
@@ -113,26 +136,28 @@ object NativeLspDocumentBridge {
             }
             
             workerScope.launch {
-                if (!ensureNativeClient()) {
-                    Log.w(TAG, "Native client unavailable, skip $filePath")
+                if (!ensureInitialized()) {
+                    Log.w(TAG, "LSP not available, skip $filePath")
                     return@launch
                 }
+                
                 val content = readEditorText()
                 Log.d(TAG, "Document opened: $fileUri")
-                val openedResult = runCatching {
-                    NativeLspService.nativeDidOpenTextDocument(fileUri, content)
-                }
-                if (openedResult.isFailure) {
-                    Log.e(TAG, "Failed to send didOpen", openedResult.exceptionOrNull())
+                
+                val result = runCatching { LspService.didOpenDocument(fileUri, content) }
+                if (result.isFailure) {
+                    Log.e(TAG, "Failed to send didOpen", result.exceptionOrNull())
                     return@launch
                 }
+                
                 lastSnapshot = content
-                NativeLspRequestBridge.notifyDocumentChange(filePath)
+                LspRequestDispatcher.notifyDocumentChange(filePath)
                 opened = true
                 registerListeners()
-                Log.i(TAG, "Native LSP synced document: $filePath")
+                Log.i(TAG, "LSP synced document: $filePath")
             }
         }
+
         private suspend fun registerListeners() {
             withContext(Dispatchers.Main) {
                 subscription = editor.subscribeEvent<ContentChangeEvent> { _, _ ->
@@ -145,7 +170,7 @@ object NativeLspDocumentBridge {
             if (disposed || !opened) return
             pendingSync?.cancel()
             pendingSync = workerScope.launch {
-                delay(300)
+                delay(SYNC_DELAY_MS)
                 sendSnapshot()
             }
         }
@@ -154,29 +179,29 @@ object NativeLspDocumentBridge {
             if (disposed || !opened) return
             pendingSync?.cancel()
             sendSnapshot()
-            // 给 clangd 更多时间处理 didChange
-            delay(100)
+            delay(100) // 给 clangd 时间处理
         }
 
-        fun resendSnapshotAfterRestart() {
+        fun resendAfterRestart() {
             if (disposed || !opened) return
             workerScope.launch {
-                if (!ensureNativeClient()) {
-                    Log.w(TAG, "Native client unavailable when resending $fileUri")
+                if (!ensureInitialized()) {
+                    Log.w(TAG, "LSP not available when resending $fileUri")
                     return@launch
                 }
+                
                 val snapshot = lastSnapshot ?: readEditorText()
                 Log.d(TAG, "Resending snapshot after restart: $fileUri")
-                val reopen = runCatching {
-                    NativeLspService.nativeDidOpenTextDocument(fileUri, snapshot)
-                }
-                if (reopen.isFailure) {
-                    Log.e(TAG, "Failed to resend didOpen for $fileUri", reopen.exceptionOrNull())
+                
+                val result = runCatching { LspService.didOpenDocument(fileUri, snapshot) }
+                if (result.isFailure) {
+                    Log.e(TAG, "Failed to resend didOpen for $fileUri", result.exceptionOrNull())
                     return@launch
                 }
+                
                 version = 1
                 lastSnapshot = snapshot
-                NativeLspRequestBridge.notifyDocumentChange(filePath)
+                LspRequestDispatcher.notifyDocumentChange(filePath)
             }
         }
 
@@ -186,75 +211,64 @@ object NativeLspDocumentBridge {
                 Log.d(TAG, "No content changes for $fileUri, skip didChange")
                 return
             }
-            val nextVersion = incrementVersion()
+            
+            val nextVersion = ++version
             Log.d(TAG, "Document changed: $fileUri, version=$nextVersion")
-            val changeResult = runCatching {
-                NativeLspService.nativeDidChangeTextDocument(fileUri, snapshot, nextVersion)
-            }
-            if (changeResult.isFailure) {
-                Log.e(TAG, "Failed to send didChange", changeResult.exceptionOrNull())
+            
+            val result = runCatching { LspService.didChangeDocument(fileUri, snapshot, nextVersion) }
+            if (result.isFailure) {
+                Log.e(TAG, "Failed to send didChange", result.exceptionOrNull())
             } else {
                 lastSnapshot = snapshot
-                NativeLspRequestBridge.notifyDocumentChange(filePath)
-            }
-        }
-        private suspend fun readEditorText(): String {
-            return withContext(Dispatchers.Main) {
-                editor.text.toString()
+                LspRequestDispatcher.notifyDocumentChange(filePath)
             }
         }
 
-        private fun incrementVersion(): Int {
-            version += 1
-            return version
+        private suspend fun readEditorText(): String = withContext(Dispatchers.Main) {
+            editor.text.toString()
         }
 
-        fun currentVersion(): Int? {
-            if (!opened || disposed) return null
-            return version
-        }
+        fun currentVersion(): Int? = if (opened && !disposed) version else null
 
-        private suspend fun ensureNativeClient(): Boolean {
-            if (NativeLspService.nativeIsInitialized()) {
-                return true
-            }
+        private suspend fun ensureInitialized(): Boolean {
+            if (LspService.isInitialized) return true
             
             val workDir = projectPath ?: "/"
-            val requestedClangdPath = clangdPath ?: NativeLspService.getConfiguredClangdBinary()
-                ?: NativeLspService.defaultClangdBinaryPath()
+            val requestedClangdPath = clangdPath 
+                ?: LspService.getClangdBinary() 
+                ?: LspService.defaultClangdPath()
+                
             Log.i(TAG, "LSP initializing: clangd=$requestedClangdPath, workDir=$workDir")
-            val result = NativeLspService.initialize(
-                clangdPath = requestedClangdPath,
-                workDir = workDir
-            )
+            val result = LspService.initialize(clangdPath = requestedClangdPath, workDir = workDir)
+            
             if (result) {
                 Log.i(TAG, "LSP initialized successfully")
             } else {
-                Log.e(TAG, "LSP initialization failed - clangd may not be available")
+                Log.e(TAG, "LSP initialization failed")
             }
             return result
         }
+
         fun dispose() {
             if (disposed) return
             disposed = true
             pendingSync?.cancel()
+            
             subscription?.let { receipt ->
                 mainScope.launch { receipt.unsubscribe() }
             }
+            
             workerScope.launch {
                 if (opened) {
                     Log.d(TAG, "Document closed: $fileUri")
-                    val closeResult = runCatching {
-                        NativeLspService.nativeDidCloseTextDocument(fileUri)
-                    }
-                    if (closeResult.isFailure) {
-                        Log.w(TAG, "Failed to send didClose", closeResult.exceptionOrNull())
-                    }
+                    runCatching { LspService.didCloseDocument(fileUri) }
+                        .onFailure { Log.w(TAG, "Failed to send didClose", it) }
                 }
             }.invokeOnCompletion {
                 workerScope.cancel()
             }
-            NativeLspResultCache.invalidateFile(filePath)
+            
+            LspResultCache.invalidateFile(filePath)
         }
     }
 }

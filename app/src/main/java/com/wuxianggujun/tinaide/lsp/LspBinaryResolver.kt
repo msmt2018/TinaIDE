@@ -1,4 +1,4 @@
-package com.wuxianggujun.tinaide.core.lsp
+package com.wuxianggujun.tinaide.lsp
 
 import android.content.Context
 import android.util.Log
@@ -7,22 +7,25 @@ import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
 import java.io.File
 
 /**
- * 负责推导 libclangd.so 的真实落地点，避免手动配置。
+ * LSP 二进制文件解析器
+ * 
+ * 负责推导 libclangd.so 的真实路径
  */
-object NativeLspBinaryResolver {
+object LspBinaryResolver {
 
-    private const val TAG = "NativeLspBinResolver"
+    private const val TAG = "LspBinaryResolver"
 
     /**
-     * 尝试根据 sysroot 和 ABI 映射推导 libclangd.so 的绝对路径。
-     * @return 文件存在时返回路径，否则返回 null。
+     * 尝试根据 sysroot 和 ABI 映射推导 libclangd.so 的绝对路径
+     * @return 文件存在时返回路径，否则返回 null
      */
-    fun resolveClangdBinary(context: Context): String? {
+    fun resolve(context: Context): String? {
         return runCatching {
             val appContext = context.applicationContext
             val sysrootDir = SysrootInstaller.ensureInstalled(appContext)
             val nativeLibDir = appContext.applicationInfo?.nativeLibraryDir
             val abiCandidates = AbiResolver.prioritizedAbis(nativeLibDir)
+            
             for (abi in abiCandidates) {
                 val triple = AbiResolver.abiToTargetTriple(abi)
                 val candidate = File(sysrootDir, "usr/lib/$triple/runtime/libclangd.so")
@@ -31,6 +34,7 @@ object NativeLspBinaryResolver {
                     return candidate.absolutePath
                 }
             }
+            
             val fallback = File(sysrootDir, "usr/lib/libclangd.so")
             if (fallback.exists()) {
                 Log.i(TAG, "Using fallback clangd binary at ${fallback.absolutePath}")

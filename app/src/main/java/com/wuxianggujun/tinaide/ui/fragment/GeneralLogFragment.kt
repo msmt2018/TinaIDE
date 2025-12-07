@@ -8,7 +8,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.databinding.TabGeneralLogBinding
-import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.lsp.LspService
 import com.wuxianggujun.tinaide.output.LogLevel
 import com.wuxianggujun.tinaide.ui.BottomLogBuffer
 
@@ -26,8 +26,8 @@ class GeneralLogFragment : Fragment() {
     private val binding get() = _binding!!
     
     private var logListener: BottomLogBuffer.LogListener? = null
-    private var initListener: NativeLspService.InitializationListener? = null
-    private var healthListener: NativeLspService.HealthListener? = null
+    private var initListener: LspService.InitializationListener? = null
+    private var healthListener: LspService.HealthListener? = null
     
     companion object {
         fun newInstance(): GeneralLogFragment {
@@ -75,24 +75,24 @@ class GeneralLogFragment : Fragment() {
     }
     
     private fun setupLspStatus() {
-        initListener = NativeLspService.InitializationListener { isInitialized ->
+        initListener = LspService.InitializationListener { isInitialized ->
             binding.root.post {
                 val message = if (isInitialized) "LSP 已连接" else "LSP 未连接"
                 updateLspStatus(isInitialized, message)
             }
         }
         
-        healthListener = NativeLspService.HealthListener { event ->
+        healthListener = LspService.HealthListener { type, message ->
             binding.root.post {
-                updateLspStatus(false, "LSP 异常: ${event.message}")
+                updateLspStatus(false, "LSP 异常: $message")
             }
         }
         
-        initListener?.let { NativeLspService.addInitializationListener(it) }
-        healthListener?.let { NativeLspService.addHealthListener(it) }
+        initListener?.let { LspService.addInitializationListener(it) }
+        healthListener?.let { LspService.addHealthListener(it) }
         
         // 初始化状态
-        val initialized = NativeLspService.nativeIsInitialized()
+        val initialized = LspService.isInitialized
         val message = if (initialized) "LSP 已连接" else "LSP 未连接"
         updateLspStatus(initialized, message)
     }
@@ -165,8 +165,8 @@ class GeneralLogFragment : Fragment() {
         logListener?.let { BottomLogBuffer.removeListener(it) }
         logListener = null
         
-        initListener?.let { NativeLspService.removeInitializationListener(it) }
-        healthListener?.let { NativeLspService.removeHealthListener(it) }
+        initListener?.let { LspService.removeInitializationListener(it) }
+        healthListener?.let { LspService.removeHealthListener(it) }
         
         _binding = null
     }

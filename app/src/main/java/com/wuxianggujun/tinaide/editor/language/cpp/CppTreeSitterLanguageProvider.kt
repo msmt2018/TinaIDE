@@ -6,9 +6,9 @@ import android.os.Bundle
 import android.util.Log
 import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCpp
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
-import com.wuxianggujun.tinaide.core.lsp.NativeLspRequestBridge
-import com.wuxianggujun.tinaide.core.lsp.NativeLspResultCache
-import com.wuxianggujun.tinaide.core.lsp.NativeLspDocumentBridge
+import com.wuxianggujun.tinaide.lsp.LspRequestDispatcher
+import com.wuxianggujun.tinaide.lsp.LspResultCache
+import com.wuxianggujun.tinaide.lsp.LspDocumentSync
 import com.wuxianggujun.tinaide.lsp.model.CompletionItem as NativeCompletionItem
 import com.wuxianggujun.tinaide.lsp.model.CompletionResult
 import io.github.rosemoe.sora.editor.ts.LocalsCaptureSpec
@@ -197,7 +197,7 @@ private object CppNativeCompletionDispatcher {
         val identifierPrefixSnapshot = completionContext.linePrefix
         val fileUri = Uri.fromFile(File(filePath)).toString()
         val key = buildKey(filePath, position)
-        val documentVersion = NativeLspDocumentBridge.currentVersion(filePath) ?: -1
+        val documentVersion = LspDocumentSync.currentVersion(filePath) ?: -1
         Log.d(
             TAG,
             "Completion request -> file=$filePath line=${position.line} col=${position.column} " +
@@ -273,7 +273,7 @@ private object CppNativeCompletionDispatcher {
         val cachePrefix = filterPrefix.firstOrNull()?.lowercaseChar()?.toString() ?: ""
         val cacheSnapshot = identifierPrefixSnapshot + cachePrefix
         
-        var contextCache = NativeLspResultCache.getCompletion(
+        var contextCache = LspResultCache.getCompletion(
             filePath = filePath,
             line = position.line,
             identifierStart = identifierStart,
@@ -299,7 +299,7 @@ private object CppNativeCompletionDispatcher {
         // 检测触发字符
         val triggerChar = detectTriggerCharacter(completionContext.lineText, completionContext.identifierStart)
         
-        NativeLspRequestBridge.requestCompletion(
+        LspRequestDispatcher.requestCompletion(
             filePath = filePath,
             line = position.line,
             column = position.column,
@@ -315,7 +315,7 @@ private object CppNativeCompletionDispatcher {
                 }
                 // 只缓存完整的结果，不完整的结果不缓存（因为可能缺少某些前缀的补全项）
                 if (completionResult.items.isNotEmpty() && !completionResult.isIncomplete) {
-                    NativeLspResultCache.putCompletion(
+                    LspResultCache.putCompletion(
                         filePath = filePath,
                         line = position.line,
                         identifierStart = identifierStart,

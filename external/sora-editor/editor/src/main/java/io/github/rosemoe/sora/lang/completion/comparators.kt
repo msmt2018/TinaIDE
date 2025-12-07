@@ -209,8 +209,9 @@ fun filterCompletionItems(
                         originItem.label.asString().lowercase(),
                         0
                     )
+                    // 保留 labelMatch 的匹配区间用于高亮，但沿用 filterText 的评分以避免排序抖动
+                    labelMatch.score = match.score
                     item.score = labelMatch
-                    labelMatch.matches[0] = match.matches[0] // use score from filterText
                 }
 
             } else {
@@ -285,12 +286,20 @@ fun List<CompletionItem>.highlightMatchLabel(colorSchema: EditorColorScheme?): L
         val score = extra.score
         val spannable = SpannableString(item.label)
 
+        val labelLength = spannable.length
         for (index in score.matches.indices.reversed()) {
             val matchIndex = score.matches[index]
+            if (matchIndex < 0 || matchIndex >= labelLength) {
+                continue
+            }
+            val spanEnd = (matchIndex + 1).coerceAtMost(labelLength)
+            if (spanEnd <= matchIndex) {
+                continue
+            }
             spannable.setSpan(
                 ForegroundColorSpan(matchedColor),
                 matchIndex,
-                spannable.length.coerceAtMost(matchIndex + 1),
+                spanEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
