@@ -8,7 +8,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.tabs.TabLayoutMediator
 import com.wuxianggujun.tinaide.databinding.BottomSheetPanelV2Binding
-import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.lsp.LspService
 import com.wuxianggujun.tinaide.output.LogLevel
 import com.wuxianggujun.tinaide.ui.fragment.BuildLogFragment
 import com.wuxianggujun.tinaide.ui.fragment.GeneralLogFragment
@@ -52,8 +52,8 @@ class BottomPanelManager(
     private var buildSucceeded: Boolean = false
     
     // LSP 监听器
-    private var initListener: NativeLspService.InitializationListener? = null
-    private var healthListener: NativeLspService.HealthListener? = null
+    private var initListener: LspService.InitializationListener? = null
+    private var healthListener: LspService.HealthListener? = null
     
     init {
         // 加载布局
@@ -207,24 +207,24 @@ class BottomPanelManager(
      * 设置 LSP 状态监听
      */
     private fun setupLspStatus() {
-        initListener = NativeLspService.InitializationListener { isInitialized ->
+        initListener = LspService.InitializationListener { isInitialized ->
             binding.root.post {
                 val message = if (isInitialized) "LSP" else "LSP"
                 updateLspStatus(isInitialized, message)
             }
         }
         
-        healthListener = NativeLspService.HealthListener { event ->
+        healthListener = LspService.HealthListener { type, message ->
             binding.root.post {
                 updateLspStatus(false, "LSP")
             }
         }
         
-        initListener?.let { NativeLspService.addInitializationListener(it) }
-        healthListener?.let { NativeLspService.addHealthListener(it) }
+        initListener?.let { LspService.addInitializationListener(it) }
+        healthListener?.let { LspService.addHealthListener(it) }
         
         // 初始化状态
-        val initialized = NativeLspService.nativeIsInitialized()
+        val initialized = LspService.isInitialized
         updateLspStatus(initialized, "LSP")
     }
     
@@ -441,8 +441,8 @@ class BottomPanelManager(
      * 销毁资源
      */
     fun destroy() {
-        initListener?.let { NativeLspService.removeInitializationListener(it) }
-        healthListener?.let { NativeLspService.removeHealthListener(it) }
+        initListener?.let { LspService.removeInitializationListener(it) }
+        healthListener?.let { LspService.removeHealthListener(it) }
     }
     
     private fun Int.dpToPx(): Int {

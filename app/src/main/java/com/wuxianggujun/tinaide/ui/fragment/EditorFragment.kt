@@ -12,8 +12,6 @@ import com.wuxianggujun.tinaide.core.lsp.CompileCommandsGenerator
 import com.wuxianggujun.tinaide.core.lsp.CompileCommandsGenerator.BuildVariant
 import com.wuxianggujun.tinaide.core.lsp.CppProjectScanner
 import com.wuxianggujun.tinaide.core.lsp.LspConfig
-import com.wuxianggujun.tinaide.core.lsp.NativeLspDocumentBridge
-import com.wuxianggujun.tinaide.core.lsp.NativeLspRequestBridge
 import com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
 import com.wuxianggujun.tinaide.editor.language.c.CTreeSitterLanguageProvider
@@ -21,7 +19,9 @@ import com.wuxianggujun.tinaide.editor.language.cmake.CMakeTreeSitterLanguagePro
 import com.wuxianggujun.tinaide.editor.language.cpp.CppTreeSitterLanguageProvider
 import com.wuxianggujun.tinaide.extensions.toastInfo
 import com.wuxianggujun.tinaide.extensions.toastWarning
-import com.wuxianggujun.tinaide.lsp.NativeLspService
+import com.wuxianggujun.tinaide.lsp.LspDocumentSync
+import com.wuxianggujun.tinaide.lsp.LspRequestDispatcher
+import com.wuxianggujun.tinaide.lsp.LspService
 import com.wuxianggujun.tinaide.lsp.model.DiagnosticItem
 import com.wuxianggujun.tinaide.lsp.model.HoverResult
 import com.wuxianggujun.tinaide.lsp.model.Location
@@ -51,10 +51,10 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
 ) {
     private lateinit var codeEditor: CodeEditor
     private var filePath: String? = null
-    private var nativeLspHandle: NativeLspDocumentBridge.Handle? = null
+    private var lspHandle: LspDocumentSync.Handle? = null
     private var hoverSubscription: SubscriptionReceipt<SelectionChangeEvent>? = null
     private var lastNativeHoverSignature: String? = null
-    private var diagnosticsListener: NativeLspService.DiagnosticsListener? = null
+    private var diagnosticsListener: LspService.DiagnosticsListener? = null
     private var currentFileUri: String? = null
     private var hoverIdleJob: Job? = null
     private var pendingHoverSignature: String? = null
@@ -293,7 +293,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             return
         }
         val cursor = codeEditor.cursor
-        NativeLspRequestBridge.requestDefinition(
+        LspRequestDispatcher.requestDefinition(
             filePath = path,
             line = cursor.leftLine,
             column = cursor.leftColumn,
@@ -320,7 +320,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             return
         }
         val cursor = codeEditor.cursor
-        NativeLspRequestBridge.requestReferences(
+        LspRequestDispatcher.requestReferences(
             filePath = path,
             line = cursor.leftLine,
             column = cursor.leftColumn,
@@ -384,12 +384,12 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     }
     
     override fun onDestroyView() {
-        nativeLspHandle?.dispose()
-        nativeLspHandle = null
+        lspHandle?.dispose()
+        lspHandle = null
         hoverSubscription?.unsubscribe()
         hoverSubscription = null
         cancelPendingHoverTrigger()
-        diagnosticsListener?.let { NativeLspService.removeDiagnosticsListener(it) }
+        diagnosticsListener?.let { LspService.removeDiagnosticsListener(it) }
         diagnosticsListener = null
         currentFileUri = null
         
@@ -489,7 +489,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     }
 
     private fun requestNativeHover(filePath: String, line: Int, column: Int) {
-        NativeLspRequestBridge.requestHover(
+        LspRequestDispatcher.requestHover(
             filePath = filePath,
             line = line,
             column = column,
@@ -517,8 +517,8 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     }
 
     private fun attachNativeBridge(filePath: String) {
-        nativeLspHandle?.dispose()
-        nativeLspHandle = NativeLspDocumentBridge.bind(
+        lspHandle?.dispose()
+        lspHandle = LspDocumentSync.bind(
             requireContext().applicationContext,
             codeEditor,
             filePath,
@@ -530,15 +530,16 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     private fun subscribeDiagnostics(filePath: String) {
         val fileUri = Uri.fromFile(java.io.File(filePath)).toString()
         currentFileUri = fileUri
-        diagnosticsListener?.let { NativeLspService.removeDiagnosticsListener(it) }
-        val listener = NativeLspService.DiagnosticsListener { uri, diagnostics ->
+        diagnosticsListener?.let { LspService.removeDiagnosticsListener(it) }
+        val listener = LspService.DiagnosticsListener { uri, diagnostics ->
             if (uri == currentFileUri) {
                 applyDiagnostics(diagnostics)
             }
         }
         diagnosticsListener = listener
-        NativeLspService.addDiagnosticsListener(listener)
-        applyDiagnostics(NativeLspService.latestDiagnostics(fileUri))
+        LspService.addDiagnosticsListener(listener)
+        // TODO: LspService 目前没有 latestDiagnostics 方法
+        // applyDiagnostics(LspService.latestDiagnostics(fileUri))
     }
 
     private fun applyDiagnostics(diagnostics: List<DiagnosticItem>) {
@@ -590,7 +591,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     }
 
     private fun clearDiagnostics() {
-        diagnosticsListener?.let { NativeLspService.removeDiagnosticsListener(it) }
+        diagnosticsListener?.let { LspService.removeDiagnosticsListener(it) }
         diagnosticsListener = null
         currentFileUri = null
         binding.root.post { codeEditor.setDiagnostics(null) }

@@ -1,13 +1,14 @@
-package com.wuxianggujun.tinaide.core.lsp
+package com.wuxianggujun.tinaide.lsp
 
 import com.wuxianggujun.tinaide.lsp.model.CompletionResult
 import java.util.LinkedHashMap
 
 /**
- * Native LSP 结果缓存，当前仅缓存补全结果，用于避免相同上下文反复命中 clangd。
- * 符合 Stage4 ResultCache 规划：热点上下文命中缓存能显著降低第三次补全超时。
+ * LSP 结果缓存
+ * 
+ * 缓存补全结果，避免相同上下文反复请求 clangd
  */
-object NativeLspResultCache {
+object LspResultCache {
 
     private const val MAX_COMPLETION_ENTRIES = 128
 
@@ -26,12 +27,11 @@ object NativeLspResultCache {
         val result: CompletionResult
     )
 
-    private val completionCache =
-        object : LinkedHashMap<CompletionKey, CompletionEntry>(32, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CompletionKey, CompletionEntry>?): Boolean {
-                return size > MAX_COMPLETION_ENTRIES
-            }
+    private val completionCache = object : LinkedHashMap<CompletionKey, CompletionEntry>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CompletionKey, CompletionEntry>?): Boolean {
+            return size > MAX_COMPLETION_ENTRIES
         }
+    }
 
     private val lastCompletionByFile = HashMap<String, CompletionResult>()
 
@@ -52,8 +52,10 @@ object NativeLspResultCache {
             scopeHash = scopeSignature.hashCode()
         )
         val entry = completionCache[key] ?: return null
+        
         val mismatchedContext = entry.identifierSnapshot != identifierSnapshot ||
             entry.scopeSignature != scopeSignature
+            
         return if (mismatchedContext) {
             completionCache.remove(key)
             null
