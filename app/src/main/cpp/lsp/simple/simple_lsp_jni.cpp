@@ -114,7 +114,7 @@ void dispatchDiagnosticsToJava(const std::string& file_uri,
 // ============================================================================
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeOnLoad(JNIEnv* env, jclass clazz) {
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeOnLoad(JNIEnv* env, jclass clazz) {
     if (env->GetJavaVM(&g_java_vm) != JNI_OK) {
         return JNI_ERR;
     }
@@ -144,13 +144,13 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeOnLoad(JNIEnv* env, jcl
 // ============================================================================
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeInitialize(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeInitialize(
     JNIEnv* env,
     jclass clazz,
     jstring clangdPath,
     jstring workDir
 ) {
-    LOGD("SimpleLspService.nativeInitialize called");
+    LOGD("LspService.nativeInitialize called");
     
     std::string clangd_path = jstringToString(env, clangdPath);
     std::string work_dir = jstringToString(env, workDir);
@@ -168,22 +168,22 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeInitialize(
     });
     
     bool success = client->initialize(clangd_path, work_dir);
-    LOGD("SimpleLspService.nativeInitialize: success=%d", success);
+    LOGD("LspService.nativeInitialize: success=%d", success);
     return static_cast<jboolean>(success);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeShutdown(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeShutdown(
     JNIEnv* env,
     jclass clazz
 ) {
-    LOGD("SimpleLspService.nativeShutdown called");
+    LOGD("LspService.nativeShutdown called");
     auto* client = SimpleLspClient::getInstance();
     client->shutdown();
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeIsInitialized(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeIsInitialized(
     JNIEnv* env,
     jclass clazz
 ) {
@@ -196,7 +196,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeIsInitialized(
 // ============================================================================
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestHover(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeRequestHover(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -210,7 +210,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestHover(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestCompletion(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeRequestCompletion(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -226,7 +226,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestCompletion(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestDefinition(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeRequestDefinition(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -240,7 +240,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestDefinition(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestReferences(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeRequestReferences(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -260,7 +260,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeRequestReferences(
 // ============================================================================
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeGetResult(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeGetResult(
     JNIEnv* env,
     jclass clazz,
     jlong requestId
@@ -280,7 +280,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeGetResult(
 // ============================================================================
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidOpen(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeDidOpen(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -299,7 +299,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidOpen(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidChange(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeDidChange(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri,
@@ -314,7 +314,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidChange(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidClose(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeDidClose(
     JNIEnv* env,
     jclass clazz,
     jstring fileUri
@@ -330,7 +330,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeDidClose(
 // ============================================================================
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeCancelRequestInternal(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeCancelRequestInternal(
     JNIEnv* env,
     jclass clazz,
     jlong requestId
@@ -340,7 +340,7 @@ Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeCancelRequestInternal(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_wuxianggujun_tinaide_lsp_SimpleLspService_nativeNotifyRequestTimeout(
+Java_com_wuxianggujun_tinaide_lsp_LspService_nativeNotifyRequestTimeout(
     JNIEnv* env,
     jclass clazz,
     jlong requestId
