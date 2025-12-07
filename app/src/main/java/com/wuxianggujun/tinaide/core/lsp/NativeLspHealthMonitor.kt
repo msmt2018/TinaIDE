@@ -35,6 +35,8 @@ object NativeLspHealthMonitor : NativeLspService.HealthListener {
                 "Native LSP 通信异常：${event.message}"
             NativeLspService.HealthEventType.TRANSPORT_ERROR ->
                 "Native LSP 传输异常：${event.message}"
+            NativeLspService.HealthEventType.IO_ERROR ->
+                "Native LSP I/O 异常：${event.message}"
             NativeLspService.HealthEventType.CLANGD_EXIT ->
                 "clangd 进程已退出：${event.message}"
         }

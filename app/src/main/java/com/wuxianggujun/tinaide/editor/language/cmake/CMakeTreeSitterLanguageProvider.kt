@@ -1,7 +1,7 @@
 package com.wuxianggujun.tinaide.editor.language.cmake
 
 import android.content.Context
-import com.wuxianggujun.tinaide.treesitter.TSLanguageCMake
+import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCMake
 import io.github.rosemoe.sora.editor.ts.LocalsCaptureSpec
 import io.github.rosemoe.sora.editor.ts.TsLanguage
 import io.github.rosemoe.sora.editor.ts.TsLanguageSpec

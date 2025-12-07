@@ -24,11 +24,11 @@
 
 package io.github.rosemoe.sora.editor.ts
 
-import com.itsaky.androidide.treesitter.TSNode
-import com.itsaky.androidide.treesitter.TSQueryCapture
-import com.itsaky.androidide.treesitter.TSQueryCursor
-import com.itsaky.androidide.treesitter.TSTree
-import com.itsaky.androidide.treesitter.string.UTF16String
+import com.wuxianggujun.tinaide.treesitter.TSNode
+import com.wuxianggujun.tinaide.treesitter.TSQueryCapture
+import com.wuxianggujun.tinaide.treesitter.TSQueryCursor
+import com.wuxianggujun.tinaide.treesitter.TSTree
+import com.wuxianggujun.tinaide.treesitter.UTF16String
 import java.util.Stack
 
 /**

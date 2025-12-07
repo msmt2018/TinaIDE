@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import com.itsaky.androidide.treesitter.cpp.TSLanguageCpp
+import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCpp
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
 import com.wuxianggujun.tinaide.core.lsp.NativeLspRequestBridge
 import com.wuxianggujun.tinaide.core.lsp.NativeLspResultCache
@@ -57,12 +57,12 @@ object CppTreeSitterLanguageProvider {
 
     private fun ensureNativeLibraries() {
         if (nativeLoaded.compareAndSet(false, true)) {
+            // Tree-sitter core and C++ parser are bundled in native_compiler
             try {
-                System.loadLibrary("android-tree-sitter")
+                System.loadLibrary("native_compiler")
             } catch (_: UnsatisfiedLinkError) {
-                // Already loaded by another language
+                // Already loaded
             }
-            System.loadLibrary("tree-sitter-cpp")
         }
     }
 

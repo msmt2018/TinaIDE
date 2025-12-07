@@ -11,6 +11,12 @@
 3. 保持与 sora-editor 的 `language-treesitter` 模块兼容
 4. 支持自定义语言（C, C++, CMake 等）
 
+## 语法高亮状态
+
+- `app/src/main/assets/tree-sitter-queries/cpp/highlights.scm` 已按照 Tree-sitter 原生 C++ 语法树更新，覆盖协程（`co_await`, `co_return`, `co_yield`）、概念约束（`concept`, `requires`）以及 `consteval`、`constinit`、`final`、`override` 等新关键字。
+- C++20 模块相关的 `module`、`import`、`export` 关键字暂未启用，因为当前 Android 端 parser 版本在解析这些模式时会抛出 `Syntax highlights query is invalid`。待 parser 升级后再补充对应 capture，以避免违背 YAGNI 原则。
+- 每次调整 `.scm` 查询前后，应使用本地 `ts_query` 校验脚本（或 `tree-sitter test`）快速验证语法，确保 `TsLanguageSpec` 初始化阶段不会再因查询错误导致 `IllegalArgumentException`。
+
 ## 当前架构
 
 ```

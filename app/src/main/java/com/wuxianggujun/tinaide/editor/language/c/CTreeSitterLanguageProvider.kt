@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import com.itsaky.androidide.treesitter.cpp.TSLanguageCpp
+import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCpp
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
 import com.wuxianggujun.tinaide.core.lsp.NativeLspRequestBridge
 import com.wuxianggujun.tinaide.core.lsp.NativeLspResultCache

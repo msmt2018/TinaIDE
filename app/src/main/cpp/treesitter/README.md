@@ -1,6 +1,6 @@
-# Tree-sitter Parsers
+# Tree-sitter Integration
 
-This directory contains tree-sitter language parsers for syntax highlighting.
+This directory contains tree-sitter language parsers and JNI bindings for syntax highlighting.
 
 ## Directory Structure
 
@@ -8,27 +8,41 @@ This directory contains tree-sitter language parsers for syntax highlighting.
 treesitter/
 ├── include/
 │   └── tree_sitter/
-│       └── parser.h      # Shared header (from tree-sitter runtime)
+│       ├── api.h         # Tree-sitter public API
+│       ├── parser.h      # Parser definitions
+│       ├── alloc.h       # Memory allocation
+│       └── array.h       # Array utilities
+├── lib/
+│   └── src/              # Tree-sitter core library source
+│       ├── lib.c         # Single-file amalgamation (main entry)
+│       ├── parser.c      # Parser implementation
+│       ├── query.c       # Query implementation
+│       ├── tree.c        # Tree implementation
+│       ├── node.c        # Node implementation
+│       └── ...           # Other source files
+├── core/                  # JNI bindings for core API
+│   ├── ts_jni.cpp        # TSLanguage, TSParser, TSTree bindings
+│   ├── ts_node_jni.cpp   # TSNode bindings
+│   └── ts_query_jni.cpp  # TSQuery, TSQueryCursor bindings
 ├── cmake/                 # CMake language parser
 │   ├── parser.c
 │   ├── scanner.c
 │   └── cmake_jni.cpp
-└── <language>/           # Add more languages here
-    ├── parser.c
-    ├── scanner.c (if needed)
-    └── <language>_jni.cpp
+└── cpp/                   # C++ language parser
+    ├── parser.c          # From tree-sitter-cpp
+    ├── scanner.c
+    └── cpp_jni.cpp
 ```
 
-## Adding a New Language
+## Kotlin Bindings
 
-1. Create a new directory: `treesitter/<language>/`
-2. Download `parser.c` (and `scanner.c` if exists) from the tree-sitter grammar repo
-3. Create `<language>_jni.cpp` with JNI bindings
-4. Add source files to `CMakeLists.txt`
-5. Create `TSLanguage<Language>.kt` in `com.wuxianggujun.tinaide.treesitter`
-6. Create query files in `assets/tree-sitter-queries/<language>/`
+The Kotlin bindings are located in:
+- `com.wuxianggujun.tinaide.treesitter` - Core classes (TSLanguage, TSParser, TSTree, etc.)
+- `com.wuxianggujun.tinaide.treesitter.languages` - Language bindings (TSLanguageCpp)
 
-## Common Header
+These bindings are compatible with sora-editor's `language-treesitter` module.
 
-The `include/tree_sitter/parser.h` is shared by all parsers.
-Download from: https://github.com/tree-sitter/tree-sitter
+## Source
+
+- Tree-sitter core: https://github.com/tree-sitter/tree-sitter
+- Tree-sitter C++: https://github.com/tree-sitter/tree-sitter-cpp

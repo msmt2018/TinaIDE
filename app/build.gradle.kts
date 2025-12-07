@@ -133,7 +133,8 @@ dependencies {
     implementation(project(":sora-editor:language-treesitter"))
 
     // Tree-sitter runtime + language grammars
-    implementation(libs.tree.sitter.cpp)
+    // Note: AndroidIDE tree-sitter dependency removed - using custom implementation
+    // implementation(libs.tree.sitter.cpp)
 
     implementation(project(":treeview"))
 

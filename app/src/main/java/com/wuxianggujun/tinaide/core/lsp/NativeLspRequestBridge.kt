@@ -1,145 +1,217 @@
 package com.wuxianggujun.tinaide.core.lsp
 
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import com.wuxianggujun.tinaide.lsp.NativeLspService
 import com.wuxianggujun.tinaide.lsp.model.CompletionResult
 import com.wuxianggujun.tinaide.lsp.model.HoverResult
 import com.wuxianggujun.tinaide.lsp.model.Location
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 面向编辑器的 Native LSP 请求桥接层。
- *
- * 当前支持 Hover / Definition / References 三种请求，并在内部确保
- * NativeLspService 已初始化、请求串行化以及取消后释放资源。
+ * Native LSP 请求调度桥接层：
+ * - 同一文件复用单个调度通道，串行发送 Hover / Completion，避免 clangd 同时处理两种请求。
+ * - Completion 拥有更高优先级，Hover 仅在光标真正移动后才触发。
  */
 object NativeLspRequestBridge {
 
     private const val TAG = "NativeLspRequestBridge"
+    private const val MIN_HOVER_INTERVAL_MS = 120L
+    private const val HOVER_COMPLETION_SUPPRESS_MS = 800L
+    private const val HOVER_RPC_TIMEOUT_MS = 350L
+    private const val COMPLETION_RPC_TIMEOUT_MS = 1200L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val requestChannels = ConcurrentHashMap<String, FileRequestChannel>()
+    private val hoverLimiter = HoverRateLimiter(MIN_HOVER_INTERVAL_MS)
+    private val completionActivity = ConcurrentHashMap<String, AtomicLong>()
+    private val definitionJobs = ConcurrentHashMap<String, Job>()
+    private val referenceJobs = ConcurrentHashMap<String, Job>()
 
-    private class RequestTask<T>(
-        private val label: String,
+    private sealed class RequestType<T>(val label: String, val priority: Int) {
+        object Hover : RequestType<HoverResult?>("Hover", priority = 1)
+        object Completion : RequestType<CompletionResult?>("Completion", priority = 2)
+    }
+
+    private class MethodTask<T>(
+        val type: RequestType<T>,
         val identity: String,
-        private val block: suspend () -> T?
+        private val label: String,
+        val priority: Int,
+        val sequence: Long,
+        private val block: suspend () -> T?,
+        initialCallback: (T?) -> Unit
     ) {
-        private val callbacks = mutableListOf<(T?) -> Unit>()
+        private val callbacks = mutableListOf(initialCallback)
 
-        @Synchronized
+        fun matches(otherType: RequestType<*>, otherIdentity: String): Boolean {
+            return type == otherType && identity == otherIdentity
+        }
+
         fun addCallback(callback: (T?) -> Unit) {
             callbacks.add(callback)
-        }
-
-        @Synchronized
-        private fun snapshotCallbacks(): List<(T?) -> Unit> {
-            return callbacks.toList().also { callbacks.clear() }
-        }
-
-        suspend fun run() {
-            val result = try {
-                block()
-            } catch (cancelled: CancellationException) {
-                Log.d(TAG, "$label request cancelled during execution identity=$identity")
-                null
-            } catch (t: Throwable) {
-                Log.e(TAG, "$label request failed identity=$identity", t)
-                null
-            }
-            val callbacks = snapshotCallbacks()
-            withContext(Dispatchers.Main) {
-                callbacks.forEach { callback -> runCatching { callback(result) } }
-            }
         }
 
         fun markSkipped() {
             Log.d(TAG, "$label request skipped identity=$identity")
         }
+
+        private fun snapshotCallbacks(): List<(T?) -> Unit> {
+            return callbacks.toList().also { callbacks.clear() }
+        }
+
+        suspend fun run() {
+            val result = runCatching { block() }
+                .onFailure { error ->
+                    Log.e(TAG, "$label request failed identity=$identity", error)
+                }
+                .getOrNull()
+            val snapshot = snapshotCallbacks()
+            withContext(Dispatchers.Main) {
+                snapshot.forEach { callback -> runCatching { callback(result) } }
+            }
+        }
     }
 
-    private class RequestWorker<T>(
-        private val label: String,
+    private class FileRequestChannel(
+        private val key: String,
         private val scope: CoroutineScope,
-        private val onIdle: (RequestWorker<T>) -> Unit
+        private val onIdle: (String, FileRequestChannel) -> Unit
     ) {
         private var job: Job? = null
-        private var currentTask: RequestTask<T>? = null
-        private var pendingTask: RequestTask<T>? = null
+        private var currentTask: MethodTask<*>? = null
+        private val pendingTasks = HashMap<RequestType<*>, MethodTask<*>>()
+        private val sequence = AtomicLong(0)
 
-        fun submit(identity: String, block: suspend () -> T?, callback: (T?) -> Unit) {
-            var replacedTask: RequestTask<T>? = null
+        fun cancelPending(type: RequestType<*>) {
+            val removed = synchronized(this) {
+                pendingTasks.remove(type)
+            }
+            removed?.markSkipped()
+        }
+
+        fun <T> submit(
+            type: RequestType<T>,
+            identity: String,
+            block: suspend () -> T?,
+            callback: (T?) -> Unit
+        ) {
+            var replacedTask: MethodTask<*>? = null
+            var appended = false
             var needsStart = false
+
             synchronized(this) {
                 when {
-                    currentTask?.identity == identity -> {
-                        Log.d(TAG, "$label request deduped (running) identity=$identity")
-                        currentTask?.addCallback(callback)
-                        return
+                    currentTask?.matches(type, identity) == true -> {
+                        @Suppress("UNCHECKED_CAST")
+                        (currentTask as MethodTask<T>).addCallback(callback)
+                        appended = true
                     }
-                    pendingTask?.identity == identity -> {
-                        Log.d(TAG, "$label request deduped (pending) identity=$identity")
-                        pendingTask?.addCallback(callback)
-                        return
+                    pendingTasks[type]?.identity == identity -> {
+                        @Suppress("UNCHECKED_CAST")
+                        (pendingTasks[type] as MethodTask<T>).addCallback(callback)
+                        appended = true
                     }
                     else -> {
-                        val newTask = RequestTask(label, identity, block).apply {
-                            addCallback(callback)
-                        }
-                        replacedTask = pendingTask
-                        pendingTask = newTask
+                        val task = MethodTask(
+                            type = type,
+                            identity = identity,
+                            label = type.label,
+                            priority = type.priority,
+                            sequence = sequence.incrementAndGet(),
+                            block = block,
+                            initialCallback = callback
+                        )
+                        replacedTask = pendingTasks.put(type, task)
                         if (job == null) {
                             needsStart = true
                         }
                     }
                 }
             }
+
+            if (appended) {
+                return
+            }
             replacedTask?.markSkipped()
             if (needsStart) {
-                synchronized(this) {
-                    if (job == null) {
-                        job = scope.launch { runLoop() }
-                    }
+                startLoop()
+            }
+        }
+
+        private fun startLoop() {
+            synchronized(this) {
+                if (job == null) {
+                    job = scope.launch { runLoop() }
                 }
+            }
+        }
+
+        fun hasActiveOrPending(type: RequestType<*>): Boolean {
+            synchronized(this) {
+                if (currentTask?.type == type) {
+                    return true
+                }
+                return pendingTasks.containsKey(type)
             }
         }
 
         private suspend fun runLoop() {
             while (true) {
-                val (task, shouldStop) = synchronized(this) {
-                    val next = pendingTask
-                    if (next == null) {
+                val next = synchronized(this) {
+                    val candidate = pendingTasks.values.maxWithOrNull(TASK_COMPARATOR)
+                    if (candidate == null) {
                         currentTask = null
                         job = null
-                        null to true
+                        null
                     } else {
-                        pendingTask = null
-                        currentTask = next
-                        next to false
+                        pendingTasks.remove(candidate.type)
+                        currentTask = candidate
+                        candidate
                     }
+                } ?: break
+                next.run()
+            }
+            onIdle(key, this)
+        }
+
+        companion object {
+            private val TASK_COMPARATOR = Comparator<MethodTask<*>> { a, b ->
+                when {
+                    a.priority != b.priority -> b.priority - a.priority
+                    a.sequence == b.sequence -> 0
+                    a.sequence < b.sequence -> 1
+                    else -> -1
                 }
-                if (shouldStop) {
-                    onIdle(this)
-                    return
-                }
-                task?.run()
             }
         }
     }
 
-    private val hoverWorkers =
-        ConcurrentHashMap<String, RequestWorker<HoverResult?>>()
-    private val completionWorkers =
-        ConcurrentHashMap<String, RequestWorker<CompletionResult?>>()
-    private val definitionJobs = ConcurrentHashMap<String, Job>()
-    private val referenceJobs = ConcurrentHashMap<String, Job>()
+    private class HoverRateLimiter(private val minIntervalMs: Long) {
+        private data class HoverState(var signature: String, var timestamp: Long)
+
+        private val states = ConcurrentHashMap<String, HoverState>()
+
+        fun shouldAllow(key: String, caretSignature: String): Boolean {
+            val now = SystemClock.elapsedRealtime()
+            val state = states[key]
+            if (state == null || state.signature != caretSignature || now - state.timestamp >= minIntervalMs) {
+                states[key] = HoverState(caretSignature, now)
+                return true
+            }
+            return false
+        }
+    }
 
     fun requestHover(
         filePath: String,
@@ -149,14 +221,25 @@ object NativeLspRequestBridge {
         onResult: (HoverResult?) -> Unit
     ) {
         val fileUri = buildUri(filePath)
-        submitRequest(
-            workers = hoverWorkers,
-            key = fileUri,
-            label = "Hover",
-            identity = buildIdentity(filePath, line, column),
+        if (shouldSuppressHover(fileUri)) {
+            Log.d(TAG, "Hover suppressed due to pending completion key=$fileUri")
+            return
+        }
+        val identity = buildIdentity(filePath, line, column)
+        val caretSignature = buildCaretSignature(line, column)
+        if (!hoverLimiter.shouldAllow(fileUri, caretSignature)) {
+            Log.d(TAG, "Hover throttled key=$fileUri caret=$caretSignature")
+            return
+        }
+        submitToChannel(
+            fileUri = fileUri,
+            type = RequestType.Hover,
+            identity = identity,
             blockProvider = {
-                if (!ensureNativeClient(workDir)) return@submitRequest null
-                NativeLspService.requestHoverAsync(fileUri, line, column)
+                if (!ensureNativeClient(workDir)) return@submitToChannel null
+                withTimeoutOrNull(HOVER_RPC_TIMEOUT_MS) {
+                    NativeLspService.requestHoverAsync(fileUri, line, column)
+                }
             },
             onResult = onResult
         )
@@ -170,17 +253,23 @@ object NativeLspRequestBridge {
         onResult: (CompletionResult?) -> Unit
     ) {
         val fileUri = buildUri(filePath)
-        submitRequest(
-            workers = completionWorkers,
-            key = fileUri,
-            label = "Completion",
+        markCompletionActivity(fileUri)
+        submitToChannel(
+            fileUri = fileUri,
+            type = RequestType.Completion,
             identity = buildIdentity(filePath, line, column),
             blockProvider = {
-                if (!ensureNativeClient(workDir)) return@submitRequest null
+                if (!ensureNativeClient(workDir)) return@submitToChannel null
                 NativeLspDocumentBridge.flushPendingSync(filePath)
-                NativeLspService.requestCompletionAsync(fileUri, line, column)
+                withTimeoutOrNull(COMPLETION_RPC_TIMEOUT_MS) {
+                    NativeLspService.requestCompletionAsync(fileUri, line, column)
+                } ?: run {
+                    Log.w(TAG, "Completion request hit ${COMPLETION_RPC_TIMEOUT_MS}ms timeout uri=$fileUri pos=$line:$column")
+                    null
+                }
             },
-            onResult = onResult
+            onResult = onResult,
+            dropPendingHover = true
         )
     }
 
@@ -232,28 +321,51 @@ object NativeLspRequestBridge {
 
     private fun buildUri(filePath: String): String = Uri.fromFile(File(filePath)).toString()
 
-    private fun buildKey(fileUri: String, line: Int, column: Int): String =
-        "$fileUri:$line:$column"
+    private fun buildKey(fileUri: String, line: Int, column: Int): String = "$fileUri:$line:$column"
+
+    private fun buildCaretSignature(line: Int, column: Int): String = "$line:$column"
 
     private fun buildIdentity(filePath: String, line: Int, column: Int): String {
         val version = NativeLspDocumentBridge.currentVersion(filePath) ?: -1
         return "$line:$column:$version"
     }
 
-    private fun <T> submitRequest(
-        workers: ConcurrentHashMap<String, RequestWorker<T>>,
-        key: String,
-        label: String,
+    private fun shouldSuppressHover(fileUri: String): Boolean {
+        val channel = requestChannels[fileUri]
+        val hasCompletionInFlight = channel?.hasActiveOrPending(RequestType.Completion) == true
+        if (hasCompletionInFlight) {
+            return true
+        }
+        val lastActivity = completionActivity[fileUri]?.get() ?: 0L
+        if (lastActivity == 0L) {
+            return false
+        }
+        val now = SystemClock.elapsedRealtime()
+        return now - lastActivity < HOVER_COMPLETION_SUPPRESS_MS
+    }
+
+    private fun markCompletionActivity(fileUri: String) {
+        val now = SystemClock.elapsedRealtime()
+        completionActivity.computeIfAbsent(fileUri) { AtomicLong(now) }.set(now)
+    }
+
+    private fun <T> submitToChannel(
+        fileUri: String,
+        type: RequestType<T>,
         identity: String,
         blockProvider: suspend () -> T?,
-        onResult: (T?) -> Unit
+        onResult: (T?) -> Unit,
+        dropPendingHover: Boolean = false
     ) {
-        val worker = workers.computeIfAbsent(key) {
-            RequestWorker(label, scope) { finished ->
-                workers.remove(key, finished)
+        val channel = requestChannels.computeIfAbsent(fileUri) { key ->
+            FileRequestChannel(key, scope) { releasedKey, worker ->
+                requestChannels.remove(releasedKey, worker)
             }
         }
-        worker.submit(identity, blockProvider, onResult)
+        if (dropPendingHover) {
+            channel.cancelPending(RequestType.Hover)
+        }
+        channel.submit(type, identity, blockProvider, onResult)
     }
 
     private fun <T> launchRequest(
