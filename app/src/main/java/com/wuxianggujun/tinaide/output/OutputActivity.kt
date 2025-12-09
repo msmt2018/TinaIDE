@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.output
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -27,6 +28,7 @@ class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)  // BaseActivity 已处理主题和状态栏
+        OutputManager.notifyOutputActivityStarted()
         
         val toolbar = binding.toolbar
         setSupportActionBar(toolbar)
@@ -37,9 +39,20 @@ class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding
         
         // 获取输出管理器
         outputManager = ServiceLocator.get<IOutputManager>()
-        
-        // 监听新的输出（活动每次打开从空白开始）
+        // 初始化已有输出内容
+        loadExistingOutput()
+        // 监听新的输出
         outputManager.addOutputListener(this)
+    }
+
+    /**
+     * 当使用 singleTop 复用已有实例时调用
+     * 刷新输出内容以显示最新数据
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // 重新加载最新的输出内容
+        loadExistingOutput()
     }
     
     private fun setupEditor() {
@@ -70,6 +83,19 @@ class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding
             
             // 禁用自动补全（Sora Editor 新版本可能不需要此属性）
             // isAutoCompletionEnabled = false
+        }
+    }
+    
+    private fun loadExistingOutput() {
+        val existing = outputManager.getOutput(IOutputManager.OutputChannel.RUN)
+        outputEditor.setText(existing)
+        if (existing.isNotEmpty()) {
+            outputEditor.post {
+                val content = outputEditor.text
+                val lastLine = content.lineCount - 1
+                val lastColumn = if (lastLine >= 0) content.getColumnCount(lastLine) else 0
+                outputEditor.setSelection(maxOf(lastLine, 0), maxOf(lastColumn, 0))
+            }
         }
     }
     
@@ -125,5 +151,6 @@ class OutputActivity : BaseActivity<ActivityOutputBinding>(ActivityOutputBinding
     override fun onDestroy() {
         super.onDestroy()
         outputManager.removeOutputListener(this)
+        OutputManager.notifyOutputActivityDestroyed()
     }
 }

@@ -6,22 +6,18 @@ import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.config.ConfigKeys
 import com.wuxianggujun.tinaide.core.get
-import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.EnumMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 输出管理器实现
  */
 class OutputManager(private val context: Context) : IOutputManager {
-    
-    private fun getOutputFile(channel: IOutputManager.OutputChannel): File {
-        val fileName = when (channel) {
-            IOutputManager.OutputChannel.RUN -> "run_output.log"
-            IOutputManager.OutputChannel.BUILD -> "build_output.log"
-        }
-        return File(context.cacheDir, fileName)
-    }
-    private val maxOutputSizeBytes: Long = 1024L * 1024L // 1MB
+
+    private val bufferLock = Any()
+    private val channelBuffers = EnumMap<IOutputManager.OutputChannel, StringBuilder>(IOutputManager.OutputChannel::class.java)
+    private val maxBufferChars = 1024 * 1024 // 1MB 级别的字符数
     private val listeners = CopyOnWriteArrayList<IOutputManager.OutputListener>()
     private var outputMode = IOutputManager.OutputMode.ACTIVITY
     
@@ -37,56 +33,27 @@ class OutputManager(private val context: Context) : IOutputManager {
     }
     
     override fun appendOutput(text: String, channel: IOutputManager.OutputChannel) {
-        val outputFile = getOutputFile(channel)
-        try {
-            if (!outputFile.exists()) {
-                outputFile.parentFile?.mkdirs()
-                outputFile.createNewFile()
+        synchronized(bufferLock) {
+            val buffer = channelBuffers.getOrPut(channel) { StringBuilder() }
+            buffer.append(text)
+            if (buffer.length > maxBufferChars) {
+                val keepStart = buffer.length - maxBufferChars / 2
+                buffer.delete(0, maxOf(0, keepStart))
             }
-            outputFile.appendText(text)
-            // 控制输出文件大小，超过上限时截断为后 50%
-            if (outputFile.length() > maxOutputSizeBytes) {
-                trimOutputFile(outputFile)
-            }
-        } catch (_: Throwable) {
-            // 忽略文件写入错误，仍然通知监听器
         }
         listeners.forEach { it.onOutputAppended(text, channel) }
     }
     
     override fun clearOutput(channel: IOutputManager.OutputChannel) {
-        val outputFile = getOutputFile(channel)
-        try {
-            if (outputFile.exists()) {
-                outputFile.writeText("")
-            }
-        } catch (_: Throwable) {
-            // 忽略清理错误
+        synchronized(bufferLock) {
+            channelBuffers[channel]?.setLength(0)
         }
         listeners.forEach { it.onOutputCleared(channel) }
     }
     
     override fun getOutput(channel: IOutputManager.OutputChannel): String {
-        val outputFile = getOutputFile(channel)
-        return try {
-            if (!outputFile.exists()) "" else outputFile.readText()
-        } catch (_: Throwable) {
-            ""
-        }
-    }
-
-    /**
-     * 截断输出文件，只保留后 50% 内容
-     */
-    private fun trimOutputFile(outputFile: File) {
-        try {
-            if (!outputFile.exists()) return
-            val lines = outputFile.readLines()
-            if (lines.isEmpty()) return
-            val keep = lines.takeLast(lines.size / 2)
-            outputFile.writeText(keep.joinToString("\n"))
-        } catch (_: Throwable) {
-            // 忽略截断错误，保持现状
+        synchronized(bufferLock) {
+            return channelBuffers[channel]?.toString() ?: ""
         }
     }
     
@@ -107,17 +74,34 @@ class OutputManager(private val context: Context) : IOutputManager {
     
     override fun showOutput() {
         when (outputMode) {
-            IOutputManager.OutputMode.ACTIVITY -> {
-                // 启动独立的输出Activity
-                val intent = Intent(context, OutputActivity::class.java)
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
+            IOutputManager.OutputMode.ACTIVITY -> launchOutputActivity()
             IOutputManager.OutputMode.BOTTOM_PANEL -> {
-                // 底部面板模式由MainActivity自己处理
-                // 这里不需要做什么，MainActivity会监听输出变化
+                // 由底部面板自行消费
             }
         }
+    }
+
+    private fun launchOutputActivity() {
+        val intent = Intent(context, OutputActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+            )
+        }
+
+        if (OutputActivityVisibilityTracker.isVisible()) {
+            // Activity 已经在前台，仅需 bringToFront
+            context.startActivity(intent)
+            return
+        }
+
+        if (!OutputActivityVisibilityTracker.tryLaunch()) {
+            // 已经有一次启动在途，忽略本次请求避免重复创建
+            return
+        }
+
+        context.startActivity(intent)
     }
     
     override fun addOutputListener(listener: IOutputManager.OutputListener) {
@@ -141,5 +125,32 @@ class OutputManager(private val context: Context) : IOutputManager {
         fun appendLog(level: LogLevel, message: String) {
             logTextView?.appendLog(level, message)
         }
+
+        internal fun notifyOutputActivityStarted() {
+            OutputActivityVisibilityTracker.onActivityStarted()
+        }
+
+        internal fun notifyOutputActivityDestroyed() {
+            OutputActivityVisibilityTracker.onActivityDestroyed()
+        }
+    }
+}
+
+private object OutputActivityVisibilityTracker {
+    private val visible = AtomicBoolean(false)
+    private val launchInFlight = AtomicBoolean(false)
+
+    fun tryLaunch(): Boolean = launchInFlight.compareAndSet(false, true)
+
+    fun isVisible(): Boolean = visible.get()
+
+    fun onActivityStarted() {
+        visible.set(true)
+        launchInFlight.set(false)
+    }
+
+    fun onActivityDestroyed() {
+        visible.set(false)
+        launchInFlight.set(false)
     }
 }
