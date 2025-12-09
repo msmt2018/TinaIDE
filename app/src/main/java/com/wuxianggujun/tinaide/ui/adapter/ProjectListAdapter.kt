@@ -9,7 +9,8 @@ import com.wuxianggujun.tinaide.R
 import java.io.File
 
 class ProjectListAdapter(
-    private val onClick: (File) -> Unit
+    private val onClick: (File) -> Unit,
+    private val onLongClick: (File) -> Unit
 ) : RecyclerView.Adapter<ProjectListAdapter.VH>() {
 
     private val items = mutableListOf<File>()
@@ -21,7 +22,7 @@ class ProjectListAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_project, parent, false)
+        val v = LayoutInflater.from(parent.context).inflate(R.layout.project_item, parent, false)
         return VH(v)
     }
 
@@ -32,13 +33,12 @@ class ProjectListAdapter(
     override fun getItemCount(): Int = items.size
 
     inner class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvName: TextView = itemView.findViewById(R.id.tv_name)
-        private val tvPath: TextView = itemView.findViewById(R.id.tv_path)
+        private val titleView: TextView = itemView.findViewById(R.id.title)
 
         fun bind(dir: File) {
-            tvName.text = dir.name
-            tvPath.text = dir.absolutePath
+            titleView.text = dir.name
             itemView.setOnClickListener { onClick(dir) }
+            itemView.setOnLongClickListener { onLongClick(dir); true }
         }
     }
 }

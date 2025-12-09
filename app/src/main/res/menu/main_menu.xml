@@ -3,18 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_open_project"
-        android:title="打开项目"
-        android:icon="@android:drawable/ic_menu_view"
-        app:showAsAction="ifRoom|withText" />
-
-
-
-
-    <item
         android:id="@+id/action_build"
-        android:title="编译"
-        android:icon="@android:drawable/ic_menu_upload"
+        android:title="构建"
+        android:icon="@drawable/ic_build"
         app:showAsAction="ifRoom" />
 
     <item
@@ -24,13 +15,16 @@
         app:showAsAction="ifRoom" />
 
     <item
-        android:id="@+id/action_reinstall_termux"
-        android:title="重新安装终端环境"
+        android:id="@+id/action_settings"
+        android:title="设置"
+        android:icon="@drawable/ic_settings"
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/action_open_terminal"
-        android:title="打开终端"
+        android:id="@+id/action_generate_compile_commands"
+        android:title="生成 compile_commands.json"
+        android:icon="@android:drawable/ic_menu_upload"
         app:showAsAction="never" />
+
 
 </menu>

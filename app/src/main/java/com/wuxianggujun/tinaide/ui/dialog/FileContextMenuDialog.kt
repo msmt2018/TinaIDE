@@ -1,11 +1,9 @@
 package com.wuxianggujun.tinaide.ui.dialog
 
-import android.app.AlertDialog
 import android.app.Dialog
 import android.os.Bundle
-import android.widget.EditText
-import android.widget.Toast
 import androidx.fragment.app.DialogFragment
+import com.wuxianggujun.tinaide.extensions.*
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.file.IFileManager
 import java.io.File
@@ -26,13 +24,19 @@ class FileContextMenuDialog(
             arrayOf("重命名", "删除", "复制路径")
         }
         
-        return AlertDialog.Builder(requireContext())
-            .setTitle(file.name)
-            .setItems(items) { _, which ->
-                handleMenuItemClick(which, file.isDirectory)
+        val dialog = ListDialog.newInstance(
+            title = file.name,
+            items = items,
+            onItemClick = { index, _ ->
+                handleMenuItemClick(index, file.isDirectory)
             }
-            .setNegativeButton("取消", null)
-            .create()
+        )
+        
+        // 直接显示 ListDialog
+        dialog.show(parentFragmentManager, "file_context_menu_list")
+        
+        // 返回一个空对话框（不会显示）
+        return super.onCreateDialog(savedInstanceState)
     }
     
     private fun handleMenuItemClick(position: Int, isDirectory: Boolean) {
@@ -57,136 +61,136 @@ class FileContextMenuDialog(
      * 显示新建文件对话框
      */
     private fun showNewFileDialog() {
-        val input = EditText(requireContext())
-        input.hint = "文件名"
+        val ctx = context ?: return
         
-        AlertDialog.Builder(requireContext())
-            .setTitle("新建文件")
-            .setView(input)
-            .setPositiveButton("创建") { _, _ ->
-                val fileName = input.text.toString().trim()
-                if (fileName.isEmpty()) {
-                    Toast.makeText(requireContext(), "文件名不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        val dialog = InputDialog.newInstance(
+            title = "新建文件",
+            hint = "文件名",
+            validator = { input ->
+                when {
+                    input.isEmpty() -> "文件名不能为空"
+                    !input.matches(Regex("[a-zA-Z0-9_.-]+")) -> "文件名包含非法字符"
+                    else -> null
                 }
-                
+            },
+            onConfirm = { fileName ->
                 try {
                     fileManager.createFile(file, fileName)
-                    Toast.makeText(requireContext(), "文件创建成功", Toast.LENGTH_SHORT).show()
+                    ctx.toastSuccess("创建成功")
                     onActionComplete()
                 } catch (e: Exception) {
-                    Toast.makeText(requireContext(), "创建失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    ctx.handleErrorWithToast(e, "创建失败")
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        )
+        dialog.show(parentFragmentManager, "new_file_dialog")
     }
     
     /**
      * 显示新建文件夹对话框
      */
     private fun showNewFolderDialog() {
-        val input = EditText(requireContext())
-        input.hint = "文件夹名"
+        val ctx = context ?: return
         
-        AlertDialog.Builder(requireContext())
-            .setTitle("新建文件夹")
-            .setView(input)
-            .setPositiveButton("创建") { _, _ ->
-                val folderName = input.text.toString().trim()
-                if (folderName.isEmpty()) {
-                    Toast.makeText(requireContext(), "文件夹名不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        val dialog = InputDialog.newInstance(
+            title = "新建文件夹",
+            hint = "文件夹名",
+            validator = { input ->
+                when {
+                    input.isEmpty() -> "文件夹名不能为空"
+                    !input.matches(Regex("[a-zA-Z0-9_.-]+")) -> "文件夹名包含非法字符"
+                    else -> null
                 }
-                
+            },
+            onConfirm = { folderName ->
                 try {
                     fileManager.createDirectory(file, folderName)
-                    Toast.makeText(requireContext(), "文件夹创建成功", Toast.LENGTH_SHORT).show()
+                    ctx.toastSuccess("文件夹创建成功")
                     onActionComplete()
                 } catch (e: Exception) {
-                    Toast.makeText(requireContext(), "创建失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    ctx.handleErrorWithToast(e, "创建失败")
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        )
+        dialog.show(parentFragmentManager, "new_folder_dialog")
     }
     
     /**
      * 显示重命名对话框
      */
     private fun showRenameDialog() {
-        val input = EditText(requireContext())
-        input.setText(file.name)
-        input.selectAll()
+        val ctx = context ?: return
         
-        AlertDialog.Builder(requireContext())
-            .setTitle("重命名")
-            .setView(input)
-            .setPositiveButton("确定") { _, _ ->
-                val newName = input.text.toString().trim()
-                if (newName.isEmpty()) {
-                    Toast.makeText(requireContext(), "名称不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
+        val dialog = InputDialog.newInstance(
+            title = "重命名",
+            hint = "新名称",
+            defaultValue = file.name,
+            validator = { input ->
+                when {
+                    input.isEmpty() -> "名称不能为空"
+                    input == file.name -> "名称未改变"
+                    !input.matches(Regex("[a-zA-Z0-9_.-]+")) -> "名称包含非法字符"
+                    else -> null
                 }
-                
-                if (newName == file.name) {
-                    return@setPositiveButton
-                }
-                
+            },
+            onConfirm = { newName ->
                 try {
                     val success = fileManager.renameFile(file, newName)
                     if (success) {
-                        Toast.makeText(requireContext(), "重命名成功", Toast.LENGTH_SHORT).show()
+                        ctx.toastSuccess("重命名成功")
                         onActionComplete()
                     } else {
-                        Toast.makeText(requireContext(), "重命名失败", Toast.LENGTH_SHORT).show()
+                        ctx.toastError("重命名失败")
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(requireContext(), "重命名失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    ctx.handleErrorWithToast(e, "重命名失败")
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        )
+        dialog.show(parentFragmentManager, "rename_dialog")
     }
     
     /**
      * 显示删除确认对话框
      */
     private fun showDeleteConfirmDialog() {
+        val ctx = context ?: return
         val message = if (file.isDirectory) {
             "确定要删除文件夹 \"${file.name}\" 及其所有内容吗？"
         } else {
             "确定要删除文件 \"${file.name}\" 吗？"
         }
         
-        AlertDialog.Builder(requireContext())
-            .setTitle("确认删除")
-            .setMessage(message)
-            .setPositiveButton("删除") { _, _ ->
+        val dialog = ConfirmDialog.newInstance(
+            title = "确认删除",
+            message = message,
+            positiveText = "删除",
+            onPositive = {
                 try {
                     val success = fileManager.deleteFile(file)
                     if (success) {
-                        Toast.makeText(requireContext(), "删除成功", Toast.LENGTH_SHORT).show()
+                        ctx.toastSuccess("删除成功")
                         onActionComplete()
                     } else {
-                        Toast.makeText(requireContext(), "删除失败", Toast.LENGTH_SHORT).show()
+                        ctx.toastError("删除失败")
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(requireContext(), "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    ctx.handleErrorWithToast(e, "删除失败")
                 }
             }
-            .setNegativeButton("取消", null)
-            .show()
+        )
+        dialog.show(parentFragmentManager, "delete_confirm_dialog")
     }
     
     /**
      * 复制路径到剪贴板
      */
     private fun copyPathToClipboard() {
-        val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) 
+        val ctx = context ?: return
+        val clipboard = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) 
             as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("file_path", file.absolutePath)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(requireContext(), "路径已复制", Toast.LENGTH_SHORT).show()
+        ctx.toastSuccess("路径已复制到剪贴板")
     }
 }

@@ -30,8 +30,10 @@ plugins {
 
 android {
     namespace = "io.github.rosemoe.sora.ts"
+    compileSdk = 34
 
     defaultConfig {
+        minSdk = 21
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -42,11 +44,22 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
 }
 
 dependencies {
-    compileOnly(projects.editor)
-    api(libs.tree.sitter)
+    compileOnly(project(":sora-editor:editor"))
+    // Tree-sitter bindings are now included directly in this module
+    // (com.wuxianggujun.tinaide.treesitter package)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso)

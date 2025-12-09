@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1.6
+# TinaIDE LLVM Build Environment
+# Persistent builder image for incremental LLVM/Clang/LLD builds targeting Android
+
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG NDK_VERSION=r26d
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    git \
+    cmake \
+    ninja-build \
+    python3 \
+    curl \
+    zip \
+    unzip \
+    file \
+    ccache \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+ENV ANDROID_NDK_HOME=/opt/ndk
+ENV PATH=$PATH:${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+# Pre-fetch Android NDK once into the image to avoid re-downloading for every run
+RUN set -eux; \
+    cd /tmp; \
+    curl -fsSL -o ndk.zip "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"; \
+    unzip -q ndk.zip -d /opt; \
+    rm -f ndk.zip; \
+    ndkdir=$(echo /opt/android-ndk-*); \
+    mv "$ndkdir" "$ANDROID_NDK_HOME"; \
+    test -d "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+# Default command keeps container alive for reuse (session mode)
+CMD ["bash", "-lc", "sleep infinity"]
+

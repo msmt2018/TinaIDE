@@ -2,15 +2,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Internet access for downloading bootstrap packages at runtime -->
+    <!-- Internet access -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Storage permissions for managing project files on external storage -->
+    <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
-    <!-- All files access for Android 11+ -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- Android 13+ media permissions（由 XXPermissions 在低版本自动兼容） -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+
+    <!-- Termux required permissions -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".TinaApplication"
@@ -23,7 +34,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TinaIDE"
         android:largeHeap="true"
-        tools:replace="android:allowBackup,android:label,android:supportsRtl,android:theme,android:largeHeap">
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".ui.ProjectManagerActivity"
             android:exported="true">
@@ -35,8 +46,25 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="true" />
-
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".output.OutputActivity"
+            android:exported="false"
+            android:label="编译输出"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false"
+            android:label="设置"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".ui.activity.CrashActivity"
+            android:exported="false"
+            android:label="应用崩溃"
+            android:theme="@style/Theme.TinaIDE"
+            android:process=":crash" />
+        <!-- Termux components declared in library manifest -->
     </application>
 
 </manifest>

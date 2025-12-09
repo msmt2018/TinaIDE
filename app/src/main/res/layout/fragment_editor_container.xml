@@ -15,11 +15,25 @@
         app:tabSelectedTextColor="@android:color/white"
         app:tabIndicatorColor="@android:color/white" />
 
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/view_pager"
+    <!-- 编辑器区域容器 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/view_pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- 使用 ViewStub 延迟加载空状态视图 -->
+        <ViewStub
+            android:id="@+id/empty_stub"
+            android:layout="@layout/view_empty_editor"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
 
     <!-- 编辑器工具栏 - 放在底部 -->
     <HorizontalScrollView
@@ -35,72 +49,143 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:paddingTop="4dp"
             android:paddingBottom="4dp">
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_undo"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:contentDescription="撤销"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_revert" />
+                app:icon="@android:drawable/ic_menu_revert"
+                app:iconTint="?attr/colorOnSurface" />
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_redo"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:contentDescription="重做"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_rotate" />
+                app:icon="@android:drawable/ic_menu_rotate"
+                app:iconTint="?attr/colorOnSurface" />
 
-            <View
+            <com.google.android.material.divider.MaterialDivider
                 android:layout_width="1dp"
-                android:layout_height="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:background="?android:attr/dividerVertical" />
+                android:layout_marginEnd="4dp" />
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_find"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:contentDescription="查找"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_search" />
+                app:icon="@android:drawable/ic_menu_search"
+                app:iconTint="?attr/colorOnSurface" />
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_goto_line"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:contentDescription="跳转到行"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_directions" />
+                app:icon="@android:drawable/ic_menu_directions"
+                app:iconTint="?attr/colorOnSurface" />
 
-            <View
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_native_definition"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="Native 跳转定义"
+                app:icon="@android:drawable/ic_menu_compass"
+                app:iconTint="?attr/colorOnSurface" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_native_references"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="Native 引用列表"
+                app:icon="@android:drawable/ic_menu_myplaces"
+                app:iconTint="?attr/colorOnSurface" />
+
+            <com.google.android.material.divider.MaterialDivider
                 android:layout_width="1dp"
-                android:layout_height="match_parent"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
                 android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:background="?android:attr/dividerVertical" />
+                android:layout_marginEnd="4dp" />
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_save"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:contentDescription="保存"
-                android:padding="6dp"
-                android:src="@android:drawable/ic_menu_save" />
+                app:icon="@android:drawable/ic_menu_save"
+                app:iconTint="?attr/colorOnSurface" />
 
         </LinearLayout>
 
     </HorizontalScrollView>
+
+    <LinearLayout
+        android:id="@+id/navigation_results_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/navigation_results_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:textColor="?attr/colorOnSurface"
+                android:text="@string/native_definition_results" />
+
+            <TextView
+                android:id="@+id/navigation_results_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:text="0" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_navigation_results_close"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@string/native_navigation_close"
+                app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                app:iconTint="?attr/colorOnSurface" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/navigation_results_list"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="8dp"
+            android:clipToPadding="false" />
+
+    </LinearLayout>
 
 </LinearLayout>

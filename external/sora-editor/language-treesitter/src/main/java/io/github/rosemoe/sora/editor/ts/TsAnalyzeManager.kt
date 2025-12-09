@@ -27,12 +27,12 @@ package io.github.rosemoe.sora.editor.ts
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
-import com.itsaky.androidide.treesitter.TSInputEdit
-import com.itsaky.androidide.treesitter.TSParser
-import com.itsaky.androidide.treesitter.TSQueryCursor
-import com.itsaky.androidide.treesitter.TSTree
-import com.itsaky.androidide.treesitter.string.UTF16String
-import com.itsaky.androidide.treesitter.string.UTF16StringFactory
+import com.wuxianggujun.tinaide.treesitter.TSInputEdit
+import com.wuxianggujun.tinaide.treesitter.TSParser
+import com.wuxianggujun.tinaide.treesitter.TSQueryCursor
+import com.wuxianggujun.tinaide.treesitter.TSTree
+import com.wuxianggujun.tinaide.treesitter.UTF16String
+import com.wuxianggujun.tinaide.treesitter.UTF16StringFactory
 import io.github.rosemoe.sora.data.ObjectAllocator
 import io.github.rosemoe.sora.editor.ts.spans.DefaultSpanFactory
 import io.github.rosemoe.sora.editor.ts.spans.TsSpanFactory
@@ -209,6 +209,7 @@ open class TsAnalyzeManager(val languageSpec: TsLanguageSpec, var theme: TsTheme
             }
             val blocks = mutableListOf<CodeBlock>()
             TSQueryCursor.create().use {
+                it.setAllowChangedNodes(true)
                 it.exec(languageSpec.blocksQuery, tree!!.rootNode)
                 var match = it.nextMatch()
                 while (match != null) {

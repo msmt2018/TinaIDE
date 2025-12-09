@@ -24,7 +24,7 @@
 
 package io.github.rosemoe.sora.editor.ts
 
-import com.itsaky.androidide.treesitter.TSQueryCursor
+import com.wuxianggujun.tinaide.treesitter.TSQueryCursor
 import io.github.rosemoe.sora.lang.brackets.BracketsProvider
 import io.github.rosemoe.sora.lang.brackets.PairedBracket
 import io.github.rosemoe.sora.text.Content
@@ -45,6 +45,7 @@ class TsBracketPairs(
     override fun getPairedBracketAt(text: Content, index: Int): PairedBracket? {
         if (languageSpec.bracketsQuery.canAccess() && languageSpec.bracketsQuery.patternCount > 0) {
             TSQueryCursor.create().use { cursor ->
+                cursor.setAllowChangedNodes(true)
                 cursor.setByteRange(max(0, index - 1) * 2, index * 2 + 1)
 
                 return safeTree.accessTree { tree ->

@@ -1,11 +1,73 @@
 <resources>
-    <string name="app_name">TinaIDE</string>
-    <string name="title_project_manager">项目管理</string>
-    <string name="menu_new_project">新建项目</string>
-    <string name="menu_choose_dir">选择目录</string>
-    <string name="menu_refresh">刷新</string>
-    <string name="btn_choose_directory">选择目录</string>
-    <string name="permission_not_all_granted">部分权限未授予，可能影响功能使用</string>
-    <string name="permission_denied_never_ask">权限被永久拒绝，请在设置中手动开启</string>
-    <string name="permission_denied">权限被拒绝</string>
+  <string name="app_name">TinaIDE</string>
+  <string name="title_project_manager">项目管理</string>
+  <string name="menu_new_project">新建项目</string>
+  <string name="menu_choose_dir">选择目录</string>
+  <string name="menu_refresh">刷新</string>
+  <string name="menu_settings">设置</string>
+  <string name="btn_choose_directory">选择目录</string>
+  <string name="permission_not_all_granted">部分权限未授予，可能影响功能使用</string>
+  <string name="permission_denied_never_ask">权限被永久拒绝，请在设置中手动开启</string>
+  <string name="permission_denied">权限被拒绝</string>
+  <string name="empty_projects_hint">当前没有项目，请从右上角菜单新建或选择目录</string>
+  <string name="editor_empty_hint">点击左侧文件树打开文件开始编辑</string>
+  <string name="empty_editor">空编辑器</string>
+
+  <!-- New Project Dialog -->
+  <string name="dialog_title_new_project">新建项目</string>
+  <string name="dialog_title_open_project">打开项目</string>
+  <string name="hint_project_name">项目名称</string>
+  <string name="hint_project_path">项目路径</string>
+  <string name="hint_project_type">项目类型</string>
+  <string name="hint_project_description">项目描述（可选）</string>
+  <string name="btn_create">创建</string>
+  <string name="btn_cancel">取消</string>
+  <string name="btn_browse">浏览…</string>
+  <string name="error_project_name_empty">项目名称不能为空</string>
+  <string name="error_project_name_invalid_chars">项目名称只能包含英文字母、数字、下划线和连字符</string>
+  <string name="error_project_path_empty">项目路径不能为空</string>
+  <string name="error_project_exists">项目已存在</string>
+  <string name="error_create_project_dir">创建项目目录失败</string>
+  <string name="error_template_failed">模板生成失败</string>
+  <string name="success_project_created">项目创建成功</string>
+  <string name="no_projects">暂无项目</string>
+
+  <!-- Project manager / main screen strings -->
+  <string name="project_manager_alpha_notice_title">Alpha 版本公告</string>
+  <string name="project_manager_alpha_notice">TinaIDE 仍处于 Alpha 阶段，可能存在崩溃、Bug 和未完成的功能；欢迎在 Issue 区反馈问题和建议。</string>
+  <string name="project_manager_projects">项目</string>
+  <string name="project_manager_empty_title">还没有项目</string>
+  <string name="project_manager_empty_subtitle">点击右下角 + 按钮即可快速创建你的第一个项目</string>
+
+  <!-- Settings root titles & descriptions（对齐 CodeAssist 风格） -->
+  <string name="settings_title_editor">编辑器</string>
+  <string name="settings_desc_editor">字体、Tab、换行等编辑器行为</string>
+
+  <string name="settings_title_compiler">编译器</string>
+  <string name="settings_desc_compiler">优化级别、目标架构等</string>
+
+  <string name="settings_title_project">项目</string>
+  <string name="settings_desc_project">默认项目路径、自动保存等</string>
+
+  <string name="settings_title_appearance">外观</string>
+  <string name="settings_desc_appearance">应用主题、沉浸式状态栏</string>
+
+  <string name="settings_title_about">关于</string>
+  <string name="settings_desc_about">版本信息、GitHub、开源许可</string>
+
+  <!-- Settings categories -->
+  <string name="settings_cat_editor_display">显示</string>
+  <string name="settings_cat_editor_behavior">编辑行为</string>
+  <string name="settings_cat_compiler_options">编译选项</string>
+  <string name="settings_cat_compiler_debug_perf">调试与性能</string>
+  <string name="settings_cat_lsp">语言服务器</string>
+  <string name="settings_completion_limit_title">补全候选上限</string>
+  <string name="settings_completion_limit_summary">限制 clangd 每次返回的候选数量。值越大越耗资源，修改后需重新初始化 LSP 生效。</string>
+  <string name="settings_completion_limit_summary_with_value">当前上限：%1$d 项</string>
+
+  <!-- Native LSP UI -->
+  <string name="native_definition_results">Native 定义列表</string>
+  <string name="native_references_results">Native 引用列表</string>
+  <string name="native_navigation_close">收起结果面板</string>
+  <string name="native_navigation_empty">没有可展示的跳转结果</string>
 </resources>

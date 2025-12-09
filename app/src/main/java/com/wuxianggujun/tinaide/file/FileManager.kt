@@ -1,12 +1,15 @@
 package com.wuxianggujun.tinaide.file
 
 import android.content.Context
+import android.os.Build
 import android.os.FileObserver
 import android.util.Log
 import com.wuxianggujun.tinaide.core.ServiceLifecycle
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.config.IConfigManager
+import com.wuxianggujun.tinaide.core.config.ConfigKeys
 import com.wuxianggujun.tinaide.core.get
+import com.wuxianggujun.tinaide.ui.BottomLogBuffer
 import java.io.File
 
 /**
@@ -15,8 +18,6 @@ import java.io.File
 class FileManager(private val context: Context) : IFileManager, ServiceLifecycle {
     companion object {
         private const val TAG = "FileManager"
-        private const val KEY_CURRENT_PROJECT = "file.current_project"
-        private const val KEY_RECENT_FILES = "file.recent_files"
         private const val MAX_RECENT_FILES = 10
     }
 
@@ -43,8 +44,12 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
         require(projectDir.exists() && projectDir.isDirectory) { "Invalid project path: $path" }
 
         closeProject()
+        
+        // 切换项目时开始新的日志会话
+        BottomLogBuffer.startNewSession(projectDir.name)
 
-        val files = collectFiles(projectDir)
+        // 避免在主线程递归扫描整个项目目录，先仅加载顶层文件，文件树按需懒加载
+        val files = projectDir.listFiles()?.toList() ?: emptyList()
         val project = Project(
             name = projectDir.name,
             rootPath = projectDir.absolutePath,
@@ -52,7 +57,7 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
         )
         currentProject = project
 
-        configManager.set(KEY_CURRENT_PROJECT, path)
+        configManager.set(ConfigKeys.CurrentProject, path)
 
         addFileWatcher(path, object : FileChangeListener {
             override fun onFileCreated(file: File) { Log.d(TAG, "File created: ${file.absolutePath}") }
@@ -67,19 +72,20 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
         currentProject?.let { project ->
             removeFileWatcher(project.rootPath)
             currentProject = null
-            configManager.remove(KEY_CURRENT_PROJECT)
+            configManager.remove(ConfigKeys.CurrentProject.key)
         }
     }
 
     override fun getCurrentProject(): Project? {
         if (currentProject == null) {
             try {
-                val lastPath = configManager.get(KEY_CURRENT_PROJECT, "")
+                val lastPath = configManager.get(ConfigKeys.CurrentProject)
                 if (lastPath.isNotEmpty()) {
                     val dir = File(lastPath)
                     if (dir.exists() && dir.isDirectory) {
-                        val files = collectFiles(dir)
-                        currentProject = Project(dir.name, dir.absolutePath, files)
+                        // 恢复时同样避免深度遍历
+                        val top = dir.listFiles()?.toList() ?: emptyList()
+                        currentProject = Project(dir.name, dir.absolutePath, top)
                         if (!fileWatchers.containsKey(dir.absolutePath)) {
                             addFileWatcher(dir.absolutePath, object : FileChangeListener {
                                 override fun onFileCreated(file: File) { Log.d(TAG, "File created: ${file.absolutePath}") }
@@ -182,22 +188,49 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
     override fun addFileWatcher(path: String, listener: FileChangeListener) {
         fileListeners.getOrPut(path) { mutableListOf() }.add(listener)
         if (!fileWatchers.containsKey(path)) {
-            val observer = object : FileObserver(path, ALL_EVENTS) {
-                override fun onEvent(event: Int, child: String?) {
-                    val base = File(path)
-                    val file = if (child != null) File(base, child) else base
-                    when (event and ALL_EVENTS) {
-                        CREATE -> notifyFileCreated(file)
-                        MODIFY -> notifyFileModified(file)
-                        DELETE, DELETE_SELF -> notifyFileDeleted(file)
+            val watchDir = File(path)
+            val mask = FileObserver.CREATE or FileObserver.MOVED_TO or FileObserver.MODIFY or
+                FileObserver.CLOSE_WRITE or FileObserver.DELETE or FileObserver.DELETE_SELF or
+                FileObserver.MOVED_FROM
+            val observer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                object : FileObserver(watchDir, mask) {
+                    override fun onEvent(event: Int, child: String?) {
+                        handleFileEvent(watchDir, event, child)
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                object : FileObserver(path, mask) {
+                    override fun onEvent(event: Int, child: String?) {
+                        handleFileEvent(watchDir, event, child)
                     }
                 }
             }
             observer.startWatching()
             fileWatchers[path] = observer
+        } else {
+            // watcher 已存在，只需记录额外 listener
         }
     }
 
+    private fun handleFileEvent(directory: File, event: Int, child: String?) {
+        val file = if (child != null) File(directory, child) else directory
+        try {
+            if ((event and FileObserver.CREATE) != 0 || (event and FileObserver.MOVED_TO) != 0) {
+                notifyFileCreated(file)
+            }
+            if ((event and FileObserver.MODIFY) != 0 || (event and FileObserver.CLOSE_WRITE) != 0) {
+                notifyFileModified(file)
+            }
+            if ((event and FileObserver.DELETE) != 0 || (event and FileObserver.DELETE_SELF) != 0 ||
+                (event and FileObserver.MOVED_FROM) != 0
+            ) {
+                notifyFileDeleted(file)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling file event: $event for $file", e)
+        }
+    }
     override fun removeFileWatcher(path: String) {
         fileWatchers[path]?.let { it.stopWatching() }
         fileWatchers.remove(path)
@@ -252,7 +285,7 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
 
     private fun loadRecentFiles() {
         try {
-            val paths = configManager.get(KEY_RECENT_FILES, "")
+            val paths = configManager.get(ConfigKeys.RecentFiles)
             if (paths.isNotEmpty()) {
                 paths.split(";").forEach { p ->
                     val f = File(p)
@@ -267,10 +300,9 @@ class FileManager(private val context: Context) : IFileManager, ServiceLifecycle
     private fun saveRecentFiles() {
         try {
             val paths = recentFiles.joinToString(";") { it.absolutePath }
-            configManager.set(KEY_RECENT_FILES, paths)
+            configManager.set(ConfigKeys.RecentFiles, paths)
         } catch (e: Exception) {
             Log.e(TAG, "Error saving recent files", e)
         }
     }
 }
-

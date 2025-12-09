@@ -13,8 +13,7 @@ import java.util.UUID
  * 编辑器管理器实现
  */
 class EditorManager(
-    private val context: Context,
-    private val fragmentManager: FragmentManager
+    private val context: Context  // 使用 ApplicationContext，避免内存泄漏
 ) : IEditorManager, ServiceLifecycle {
     
     companion object {

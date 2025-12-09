@@ -1,77 +1,122 @@
 package com.wuxianggujun.tinaide.ui.fragment
 
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import androidx.fragment.app.Fragment
+import android.widget.TextView
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.wuxianggujun.tinaide.R
+import com.wuxianggujun.tinaide.base.BaseBindingFragment
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.get
+import com.wuxianggujun.tinaide.databinding.FragmentEditorContainerBinding
 import com.wuxianggujun.tinaide.editor.EditorTab
 import com.wuxianggujun.tinaide.editor.IEditorManager
+import com.wuxianggujun.tinaide.extensions.*
+import com.wuxianggujun.tinaide.lsp.model.Location
 import com.wuxianggujun.tinaide.ui.adapter.EditorTabAdapter
+import com.wuxianggujun.tinaide.ui.adapter.NativeNavigationResultAdapter
+
+import com.wuxianggujun.tinaide.utils.Logger
 import java.io.File
 
 /**
  * 编辑器容器 Fragment
  * 包含多标签页功能
  */
-class EditorContainerFragment : Fragment() {
-    
+class EditorContainerFragment : BaseBindingFragment<FragmentEditorContainerBinding>(
+    FragmentEditorContainerBinding::inflate
+) {
+
     private lateinit var tabLayout: TabLayout
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: EditorTabAdapter
     private var tabLayoutMediator: TabLayoutMediator? = null
     private lateinit var editorToolbar: View
+    private var emptyView: View? = null  // 改为可空类型，延迟加载
+    private lateinit var navigationPanel: View
+    private lateinit var navigationTitle: TextView
+    private lateinit var navigationCount: TextView
+    private lateinit var navigationAdapter: NativeNavigationResultAdapter
     
-    private val editorManager: IEditorManager by lazy {
-        ServiceLocator.get<IEditorManager>()
-    }
-    
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_editor_container, container, false)
-    }
+    // EditorManager 只管理数据，Fragment 管理由本 Fragment 负责
+    private val editorManager: IEditorManager
+        get() = ServiceLocator.get<IEditorManager>()
     
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
-        tabLayout = view.findViewById(R.id.tab_layout)
-        viewPager = view.findViewById(R.id.view_pager)
-        editorToolbar = view.findViewById(R.id.editor_toolbar)
-        
+
+        tabLayout = binding.tabLayout
+        viewPager = binding.viewPager
+        editorToolbar = binding.editorToolbar
+        setupNavigationPanel()
+        // emptyView 不在这里初始化，延迟到需要时再加载
+
         setupViewPager()
         setupTabLayout()
         setupEditorToolbar()
     }
     
     private fun setupEditorToolbar() {
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_undo)?.setOnClickListener {
+        binding.btnUndo.setOnClickListener {
             getCurrentEditorFragment()?.undo()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_redo)?.setOnClickListener {
+        binding.btnRedo.setOnClickListener {
             getCurrentEditorFragment()?.redo()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_find)?.setOnClickListener {
+        binding.btnFind.setOnClickListener {
             showFindDialog()
         }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_goto_line)?.setOnClickListener {
+        binding.btnGotoLine.setOnClickListener {
             showGotoLineDialog()
         }
+
+        binding.btnNativeDefinition.setOnClickListener {
+            val fragment = getCurrentEditorFragment()
+            if (fragment == null) {
+                requireContext().toastInfo("没有打开的 C/C++ 文件")
+            } else {
+                fragment.openNativeDefinitionPicker()
+            }
+        }
+
+        binding.btnNativeReferences.setOnClickListener {
+            val fragment = getCurrentEditorFragment()
+            if (fragment == null) {
+                requireContext().toastInfo("没有打开的 C/C++ 文件")
+            } else {
+                fragment.openNativeReferencesPicker()
+            }
+        }
         
-        view?.findViewById<android.widget.ImageButton>(R.id.btn_save)?.setOnClickListener {
+        binding.btnSave.setOnClickListener {
             saveCurrentFile()
         }
+    }
+
+    private fun setupNavigationPanel() {
+        navigationPanel = binding.navigationResultsPanel
+        navigationTitle = binding.navigationResultsTitle
+        navigationCount = binding.navigationResultsCount
+        navigationAdapter = NativeNavigationResultAdapter { location ->
+            hideNativeNavigationResults()
+            openLocation(location)
+        }
+        binding.navigationResultsList.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = navigationAdapter
+            addItemDecoration(
+                DividerItemDecoration(context, DividerItemDecoration.VERTICAL)
+            )
+        }
+        binding.btnNavigationResultsClose.setOnClickListener { hideNativeNavigationResults() }
     }
     
     private fun getCurrentEditorFragment(): com.wuxianggujun.tinaide.ui.fragment.EditorFragment? {
@@ -80,44 +125,51 @@ class EditorContainerFragment : Fragment() {
         return tab?.let { adapter.getFragment(it) }
     }
     
+    /**
+     * 在当前编辑器光标位置插入文本
+     */
+    fun insertTextAtCursor(text: String) {
+        val fragment = getCurrentEditorFragment()
+        if (fragment != null) {
+            fragment.insertTextAtCursor(text)
+        }
+    }
+    
     private fun showFindDialog() {
         val fragment = getCurrentEditorFragment()
         if (fragment != null) {
             val dialog = com.wuxianggujun.tinaide.ui.dialog.FindReplaceDialog(fragment.getEditor())
             dialog.show(childFragmentManager, "FindReplace")
         } else {
-            android.widget.Toast.makeText(requireContext(), "没有打开的文件", android.widget.Toast.LENGTH_SHORT).show()
+            requireContext().toastWarning("没有打开的文件")
         }
     }
     
     private fun showGotoLineDialog() {
         val fragment = getCurrentEditorFragment() ?: return
         val editor = fragment.getEditor()
-        
-        val input = android.widget.EditText(requireContext())
-        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        input.hint = "行号"
-        
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("跳转到行")
-            .setView(input)
-            .setPositiveButton("跳转") { _, _ ->
-                val lineStr = input.text.toString()
-                if (lineStr.isNotEmpty()) {
-                    try {
-                        val line = lineStr.toInt() - 1 // 行号从 0 开始
-                        if (line >= 0 && line < editor.lineCount) {
-                            editor.setSelection(line, 0)
-                        } else {
-                            android.widget.Toast.makeText(requireContext(), "行号超出范围", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: NumberFormatException) {
-                        android.widget.Toast.makeText(requireContext(), "请输入有效的行号", android.widget.Toast.LENGTH_SHORT).show()
+
+        val dialog = com.wuxianggujun.tinaide.ui.dialog.InputDialog.newInstance(
+            title = "跳转到行",
+            hint = "行号",
+            validator = { value ->
+                if (value.isEmpty()) {
+                    "请输入行号"
+                } else {
+                    val line = value.toIntOrNull()
+                    when {
+                        line == null -> "请输入有效的数字"
+                        line <= 0 || line > editor.lineCount -> "行号超出范围"
+                        else -> null
                     }
                 }
+            },
+            onConfirm = { value ->
+                val line = value.toInt() - 1
+                editor.setSelection(line, 0)
             }
-            .setNegativeButton("取消", null)
-            .show()
+        )
+        dialog.show(childFragmentManager, "goto_line_dialog")
     }
     
     private fun setupViewPager() {
@@ -140,8 +192,23 @@ class EditorContainerFragment : Fragment() {
     
     private fun updateTabLayoutVisibility() {
         val hasFiles = adapter.itemCount > 0
+
         tabLayout.visibility = if (hasFiles) View.VISIBLE else View.GONE
         editorToolbar.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        viewPager.visibility = if (hasFiles) View.VISIBLE else View.GONE
+        if (!hasFiles) {
+            hideNativeNavigationResults()
+        }
+
+        // 懒加载空状态视图
+        if (!hasFiles) {
+            if (emptyView == null) {
+                emptyView = binding.emptyStub.inflate()
+            }
+            emptyView?.visibility = View.VISIBLE
+        } else {
+            emptyView?.visibility = View.GONE
+        }
     }
     
     private fun setupTabLayout() {
@@ -226,6 +293,31 @@ class EditorContainerFragment : Fragment() {
         setupTabLongClickListeners()
         
         android.util.Log.d("EditorContainer", "TabLayout visibility: ${if (tabLayout.visibility == View.VISIBLE) "VISIBLE" else "GONE"}")
+    }
+
+    fun openLocation(location: Location) {
+        val targetFile = File(location.filePath)
+        openFile(targetFile)
+        viewPager.post {
+            getCurrentEditorFragment()?.jumpToLocation(location)
+        }
+    }
+
+    fun showNativeNavigationResults(title: String, locations: List<Location>) {
+        if (locations.isEmpty()) {
+            requireContext().toastInfo(getString(R.string.native_navigation_empty))
+            hideNativeNavigationResults()
+            return
+        }
+        navigationPanel.isVisible = true
+        navigationTitle.text = title
+        navigationCount.text = locations.size.toString()
+        navigationAdapter.submitList(locations)
+    }
+
+    fun hideNativeNavigationResults() {
+        navigationPanel.isVisible = false
+        navigationAdapter.submitList(emptyList())
     }
     
     /**
@@ -324,10 +416,10 @@ class EditorContainerFragment : Fragment() {
                     tab.file.writeText(content)
                     tab.isDirty = false
                     android.util.Log.d("EditorContainer", "File saved: ${tab.file.absolutePath}")
-                    android.widget.Toast.makeText(requireContext(), "文件已保存", android.widget.Toast.LENGTH_SHORT).show()
+                    requireContext().toastSuccess("文件已保存")
                 } catch (e: Exception) {
-                    android.util.Log.e("EditorContainer", "Error saving file", e)
-                    android.widget.Toast.makeText(requireContext(), "保存失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    Logger.e("Error saving file", e, "EditorContainer")
+                    requireContext().handleErrorWithToast(e, "保存失败")
                 }
             }
         }
@@ -349,7 +441,7 @@ class EditorContainerFragment : Fragment() {
                 }
             }
         }
-        android.widget.Toast.makeText(requireContext(), "所有文件已保存", android.widget.Toast.LENGTH_SHORT).show()
+        requireContext().toastSuccess("所有文件已保存")
     }
     
     override fun onDestroyView() {

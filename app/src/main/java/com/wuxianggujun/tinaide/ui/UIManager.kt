@@ -9,6 +9,7 @@ import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.core.ServiceLifecycle
 import com.wuxianggujun.tinaide.core.ServiceLocator
 import com.wuxianggujun.tinaide.core.config.IConfigManager
+import com.wuxianggujun.tinaide.core.config.ConfigKeys
 import com.wuxianggujun.tinaide.core.get
 
 /**
@@ -31,7 +32,7 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
     
     override fun onCreate() {
         // 恢复主题设置
-        val themeName = configManager.get(KEY_THEME, Theme.DARK.name)
+        val themeName = configManager.get(ConfigKeys.Theme)
         currentTheme = try {
             Theme.valueOf(themeName)
         } catch (e: Exception) {
@@ -42,7 +43,7 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
         // 恢复面板可见性
         PanelType.values().forEach { panel ->
             val key = KEY_PANEL_PREFIX + panel.name
-            panelVisibility[panel] = configManager.get(key, getDefaultVisibility(panel))
+            panelVisibility[panel] = configManager.get(ConfigKeys.panelVisible(panel.name, getDefaultVisibility(panel)))
         }
     }
     
@@ -111,7 +112,7 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
     
     override fun restoreLayoutState() {
         // 恢复主题
-        val themeName = configManager.get(KEY_THEME, Theme.DARK.name)
+        val themeName = configManager.get(ConfigKeys.Theme)
         currentTheme = try {
             Theme.valueOf(themeName)
         } catch (e: Exception) {
@@ -122,7 +123,7 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
         // 恢复面板可见性
         PanelType.values().forEach { panel ->
             val key = KEY_PANEL_PREFIX + panel.name
-            val visible = configManager.get(key, getDefaultVisibility(panel))
+            val visible = configManager.get(ConfigKeys.panelVisible(panel.name, getDefaultVisibility(panel)))
             panelVisibility[panel] = visible
             updatePanelView(panel, visible)
         }
@@ -137,8 +138,10 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
             Theme.DARK -> AppCompatDelegate.MODE_NIGHT_YES
             Theme.AUTO -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
-        
-        AppCompatDelegate.setDefaultNightMode(mode)
+        // Avoid unnecessary Activity recreate: only set when changed
+        if (AppCompatDelegate.getDefaultNightMode() != mode) {
+            AppCompatDelegate.setDefaultNightMode(mode)
+        }
     }
     
     /**
@@ -146,14 +149,13 @@ class UIManager(private val activity: Activity) : IUIManager, ServiceLifecycle {
      */
     private fun updatePanelView(panel: PanelType, visible: Boolean) {
         try {
-            val viewId = when (panel) {
-                PanelType.EDITOR -> R.id.editor_container
-                PanelType.FILE_TREE -> R.id.file_tree_container
-                PanelType.TERMINAL -> R.id.terminal_container
-                PanelType.TOOLBAR -> R.id.toolbar
+            val view = when (panel) {
+                PanelType.EDITOR -> activity.findViewById<View>(R.id.editor_container)
+                PanelType.FILE_TREE -> activity.findViewById<View>(R.id.file_tree_container)
+                // 终端面板已移除布局，这里直接忽略
+                PanelType.TERMINAL -> null
+                PanelType.TOOLBAR -> activity.findViewById<View>(R.id.toolbar)
             }
-            
-            val view = activity.findViewById<View>(viewId)
             view?.visibility = if (visible) View.VISIBLE else View.GONE
         } catch (e: Exception) {
             Log.e(TAG, "Error updating panel view: $panel", e)

@@ -20,9 +20,12 @@ local.properties
 .vscode/
 out/
 *.log
+log.txt
 *.jks
 *.keystore
 keystore.properties
+keystore/
+nul
 # Ignore large offline bootstrap archives by default; keep README
 app/src/main/assets/bootstrap/**/*.zip
 # Sora editor upstream debug keystore
@@ -31,3 +34,29 @@ external/sora-editor/debug.jks
 /.idea/
 /.kiro/
 /.serena/
+/.claude/
+CLAUDE.md
+# Docker dev workdir (mounted cache and build artifacts) - do not commit
+docker/llvm-build/dev-work/
+docker/llvm-build/build-output/
+
+# Local LLVM source trees (do not commit huge upstream repos)
+llvm_projects/
+llvm-project/
+llvm-projects/
+
+# App 集成的 LLVM 库（由同步脚本生成，不提交）
+app/src/main/jniLibs/**/libLLVM*.so
+app/src/main/jniLibs/**/libclang*.so
+app/src/main/jniLibs/**/liblld*.so
+app/src/main/jniLibs/**/libc++_shared.so
+
+# Sysroot（由同步脚本生成，不提交）
+app/src/main/assets/sysroot/
+app/src/main/assets/*.zip
+!app/src/main/assets/xmake-overrides/**
+
+# Generated LLVM build artifacts (headers/libs/sysroot)
+external/llvm-build-libs/
+!external/llvm-build-libs/README.md
+
