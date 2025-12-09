@@ -1,253 +1,223 @@
-# LLD 链接器进程隔离架构
+# LLD 链接器进程隔离架构 v2
 
 > 文档日期：2024-12-09
-> 作者：Claude Code
+> 更新：链接服务器 + dlclose 方案
 
 ## 概述
 
-本文档描述 TinaIDE 中 LLD 链接器的进程隔离实现，解决了 LLVM 17 版本 LLD 多次调用时的全局状态问题。
+本文档描述 TinaIDE 中 LLD 链接器的进程隔离实现，解决了 LLVM 17 版本 LLD 多次调用时的全局状态问题，以及 Android 多线程环境下 fork() 死锁问题。
 
 ## 问题背景
 
-### 症状
+### 问题 1：LLD 全局状态
 
-在 TinaIDE 中连续第二次编译时，链接阶段会失败并报告 "duplicate symbol" 错误：
+LLVM 17 的 LLD 链接器设计为独立程序使用，内部大量依赖全局变量存储状态。当作为库多次调用 `lld::elf::link()` 时，会导致 "duplicate symbol" 错误。
 
-```
-ld.lld: error: duplicate symbol: __atexit_handler_wrapper
->>> defined at crtbegin_so.c
->>>            .../crtbegin_so.o:(__atexit_handler_wrapper)
->>> defined at crtbegin_so.c
->>>            .../crtbegin_so.o:(.text+0x30)
+### 问题 2：fork() 死锁
 
-ld.lld: error: duplicate symbol: main
->>> defined at main.cpp
->>>            .../main.cpp.o:(main)
->>> defined at main.cpp
->>>            .../main.cpp.o:(.text+0x0)
-```
+之前的方案使用 `fork()` 进程隔离，但在 Android 多线程环境中，fork() 会继承已持有的锁，导致子进程死锁（表现为 "link timeout"）。
 
-### 根本原因
+## 解决方案：链接服务器 + dlclose
 
-LLVM 17 的 LLD 链接器设计为独立程序使用，内部大量依赖全局变量存储状态（符号表、输入文件列表等）。当作为库多次调用 `lld::elf::link()` 时，这些全局状态不会自动重置，导致：
-
-1. 之前链接的符号仍然存在于全局符号表中
-2. CRT 对象文件（crtbegin_so.o）的符号被重复记录
-3. 用户代码的符号（如 main）也被认为是重复定义
-
-### LLVM 社区进展
-
-- **2024年11月**：LLVM 主分支已完全移除 LLD 的全局变量（[MaskRay 的博客](https://maskray.me/blog/2024-11-17-removing-global-state-from-lld)）
-- **LLVM 17/18**：仍然存在全局状态问题，需要使用 workaround
-
-## 解决方案
-
-### 架构设计
-
-采用**进程隔离**策略：每次链接操作都在独立的子进程中执行，确保全局状态完全干净。
+### 架构概览
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    父进程 (TinaIDE App)                  │
-├─────────────────────────────────────────────────────────┤
-│  1. 验证 sysroot 和依赖文件                              │
-│  2. 构建链接参数 (ld.lld -shared ...)                   │
-│  3. 创建管道用于 IPC                                     │
-│  4. fork() 子进程                                        │
-│  5. 等待子进程完成，收集输出                             │
-│  6. 解析结果返回给调用者                                 │
-└─────────────────────────────────────────────────────────┘
-                            │
-                         fork()
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│                    子进程 (链接器)                        │
-├─────────────────────────────────────────────────────────┤
-│  1. 重定向 stdout/stderr 到管道                          │
-│  2. 调用 lld::elf::link()                               │
-│  3. 输出诊断信息                                         │
-│  4. _exit(0/1) 退出                                      │
-│                                                          │
-│  ✓ 全局状态完全隔离                                       │
-│  ✓ 进程退出后自动清理所有资源                            │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     主进程 (TinaIDE App)                         │
+├─────────────────────────────────────────────────────────────────┤
+│  TinaApplication.onCreate()                                      │
+│    │                                                             │
+│    ├─ 1. 加载 native_compiler.so                                 │
+│    │                                                             │
+│    └─ 2. 早期 fork() 链接服务器守护进程 ◄──────────────────────┐  │
+│         （在任何其他线程启动之前）                               │  │
+│                                                                  │  │
+│  编译流程:                                                       │  │
+│    │                                                             │  │
+│    ├─ 方案 A: 直接 dlopen/dlclose（主进程内）                   │  │
+│    │   └─ dlopen(liblld_linker.so) → 链接 → dlclose()           │  │
+│    │                                                             │  │
+│    └─ 方案 B: IPC 到链接服务器（推荐）                          │  │
+│        └─ Unix Socket → 请求 → 响应                              │  │
+└──────────────────────────────────────────────────────────────────┘
+                             │
+                          fork()
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    链接服务器守护进程                            │
+├─────────────────────────────────────────────────────────────────┤
+│  单线程事件循环（无其他线程干扰）                                │
+│    │                                                             │
+│    └─ 接收 IPC 请求                                              │
+│         │                                                        │
+│         ├─ dlopen(liblld_linker.so)                              │
+│         │                                                        │
+│         ├─ 调用 lld_link_shared() / lld_link_executable()        │
+│         │                                                        │
+│         ├─ dlclose(liblld_linker.so) ← 清理 LLD 全局状态         │
+│         │                                                        │
+│         └─ 发送响应                                              │
+│                                                                  │
+│  ✓ 早期 fork，无锁继承                                           │
+│  ✓ dlclose() 清理全局状态                                        │
+│  ✓ 崩溃可重启                                                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 核心实现
+### 核心组件
 
-#### 1. 进程隔离入口 (`linkIsolated`)
+#### 1. liblld_linker.so（独立链接器库）
+
+将 LLD 链接逻辑拆分为独立的共享库，提供纯 C 接口：
+
+```c
+// lld_linker_api.h
+void lld_link_shared(
+    const char** obj_paths,
+    size_t obj_count,
+    const char* output_path,
+    const LldLinkOptions* options,
+    LldLinkResult* result
+);
+
+void lld_link_executable(...);
+void lld_free_result(LldLinkResult* result);
+```
+
+#### 2. dlopen/dlclose 调用方式
+
+主进程或链接服务器通过 dlopen/dlclose 动态加载 liblld_linker.so：
 
 ```cpp
-static LinkResult linkIsolated(const std::vector<std::string>& argStrings,
-                                const std::string& outputPath,
-                                int timeoutMs) {
-    // 创建管道
-    int pipefd[2];
-    pipe(pipefd);
+// 每次链接
+void* handle = dlopen("liblld_linker.so", RTLD_NOW | RTLD_LOCAL);
+auto linkFn = (lld_link_shared_fn)dlsym(handle, "lld_link_shared");
+linkFn(objPaths, count, outputPath, &options, &result);
+dlclose(handle);  // ← 清理 LLD 全局状态
+```
 
-    // Fork 子进程
-    pid_t pid = fork();
+#### 3. 链接服务器守护进程
 
-    if (pid == 0) {
-        // 子进程：重定向输出，执行链接
-        dup2(pipefd[1], STDOUT_FILENO);
-        dup2(pipefd[1], STDERR_FILENO);
-        executeLinkerInChild(argStrings, outputPath);
-        _exit(127);
-    }
+- **启动时机**：TinaApplication.onCreate() 最早期，在任何其他线程启动之前
+- **通信方式**：Unix Domain Socket（抽象命名空间）
+- **处理流程**：单线程串行处理，dlopen → 链接 → dlclose
+- **生命周期**：应用退出时终止，崩溃时可重新 fork
 
-    // 父进程：等待并收集结果
-    // ... poll + waitpid ...
+#### 4. IPC 协议
+
+```json
+// 链接请求
+{
+    "obj_paths": ["/path/to/obj1.o", "/path/to/obj2.o"],
+    "output_path": "/path/to/output.so",
+    "sysroot": "/path/to/sysroot",
+    "target": "aarch64-linux-android24",
+    "is_cxx": true,
+    "extra_lib_dirs": [],
+    "extra_libs": []
+}
+
+// 链接响应
+{
+    "success": true,
+    "exit_code": 0,
+    "error_message": "",
+    "diagnostics": ""
 }
 ```
 
-#### 2. 子进程执行 (`executeLinkerInChild`)
+## 文件结构
 
-```cpp
-static void executeLinkerInChild(const std::vector<std::string>& argStrings,
-                                  const std::string& outputPath) {
-    // 转换参数
-    std::vector<const char*> args;
-    for (const auto& arg : argStrings) {
-        args.push_back(arg.c_str());
-    }
-
-    // 调用 LLD
-    std::string diagStr;
-    llvm::raw_string_ostream diagStream(diagStr);
-    bool success = lld::elf::link(args, diagStream, diagStream, false, false);
-
-    // 输出诊断并退出
-    if (!diagStr.empty()) fprintf(stderr, "%s", diagStr.c_str());
-    _exit(success ? 0 : 1);
-}
+```
+app/src/main/cpp/
+├── linker/
+│   ├── lld_linker.h           # 链接器公共接口
+│   ├── lld_linker.cpp         # dlopen/dlclose 调用实现
+│   ├── lld_linker_api.h       # liblld_linker.so 的纯 C API
+│   └── lld_linker_impl.cpp    # LLD 调用实现（编译到 liblld_linker.so）
+│
+├── server/
+│   ├── link_server_protocol.h # IPC 协议定义
+│   ├── link_server.cpp        # 链接服务器守护进程
+│   ├── link_client.cpp        # IPC 客户端
+│   ├── link_client.h          # 客户端接口
+│   └── link_server_jni.cpp    # JNI 接口（fork/kill/status）
+│
+└── CMakeLists.txt             # 构建配置
 ```
 
-### 超时机制
+## 两种调用方式对比
 
-为防止链接器死锁或无限循环，实现了超时控制：
+| 特性 | 方案 A: 主进程 dlopen | 方案 B: IPC 到链接服务器 |
+|------|----------------------|------------------------|
+| 实现复杂度 | 低 | 高 |
+| fork 死锁风险 | 有（多线程环境） | 无（早期单线程 fork） |
+| LLD 全局状态 | ✓ dlclose 清理 | ✓ dlclose 清理 |
+| 崩溃影响 | 影响主进程 | 仅影响守护进程（可重启） |
+| 推荐场景 | 简单场景 | 生产环境 |
 
-```cpp
-// 默认超时 30 秒
-int timeoutMs = 30000;
+## 使用建议
 
-// 使用 poll() 非阻塞读取 + waitpid(WNOHANG) 检查子进程状态
-while (elapsed < timeoutMs) {
-    poll(&pfd, 1, 100);  // 100ms 步长
-    // 读取输出...
-    waitpid(pid, &status, WNOHANG);
-    // 检查是否完成...
-}
-
-// 超时则强制终止
-kill(pid, SIGKILL);
-```
+1. **默认使用链接服务器模式**：更稳定，避免多线程 fork 问题
+2. **降级到主进程 dlopen**：如果服务器不可用，可作为备用方案
+3. **监控链接服务器状态**：定期检查，必要时重新 fork
 
 ## API 参考
 
-### LinkOptions
+### Kotlin 层
+
+```kotlin
+// NativeLoader.kt
+object NativeLoader {
+    // 启动链接服务器（在 TinaApplication.onCreate() 调用）
+    fun startLinkServerIfNeeded()
+
+    // 停止链接服务器
+    fun stopLinkServer()
+
+    // JNI 方法
+    external fun forkLinkServer(nativeLibDir: String, filesDir: String): Int
+    external fun isLinkServerRunning(): Boolean
+    external fun killLinkServer()
+    external fun getLinkServerPid(): Int
+}
+```
+
+### C++ 层
 
 ```cpp
-struct LinkOptions {
-    std::string sysroot;                    // Sysroot 路径
-    std::string target;                     // 目标三元组
-    bool isCxx = false;                     // 是否为 C++ 代码
-    std::vector<std::string> libDirs;       // 额外的库搜索目录
-    std::vector<std::string> libs;          // 额外的链接库
-    int timeoutMs = 30000;                  // 链接超时（毫秒）
-};
-```
+// linker/lld_linker.h
+namespace tinaide::linker {
+    void initLinker(const std::string& nativeLibDir);
+    LinkResult linkSharedLibrary(...);
+    LinkResult linkExecutable(...);
+}
 
-### LinkResult
-
-```cpp
-struct LinkResult {
-    bool success = false;                   // 是否成功
-    std::string errorMessage;               // 错误信息
-    int exitCode = -1;                      // 子进程退出码
-};
-```
-
-### 公共接口
-
-```cpp
-// 链接可执行文件
-LinkResult linkExecutable(const std::string& objPath,
-                          const std::string& exePath,
-                          const LinkOptions& options);
-
-LinkResult linkExecutableMany(const std::vector<std::string>& objPaths,
-                              const std::string& exePath,
-                              const LinkOptions& options);
-
-// 链接共享库
-LinkResult linkSharedLibrary(const std::string& objPath,
-                             const std::string& soPath,
-                             const LinkOptions& options);
-
-LinkResult linkSharedLibraryMany(const std::vector<std::string>& objPaths,
-                                 const std::string& soPath,
-                                 const LinkOptions& options);
-```
-
-## 与 runIsolated 的对比
-
-本实现参考了 `runner/shared_runner.cpp` 中的 `runIsolated()` 函数：
-
-| 特性 | runIsolated | linkIsolated |
-|------|-------------|--------------|
-| 目的 | 运行用户代码 | 执行链接器 |
-| 隔离原因 | 防止崩溃影响主进程 | 解决全局状态问题 |
-| 超时默认值 | 15 秒 | 30 秒 |
-| 输出捕获 | stdout + stderr | 诊断信息 |
-| 退出码解析 | 用户程序返回值 | 0=成功, 1=失败 |
-
-## 性能考虑
-
-### 开销
-
-- **fork() 开销**：Android 上 fork() 是写时复制（COW），开销较小
-- **管道通信**：仅传输诊断输出，数据量小
-- **进程创建**：每次链接约增加 10-50ms
-
-### 优化建议
-
-1. **批量链接**：如果有多个目标文件，使用 `linkSharedLibraryMany` 而不是多次调用单文件版本
-2. **增量编译**：仅重新编译修改过的源文件，减少链接频率
-3. **升级 LLVM**：当升级到 LLVM 19+ 后，可以考虑移除进程隔离（全局状态问题已修复）
-
-## 测试验证
-
-### 手动测试
-
-1. 创建一个简单的 C++ 项目
-2. 编译并运行（第一次应成功）
-3. 不修改代码，再次编译运行（第二次也应成功）
-4. 连续多次编译运行（都应成功）
-
-### 预期日志
-
-```
-I/TinaIDE: linkSharedLibraryMany: 1 objects -> .../libnihao.so
-I/Compile: 链接成功: libnihao.so
+// server/link_client.h
+namespace tinaide::linker::client {
+    LinkResult linkSharedViaServer(...);
+    LinkResult linkExecutableViaServer(...);
+    bool pingServer();
+    void shutdownServer();
+}
 ```
 
 ## 未来改进
 
-1. **LLVM 19+ 迁移**：新版本已修复全局状态问题，可选择性移除进程隔离
+1. **LLVM 19+ 迁移**：新版本已修复全局状态问题，可简化架构
 2. **链接缓存**：对相同输入生成缓存，避免重复链接
-3. **并行链接**：对多个独立目标支持并行链接
+3. **并行链接**：链接服务器支持多个请求并行处理
 
 ## 相关文件
 
-- [lld_linker.h](../app/src/main/cpp/linker/lld_linker.h) - 链接器接口定义
-- [lld_linker.cpp](../app/src/main/cpp/linker/lld_linker.cpp) - 进程隔离实现
-- [shared_runner.cpp](../app/src/main/cpp/runner/shared_runner.cpp) - 参考的进程隔离实现
-- [Native-Compile-Runtime.md](./Native-Compile-Runtime.md) - 编译运行时文档
+- [lld_linker.h](../app/src/main/cpp/linker/lld_linker.h)
+- [lld_linker_api.h](../app/src/main/cpp/linker/lld_linker_api.h)
+- [link_server.cpp](../app/src/main/cpp/server/link_server.cpp)
+- [link_client.cpp](../app/src/main/cpp/server/link_client.cpp)
+- [link-server-mode.md](./link-server-mode.md)
 
 ## 参考资料
 
 - [Removing global state from LLD - MaskRay](https://maskray.me/blog/2024-11-17-removing-global-state-from-lld)
 - [LLVM LLD Documentation](https://lld.llvm.org/)
-- [CommonLinkerContext.h](https://github.com/llvm/llvm-project/blob/main/lld/include/lld/Common/CommonLinkerContext.h)
