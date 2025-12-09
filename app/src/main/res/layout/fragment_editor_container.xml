@@ -9,11 +9,11 @@
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
+        android:background="?attr/colorSurface"
         app:tabMode="scrollable"
-        app:tabTextColor="@android:color/white"
-        app:tabSelectedTextColor="@android:color/white"
-        app:tabIndicatorColor="@android:color/white" />
+        app:tabTextColor="?attr/colorOnSurface"
+        app:tabSelectedTextColor="?attr/colorOnSurface"
+        app:tabIndicatorColor="?attr/colorOnSurface" />
 
     <!-- 编辑器区域容器 -->
     <FrameLayout

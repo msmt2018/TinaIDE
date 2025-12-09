@@ -30,28 +30,28 @@ object ToastUtil {
      * 显示成功消息
      */
     fun showSuccess(context: Context, message: String) {
-        show(context, "✅ $message", Toast.LENGTH_SHORT)
+        show(context, message, Toast.LENGTH_SHORT)
     }
-    
+
     /**
      * 显示错误消息
      */
     fun showError(context: Context, message: String) {
-        show(context, "❌ $message", Toast.LENGTH_LONG)
+        show(context, message, Toast.LENGTH_LONG)
     }
-    
+
     /**
      * 显示警告消息
      */
     fun showWarning(context: Context, message: String) {
-        show(context, "⚠️ $message", Toast.LENGTH_SHORT)
+        show(context, message, Toast.LENGTH_SHORT)
     }
-    
+
     /**
      * 显示信息消息
      */
     fun showInfo(context: Context, message: String) {
-        show(context, "ℹ️ $message", Toast.LENGTH_SHORT)
+        show(context, message, Toast.LENGTH_SHORT)
     }
     
     /**
