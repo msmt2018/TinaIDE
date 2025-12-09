@@ -72,18 +72,26 @@ abstract class BaseActivity<VB : ViewBinding>(
      * 子类可以重写自定义
      *
      * 注意：
-     * 1. 状态栏颜色为深色，系统图标使用浅色（白色）以确保可见性
+     * 1. 根据当前主题模式（浅色/深色）自动调整状态栏图标颜色
      * 2. fitsSystemWindows 由 setupFitsSystemWindows() 统一处理
      */
     protected open fun setupImmersionBar() {
+        // 检测当前是否为深色模式
+        val isDarkMode = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
         immersionBar {
-            statusBarColor(R.color.statusBarColor)
-            // 使用浅色图标（白色）在深色状态栏上显示
-            statusBarDarkFont(false)
+            // 透明状态栏，让内容延伸到状态栏下方
+            transparentStatusBar()
+            // 浅色模式使用深色图标，深色模式使用浅色图标
+            statusBarDarkFont(!isDarkMode)
+            // 导航栏颜色
             navigationBarColor(R.color.navigationBarColor)
+            // 导航栏图标颜色同样适配
+            navigationBarDarkIcon(!isDarkMode)
             // fitsSystemWindows 在 setupFitsSystemWindows() 中统一处理
             fitsSystemWindows(false)
-            // 移除 autoStatusBarDarkModeEnable，避免与 statusBarDarkFont 冲突
         }
     }
 
