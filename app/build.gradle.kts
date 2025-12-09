@@ -115,7 +115,7 @@ android {
                 val keyAliasProp = keystoreProps.getProperty("keyAlias")
                 val keyPasswordProp = keystoreProps.getProperty("keyPassword")
 
-                if (!storeFileProp.isNullOrBlank()) storeFile = file(storeFileProp)
+                if (!storeFileProp.isNullOrBlank()) storeFile = rootProject.file(storeFileProp)
                 if (!storePasswordProp.isNullOrBlank()) storePassword = storePasswordProp
                 if (!keyAliasProp.isNullOrBlank()) keyAlias = keyAliasProp
                 if (!keyPasswordProp.isNullOrBlank()) keyPassword = keyPasswordProp
