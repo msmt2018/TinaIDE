@@ -1,9 +1,12 @@
 package com.wuxianggujun.tinaide.ui.fragment
 
+import android.content.SharedPreferences
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceManager
 import com.wuxianggujun.tinaide.BuildConfig
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.base.BaseBindingFragment
@@ -58,6 +61,19 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     private var currentFileUri: String? = null
     private var hoverIdleJob: Job? = null
     private var pendingHoverSignature: String? = null
+
+    /**
+     * SharedPreferences 变化监听器，用于实时更新编辑器设置
+     */
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            "editor_font_size" -> applyFontSize()
+            "editor_line_numbers" -> applyLineNumbers()
+            "editor_word_wrap" -> applyWordWrap()
+            "editor_tab_size" -> applyTabSize()
+            "editor_font_path" -> applyCustomFont()
+        }
+    }
     
     companion object {
         private const val ARG_FILE_PATH = "file_path"
@@ -93,6 +109,10 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
         setupEditor()
         loadFileContent()
         setupLanguage()
+
+        // 注册设置变化监听器，实现设置即时生效
+        PreferenceManager.getDefaultSharedPreferences(requireContext())
+            .registerOnSharedPreferenceChangeListener(prefsListener)
     }
     
     private fun loadFileContent() {
@@ -187,27 +207,100 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
             isWordwrap = com.wuxianggujun.tinaide.core.config.Prefs.editorWordWrap
 
             // 显示不可打印字符（保持原有策略）
-            nonPrintablePaintingFlags = CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or 
-                                        CodeEditor.FLAG_DRAW_LINE_SEPARATOR or 
+            nonPrintablePaintingFlags = CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
+                                        CodeEditor.FLAG_DRAW_LINE_SEPARATOR or
                                         CodeEditor.FLAG_DRAW_WHITESPACE_IN_SELECTION
 
             // 启用自动缩进
             tabWidth = com.wuxianggujun.tinaide.core.config.Prefs.editorTabSize
-            
+
             // 启用代码块线
             isBlockLineEnabled = true
-            
+
             // 启用光标动画
             isCursorAnimationEnabled = true
-            
+
             // 设置深色主题颜色方案
             colorScheme = TinaDarkColorScheme()
-            
+
             // 调整行号区域宽度 - 增加左右边距使布局更宽松
             val density = resources.displayMetrics.density
             setDividerMargin(8f * density, 8f * density)  // 左右各 8dp 边距
             setLineNumberMarginLeft(6f * density)          // 行号左边距 6dp
         }
+
+        // 应用自定义字体（如果设置了）
+        applyCustomFont()
+    }
+
+    // ========== 设置实时刷新方法 ==========
+
+    /**
+     * 应用字体大小设置
+     */
+    private fun applyFontSize() {
+        if (!::codeEditor.isInitialized) return
+        codeEditor.setTextSize(com.wuxianggujun.tinaide.core.config.Prefs.editorFontSize)
+    }
+
+    /**
+     * 应用行号显示设置
+     */
+    private fun applyLineNumbers() {
+        if (!::codeEditor.isInitialized) return
+        codeEditor.isLineNumberEnabled = com.wuxianggujun.tinaide.core.config.Prefs.editorShowLineNumbers
+    }
+
+    /**
+     * 应用自动换行设置
+     */
+    private fun applyWordWrap() {
+        if (!::codeEditor.isInitialized) return
+        codeEditor.isWordwrap = com.wuxianggujun.tinaide.core.config.Prefs.editorWordWrap
+    }
+
+    /**
+     * 应用 Tab 宽度设置
+     */
+    private fun applyTabSize() {
+        if (!::codeEditor.isInitialized) return
+        codeEditor.tabWidth = com.wuxianggujun.tinaide.core.config.Prefs.editorTabSize
+    }
+
+    /**
+     * 应用自定义字体设置
+     */
+    private fun applyCustomFont() {
+        if (!::codeEditor.isInitialized) return
+        val fontPath = com.wuxianggujun.tinaide.core.config.Prefs.editorFontPath
+        if (fontPath.isNotEmpty()) {
+            try {
+                val fontFile = java.io.File(fontPath)
+                if (fontFile.exists()) {
+                    val typeface = Typeface.createFromFile(fontFile)
+                    codeEditor.typefaceText = typeface
+                    codeEditor.typefaceLineNumber = typeface
+                    android.util.Log.d(TAG, "Applied custom font: $fontPath")
+                } else {
+                    android.util.Log.w(TAG, "Custom font file not found: $fontPath")
+                    resetToDefaultFont()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to load custom font: $fontPath", e)
+                resetToDefaultFont()
+            }
+        } else {
+            resetToDefaultFont()
+        }
+    }
+
+    /**
+     * 重置为默认字体
+     */
+    private fun resetToDefaultFont() {
+        if (!::codeEditor.isInitialized) return
+        codeEditor.typefaceText = Typeface.MONOSPACE
+        codeEditor.typefaceLineNumber = Typeface.MONOSPACE
     }
     
     /**
@@ -389,6 +482,10 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
     }
     
     override fun onDestroyView() {
+        // 注销设置变化监听器
+        PreferenceManager.getDefaultSharedPreferences(requireContext())
+            .unregisterOnSharedPreferenceChangeListener(prefsListener)
+
         lspBinding?.unbind()
         lspBinding = null
         hoverSubscription?.unsubscribe()
@@ -397,7 +494,7 @@ class EditorFragment : BaseBindingFragment<FragmentEditorBinding>(
         diagnosticsListener?.let { LspService.removeDiagnosticsListener(it) }
         diagnosticsListener = null
         currentFileUri = null
-        
+
         super.onDestroyView()
     }
 
