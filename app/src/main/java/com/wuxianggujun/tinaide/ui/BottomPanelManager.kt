@@ -165,6 +165,12 @@ class BottomPanelManager(
 
         diagnosticsFragment = DiagnosticsFragment.newInstance(onDiagnosticClick)
 
+        // 强制设置 TabLayout 背景色为主题的 colorSurface
+        // 解决某些设备上 Material 3 TabLayout 显示青绿色的问题
+        val typedValue = android.util.TypedValue()
+        container.context.theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
+        binding.tabLayout.setBackgroundColor(typedValue.data)
+
         // 设置 ViewPager2 适配器
         val adapter = BottomPanelPagerAdapter(activity)
         binding.viewPager.adapter = adapter
