@@ -21,20 +21,17 @@ import com.wuxianggujun.tinaide.R
 
 /**
  * 重构后的底部面板管理器
- * 
+ *
  * 布局结构：
  * - 符号输入栏（48dp，默认显示）
  * - Tab栏 + LSP状态（48dp）
  * - ViewPager2（占据剩余空间，显示当前Tab内容）
- * 
+ *
  * ViewPager2 只占据内容区域，不占据整个屏幕
  */
 class BottomPanelManager(
     private val activity: FragmentActivity,
     private val container: ViewGroup,
-    private val onCompile: () -> Unit = {},
-    private val onStop: () -> Unit = {},
-    private val onOpenOutput: () -> Unit = {},
     private val onDiagnosticClick: (Diagnostic) -> Unit = {},
     private val onSymbolClick: (String) -> Unit = {}
 ) {
@@ -47,10 +44,7 @@ class BottomPanelManager(
     private lateinit var buildLogFragment: BuildLogFragment
     private lateinit var generalLogFragment: GeneralLogFragment
     private lateinit var diagnosticsFragment: DiagnosticsFragment
-    
-    // 构建状态
-    private var buildSucceeded: Boolean = false
-    
+
     // LSP 监听器
     private var initListener: LspService.InitializationListener? = null
     private var healthListener: LspService.HealthListener? = null
@@ -165,33 +159,19 @@ class BottomPanelManager(
      */
     private fun setupTabs() {
         // 初始化 Fragments
-        buildLogFragment = BuildLogFragment.newInstance(
-            onCompile = onCompile,
-            onStop = onStop,
-            onOpenOutput = {
-                if (buildSucceeded) {
-                    onOpenOutput()
-                } else {
-                    android.widget.Toast.makeText(
-                        container.context,
-                        "构建失败，无法打开输出界面",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        )
-        
+        buildLogFragment = BuildLogFragment.newInstance()
+
         generalLogFragment = GeneralLogFragment.newInstance()
-        
+
         diagnosticsFragment = DiagnosticsFragment.newInstance(onDiagnosticClick)
-        
+
         // 设置 ViewPager2 适配器
         val adapter = BottomPanelPagerAdapter(activity)
         binding.viewPager.adapter = adapter
-        
+
         // 禁止 ViewPager2 左右滑动，避免与内容上下滚动冲突
         binding.viewPager.isUserInputEnabled = false
-        
+
         // 连接 TabLayout 和 ViewPager2
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = when (position) {
@@ -349,19 +329,7 @@ class BottomPanelManager(
             }
         }
     }
-    
-    /**
-     * 设置构建状态（成功/失败）
-     */
-    fun setBuildSucceeded(succeeded: Boolean) {
-        buildSucceeded = succeeded
-        if (::buildLogFragment.isInitialized && buildLogFragment.isAdded) {
-            buildLogFragment.view?.post {
-                buildLogFragment.setOutputButtonEnabled(succeeded)
-            }
-        }
-    }
-    
+
     /**
      * 展开面板
      */

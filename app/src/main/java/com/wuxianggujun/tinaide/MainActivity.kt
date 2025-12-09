@@ -134,7 +134,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
                             }
                             is CompileState.Compiling -> {
                                 showLoading("正在编译项目...", cancelable = false)
-                                bottomPanelManager.setBuildSucceeded(false)
                             }
                         }
                     }
@@ -143,7 +142,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
                     compilerViewModel.events.collect { event ->
                         when (event) {
                             is CompileEvent.Success -> {
-                                bottomPanelManager.setBuildSucceeded(true)
                                 toastSuccess("编译完成")
                                 if (outputManager.getOutputMode() == IOutputManager.OutputMode.ACTIVITY) {
                                     outputManager.showOutput()
@@ -153,7 +151,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
                             }
                             is CompileEvent.Error -> {
                                 toastError(event.message)
-                                bottomPanelManager.setBuildSucceeded(false)
                                 bottomPanelManager.switchToBuildLog()
                                 bottomPanelManager.expand()
                             }
@@ -241,12 +238,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
         bottomPanelManager = com.wuxianggujun.tinaide.ui.BottomPanelManager(
             activity = this,
             container = binding.bottomPanelContainer,
-            onCompile = { onCompileProject() },
-            onStop = { /* TODO: 实现停止功能 */ },
-            onOpenOutput = { 
-                // 打开编译输出界面
-                outputManager.showOutput()
-            },
             onDiagnosticClick = { diagnostic ->
                 // TODO: 跳转到诊断对应的代码位置
                 toastInfo("诊断: ${diagnostic.message} (${diagnostic.uri}:${diagnostic.range.start.line + 1})")
