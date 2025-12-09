@@ -1,12 +1,12 @@
 // 链接服务器守护进程
 //
 // 在应用启动最早期 fork 出的守护进程，负责处理所有链接请求。
-// 守护进程使用 dlopen/dlclose 加载 liblld_linker.so，每次链接后清理全局状态。
+// 每次链接请求都会 fork 一个子进程执行，确保 LLD 全局状态被完全隔离。
 //
 // 架构：
 // 1. 单线程事件循环，使用 Unix Domain Socket 接收请求
-// 2. 每次链接：dlopen -> 调用链接函数 -> dlclose
-// 3. 通过 socket 返回结果
+// 2. 每次链接：fork -> dlopen -> 调用链接函数 -> 子进程退出
+// 3. 通过 pipe 返回结果给父进程，再通过 socket 返回给客户端
 //
 // 生命周期：
 // 1. 由 TinaApplication.onCreate() 在最早期 fork
@@ -19,6 +19,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
 #include <dlfcn.h>
@@ -234,15 +235,25 @@ bool parseRequest(const std::string& json, LinkRequest& req) {
     return true;
 }
 
-std::string executeLink(const LinkRequest& req, bool isShared) {
-    LOGI("executeLink: %zu objects -> %s (shared=%d)", req.objPaths.size(), req.outputPath.c_str(), isShared);
+// 在子进程中执行实际的链接操作
+// 这个函数在 fork 的子进程中运行，完成后进程退出，确保 LLD 状态被完全清理
+void executeLinkInChild(const LinkRequest& req, bool isShared, int resultPipeFd) {
+    LOGI("executeLinkInChild: %zu objects -> %s (shared=%d)", req.objPaths.size(), req.outputPath.c_str(), isShared);
+
+    auto writeResult = [resultPipeFd](const std::string& response) {
+        uint32_t len = static_cast<uint32_t>(response.size());
+        write(resultPipeFd, &len, sizeof(len));
+        write(resultPipeFd, response.data(), response.size());
+        close(resultPipeFd);
+    };
 
     // 打开 liblld_linker.so
     void* handle = dlopen(g_lldLinkerLibPath.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
         std::string error = std::string("dlopen failed: ") + dlerror();
         LOGE("%s", error.c_str());
-        return buildResponseJson(false, -1, error, "");
+        writeResult(buildResponseJson(false, -1, error, ""));
+        return;
     }
 
     // 获取函数指针
@@ -254,7 +265,8 @@ std::string executeLink(const LinkRequest& req, bool isShared) {
         std::string error = std::string("dlsym failed: ") + dlerror();
         LOGE("%s", error.c_str());
         dlclose(handle);
-        return buildResponseJson(false, -1, error, "");
+        writeResult(buildResponseJson(false, -1, error, ""));
+        return;
     }
 
     // 准备参数
@@ -302,7 +314,93 @@ std::string executeLink(const LinkRequest& req, bool isShared) {
     freeResultFn(&result);
     dlclose(handle);
 
-    LOGI("executeLink done: success=%d", result.success);
+    LOGI("executeLinkInChild done: success=%d", result.success);
+    writeResult(response);
+}
+
+// 主进程中的 executeLink：fork 子进程执行链接，等待结果
+// 这确保每次链接都在全新的进程中执行，LLD 全局状态被完全隔离
+std::string executeLink(const LinkRequest& req, bool isShared) {
+    LOGI("executeLink: %zu objects -> %s (shared=%d)", req.objPaths.size(), req.outputPath.c_str(), isShared);
+
+    // 创建管道用于接收子进程的结果
+    int pipeFds[2];
+    if (pipe(pipeFds) < 0) {
+        std::string error = std::string("pipe failed: ") + strerror(errno);
+        LOGE("%s", error.c_str());
+        return buildResponseJson(false, -1, error, "");
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        std::string error = std::string("fork failed: ") + strerror(errno);
+        LOGE("%s", error.c_str());
+        close(pipeFds[0]);
+        close(pipeFds[1]);
+        return buildResponseJson(false, -1, error, "");
+    }
+
+    if (pid == 0) {
+        // ====== 子进程 ======
+        close(pipeFds[0]);  // 关闭读端
+        executeLinkInChild(req, isShared, pipeFds[1]);
+        _exit(0);
+    }
+
+    // ====== 父进程 ======
+    close(pipeFds[1]);  // 关闭写端
+
+    // 读取子进程的结果
+    std::string response;
+    uint32_t len = 0;
+
+    // 设置超时读取
+    struct pollfd pfd;
+    pfd.fd = pipeFds[0];
+    pfd.events = POLLIN;
+
+    int pollResult = poll(&pfd, 1, 120000);  // 2 分钟超时
+    if (pollResult <= 0) {
+        close(pipeFds[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, nullptr, 0);
+        std::string error = pollResult == 0 ? "Link timeout" : std::string("poll failed: ") + strerror(errno);
+        LOGE("%s", error.c_str());
+        return buildResponseJson(false, -1, error, "");
+    }
+
+    // 读取长度
+    ssize_t n = read(pipeFds[0], &len, sizeof(len));
+    if (n != sizeof(len) || len == 0 || len > 10 * 1024 * 1024) {
+        close(pipeFds[0]);
+        waitpid(pid, nullptr, 0);
+        std::string error = "Invalid response from link child";
+        LOGE("%s (n=%zd, len=%u)", error.c_str(), n, len);
+        return buildResponseJson(false, -1, error, "");
+    }
+
+    // 读取响应体
+    response.resize(len);
+    size_t received = 0;
+    while (received < len) {
+        n = read(pipeFds[0], &response[received], len - received);
+        if (n <= 0) break;
+        received += static_cast<size_t>(n);
+    }
+
+    close(pipeFds[0]);
+
+    // 等待子进程退出
+    int status;
+    waitpid(pid, &status, 0);
+
+    if (received != len) {
+        std::string error = "Incomplete response from link child";
+        LOGE("%s (received=%zu, expected=%u)", error.c_str(), received, len);
+        return buildResponseJson(false, -1, error, "");
+    }
+
+    LOGI("executeLink done (child exited with status=%d)", WEXITSTATUS(status));
     return response;
 }
 
@@ -315,30 +413,68 @@ std::string executeLink(const LinkRequest& req, bool isShared) {
 namespace {
 
 bool sendMessage(int fd, uint16_t type, const std::string& body) {
+    auto writeFully = [](int outFd, const void* data, size_t size) -> bool {
+        const char* ptr = static_cast<const char*>(data);
+        size_t written = 0;
+        while (written < size) {
+            ssize_t n = write(outFd, ptr + written, size - written);
+            if (n < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                LOGE("write failed: %s", strerror(errno));
+                return false;
+            }
+            if (n == 0) {
+                LOGE("write returned 0 (size=%zu, written=%zu)", size, written);
+                return false;
+            }
+            written += static_cast<size_t>(n);
+        }
+        return true;
+    };
+
     LinkMessageHeader header;
     header.length = static_cast<uint32_t>(body.size());
     header.type = type;
     header.version = LINK_SERVER_PROTOCOL_VERSION;
 
-    // 发送消息头
-    if (write(fd, &header, sizeof(header)) != sizeof(header)) {
-        LOGE("Failed to send message header");
+    if (!writeFully(fd, &header, sizeof(header))) {
+        LOGE("Failed to send message header (type=%u, len=%u)", header.type, header.length);
         return false;
     }
 
-    // 发送消息体
-    if (!body.empty()) {
-        if (write(fd, body.c_str(), body.size()) != static_cast<ssize_t>(body.size())) {
-            LOGE("Failed to send message body");
-            return false;
-        }
+    if (!body.empty() && !writeFully(fd, body.data(), body.size())) {
+        LOGE("Failed to send message body (%zu bytes)", body.size());
+        return false;
     }
 
+    LOGI("Sent response header type=%u len=%u", header.type, header.length);
     return true;
 }
 
 bool receiveMessage(int fd, uint16_t& type, std::string& body, int timeoutMs) {
-    // 等待数据
+    auto readFully = [](int inFd, void* data, size_t size) -> bool {
+        char* ptr = static_cast<char*>(data);
+        size_t total = 0;
+        while (total < size) {
+            ssize_t n = read(inFd, ptr + total, size - total);
+            if (n == 0) {
+                LOGE("read returned 0 (expected %zu)", size);
+                return false;
+            }
+            if (n < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                LOGE("read failed: %s", strerror(errno));
+                return false;
+            }
+            total += static_cast<size_t>(n);
+        }
+        return true;
+    };
+
     struct pollfd pfd;
     pfd.fd = fd;
     pfd.events = POLLIN;
@@ -346,23 +482,27 @@ bool receiveMessage(int fd, uint16_t& type, std::string& body, int timeoutMs) {
 
     int pollResult = poll(&pfd, 1, timeoutMs);
     if (pollResult <= 0) {
-        return false;  // 超时或错误
-    }
-
-    // 读取消息头
-    LinkMessageHeader header;
-    ssize_t n = read(fd, &header, sizeof(header));
-    if (n != sizeof(header)) {
+        if (pollResult == 0) {
+            LOGW("Server receive timeout after %d ms", timeoutMs);
+        } else {
+            LOGE("Server poll failed: %s", strerror(errno));
+        }
         return false;
     }
 
+    LinkMessageHeader header;
+    if (!readFully(fd, &header, sizeof(header))) {
+        LOGE("Failed to read request header");
+        return false;
+    }
+
+    LOGI("Server received header type=%u len=%u", header.type, header.length);
     type = header.type;
 
-    // 读取消息体
     if (header.length > 0) {
         body.resize(header.length);
-        n = read(fd, &body[0], header.length);
-        if (n != static_cast<ssize_t>(header.length)) {
+        if (!readFully(fd, &body[0], header.length)) {
+            LOGE("Failed to read request body (%u bytes)", header.length);
             return false;
         }
     } else {
@@ -376,6 +516,7 @@ void handleClient(int clientFd) {
     LOGI("Client connected");
 
     while (g_running) {
+        bool shouldClose = false;
         uint16_t msgType;
         std::string msgBody;
 
@@ -391,9 +532,15 @@ void handleClient(int clientFd) {
                 LinkRequest req;
                 if (parseRequest(msgBody, req)) {
                     std::string response = executeLink(req, true);
-                    sendMessage(clientFd, LINK_MSG_RESPONSE, response);
+                    if (!sendMessage(clientFd, LINK_MSG_RESPONSE, response)) {
+                        LOGE("Failed to send shared link response");
+                        shouldClose = true;
+                    }
                 } else {
-                    sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Invalid request\"}");
+                    if (!sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Invalid request\"}")) {
+                        LOGE("Failed to send error response");
+                        shouldClose = true;
+                    }
                 }
                 break;
             }
@@ -402,15 +549,24 @@ void handleClient(int clientFd) {
                 LinkRequest req;
                 if (parseRequest(msgBody, req)) {
                     std::string response = executeLink(req, false);
-                    sendMessage(clientFd, LINK_MSG_RESPONSE, response);
+                    if (!sendMessage(clientFd, LINK_MSG_RESPONSE, response)) {
+                        LOGE("Failed to send executable link response");
+                        shouldClose = true;
+                    }
                 } else {
-                    sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Invalid request\"}");
+                    if (!sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Invalid request\"}")) {
+                        LOGE("Failed to send error response");
+                        shouldClose = true;
+                    }
                 }
                 break;
             }
 
             case LINK_MSG_PING:
-                sendMessage(clientFd, LINK_MSG_PONG, "{\"alive\":true}");
+                if (!sendMessage(clientFd, LINK_MSG_PONG, "{\"alive\":true}")) {
+                    LOGE("Failed to send pong");
+                    shouldClose = true;
+                }
                 break;
 
             case LINK_MSG_SHUTDOWN:
@@ -421,8 +577,14 @@ void handleClient(int clientFd) {
 
             default:
                 LOGW("Unknown message type: %d", msgType);
-                sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Unknown message type\"}");
+                if (!sendMessage(clientFd, LINK_MSG_ERROR, "{\"error\":\"Unknown message type\"}")) {
+                    shouldClose = true;
+                }
                 break;
+        }
+
+        if (shouldClose) {
+            break;
         }
     }
 

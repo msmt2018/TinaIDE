@@ -27,4 +27,7 @@
     <color name="lsp_status_connected">#4CAF50</color>
     <color name="lsp_status_disconnected">#F44336</color>
     <color name="lsp_status_initializing">#FFC107</color>
+
+    <!-- Button colors -->
+    <color name="button_tonal_background">#2D3D3B</color>
 </resources>

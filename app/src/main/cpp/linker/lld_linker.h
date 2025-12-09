@@ -1,10 +1,9 @@
 // LLD 链接器接口
 // 提供可执行文件和共享库的链接功能
 //
-// 本实现通过 dlopen/dlclose 动态加载 liblld_linker.so 来执行链接。
-// 每次链接完成后 dlclose() 清理 LLD 全局状态，解决 duplicate symbol 问题。
-//
-// 使用前必须调用 initLinker() 设置 liblld_linker.so 的路径。
+// 实际链接逻辑委托给独立的 link server 进程（参见 docs/LLD-Process-Isolation.md）。
+// 每次链接通过 IPC 请求 link server，在隔离进程内 dlopen/liblld_linker.so 并清理
+// 其全局状态，避免 duplicate symbol 与 fork 死锁问题。
 
 #ifndef TINAIDE_LLD_LINKER_H
 #define TINAIDE_LLD_LINKER_H
@@ -14,11 +13,6 @@
 
 namespace tinaide {
 namespace linker {
-
-// 初始化链接器
-// 必须在调用任何链接函数之前调用此函数
-// @param nativeLibDir 包含 liblld_linker.so 的目录路径（通常是 applicationInfo.nativeLibraryDir）
-void initLinker(const std::string& nativeLibDir);
 
 // 链接选项结构
 struct LinkOptions {

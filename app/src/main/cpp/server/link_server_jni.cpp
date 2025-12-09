@@ -8,6 +8,9 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <android/log.h>
+#include <string>
+#include <cerrno>
+#include <cstring>
 
 #define LOG_TAG "LinkServerJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -82,12 +85,11 @@ Java_com_wuxianggujun_tinaide_core_nativebridge_NativeLoader_forkLinkServer(
 
     if (pid == 0) {
         // ====== 子进程（守护进程）======
-        // 关闭继承的文件描述符（除了标准流）
-        for (int fd = 3; fd < 1024; ++fd) {
-            close(fd);
-        }
+        // 注意：不要关闭所有文件描述符，因为这会破坏 Android 日志系统
+        // Android 的 __android_log_print 需要与 /dev/log 通信
+        // 只关闭明确不需要的 fd（如继承的 socket 连接等）
 
-        // 创建新的会话
+        // 创建新的会话（但保留日志能力）
         setsid();
 
         // 运行服务器主循环

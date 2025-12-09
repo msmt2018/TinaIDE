@@ -188,14 +188,14 @@ bool sendMessage(uint16_t type, const std::string& body) {
     header.version = LINK_SERVER_PROTOCOL_VERSION;
 
     if (write(g_socketFd, &header, sizeof(header)) != sizeof(header)) {
-        LOGE("Failed to send message header");
+        LOGE("Failed to send message header (type=%u, len=%u): %s", header.type, header.length, strerror(errno));
         disconnectFromServer();
         return false;
     }
 
     if (!body.empty()) {
         if (write(g_socketFd, body.c_str(), body.size()) != static_cast<ssize_t>(body.size())) {
-            LOGE("Failed to send message body");
+            LOGE("Failed to send message body (%zu bytes): %s", body.size(), strerror(errno));
             disconnectFromServer();
             return false;
         }
@@ -207,6 +207,26 @@ bool sendMessage(uint16_t type, const std::string& body) {
 bool receiveMessage(uint16_t& type, std::string& body, int timeoutMs) {
     if (g_socketFd < 0) return false;
 
+    auto readFully = [](int fd, void* buffer, size_t size) -> bool {
+        char* ptr = static_cast<char*>(buffer);
+        size_t received = 0;
+        while (received < size) {
+            ssize_t n = read(fd, ptr + received, size - received);
+            if (n == 0) {
+                return false; // peer closed
+            }
+            if (n < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                LOGE("read failed: %s", strerror(errno));
+                return false;
+            }
+            received += static_cast<size_t>(n);
+        }
+        return true;
+    };
+
     struct pollfd pfd;
     pfd.fd = g_socketFd;
     pfd.events = POLLIN;
@@ -215,7 +235,7 @@ bool receiveMessage(uint16_t& type, std::string& body, int timeoutMs) {
     int pollResult = poll(&pfd, 1, timeoutMs);
     if (pollResult <= 0) {
         if (pollResult == 0) {
-            LOGE("Receive timeout");
+            LOGE("Receive timeout after %d ms", timeoutMs);
         } else {
             LOGE("poll failed: %s", strerror(errno));
         }
@@ -223,27 +243,28 @@ bool receiveMessage(uint16_t& type, std::string& body, int timeoutMs) {
     }
 
     LinkMessageHeader header;
-    ssize_t n = read(g_socketFd, &header, sizeof(header));
-    if (n != sizeof(header)) {
+    if (!readFully(g_socketFd, &header, sizeof(header))) {
         LOGE("Failed to read message header");
         disconnectFromServer();
         return false;
     }
 
+    LOGI("Received header: type=%u len=%u", header.type, header.length);
     type = header.type;
 
-    if (header.length > 0) {
-        body.resize(header.length);
-        n = read(g_socketFd, &body[0], header.length);
-        if (n != static_cast<ssize_t>(header.length)) {
-            LOGE("Failed to read message body");
-            disconnectFromServer();
-            return false;
-        }
-    } else {
+    if (header.length == 0) {
         body.clear();
+        return true;
     }
 
+    body.resize(header.length);
+    if (!readFully(g_socketFd, &body[0], header.length)) {
+        LOGE("Failed to read message body (%u bytes expected)", header.length);
+        disconnectFromServer();
+        return false;
+    }
+
+    LOGI("Received body (%zu bytes)", body.size());
     return true;
 }
 

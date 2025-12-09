@@ -25,7 +25,7 @@
             <!-- 编译按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_compile"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="编译"
@@ -35,7 +35,7 @@
             <!-- 停止按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_stop"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="停止"
@@ -45,7 +45,7 @@
             <!-- 清空日志 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_clear"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="清空"
@@ -55,7 +55,7 @@
             <!-- 打开输出界面按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_open_output"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="打开输出"

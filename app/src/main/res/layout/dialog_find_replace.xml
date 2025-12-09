@@ -82,7 +82,7 @@
 
         <Button
             android:id="@+id/btn_find_previous"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
@@ -91,7 +91,7 @@
 
         <Button
             android:id="@+id/btn_find_next"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
@@ -108,7 +108,7 @@
 
         <Button
             android:id="@+id/btn_replace"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
@@ -117,7 +117,7 @@
 
         <Button
             android:id="@+id/btn_replace_all"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Primary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"

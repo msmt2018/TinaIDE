@@ -26,7 +26,7 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_add_file"
-        style="@style/Widget.Material3.Button.IconButton"
+        style="@style/Widget.App.Button.Icon"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:contentDescription="添加文件"

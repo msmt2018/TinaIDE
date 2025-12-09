@@ -34,6 +34,20 @@
 -keep class com.wuxianggujun.tinaide.core.nativebridge.SysrootInstaller { *; }
 -keep class com.wuxianggujun.tinaide.core.nativebridge.SysrootLibraryLoader { *; }
 
+# RunExecutionResult - Native 代码通过 FindClass 和构造函数创建实例
+-keep class com.wuxianggujun.tinaide.core.nativebridge.RunExecutionResult {
+    <init>(int, java.lang.String);
+    *;
+}
+
+# LSP 服务 - Native 回调方法（从 C++ JNI 调用）
+# 这些方法不是 native 方法，而是被 native 代码回调的普通方法
+-keep class com.wuxianggujun.tinaide.lsp.LspService {
+    public static void handleNativeHealthEvent(java.lang.String, java.lang.String);
+    public static void handleNativeDiagnostics(java.lang.String, java.util.List);
+    native <methods>;
+}
+
 # ============================================================================
 # Android 组件 - 必须保留
 # ============================================================================
@@ -130,6 +144,15 @@
 
 # Tree-sitter 支持
 -keep class io.github.rosemoe.sora.langs.treesitter.** { *; }
+
+# Tree-sitter JNI 绑定类 - 必须保留（native 代码通过字段名访问）
+# TSNode 的 context、id、treePointer 字段被 JNI 直接访问
+-keep class com.wuxianggujun.tinaide.treesitter.** { *; }
+-keepclassmembers class com.wuxianggujun.tinaide.treesitter.TSNode {
+    private int[] context;
+    private long id;
+    private long treePointer;
+}
 
 # ============================================================================
 # TreeView 组件

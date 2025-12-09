@@ -62,8 +62,10 @@ class CompileProjectUseCase(
         projectName: String,
         onProgress: (CompileProgress) -> Unit
     ): Result = withContext(Dispatchers.IO) {
-        // 加载本地库和 sysroot
+        // 加载本地库、确保链接服务器存活，然后准备 sysroot
         NativeLoader.loadIfNeeded()
+        // 如果 IDE 从后台恢复后守护进程被系统杀掉，确保在真正编译前重新 fork
+        NativeLoader.startLinkServerIfNeeded()
         val sysrootDir = SysrootInstaller.ensureInstalled(appContext)
 
         val abi = android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"

@@ -129,4 +129,34 @@
         <item name="android:textColorHint">#80FFFFFF</item>
         <item name="errorTextColor">@color/dark_error</item>
     </style>
+
+    <!-- ========== 统一按钮样式 ========== -->
+
+    <!-- 主要操作按钮（填充样式） -->
+    <style name="Widget.App.Button.Primary" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/dark_secondary</item>
+        <item name="android:textColor">@color/dark_on_secondary</item>
+    </style>
+
+    <!-- 次要操作按钮（色调样式） -->
+    <style name="Widget.App.Button.Secondary" parent="Widget.Material3.Button.TonalButton">
+        <item name="backgroundTint">@color/button_tonal_background</item>
+        <item name="android:textColor">@color/dark_on_surface</item>
+    </style>
+
+    <!-- 文本按钮（低强调） -->
+    <style name="Widget.App.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/dark_secondary</item>
+    </style>
+
+    <!-- 危险操作按钮 -->
+    <style name="Widget.App.Button.Danger" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/dark_error</item>
+        <item name="android:textColor">@color/dark_on_error</item>
+    </style>
+
+    <!-- 图标按钮 -->
+    <style name="Widget.App.Button.Icon" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">@color/dark_on_surface</item>
+    </style>
 </resources>
