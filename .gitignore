@@ -24,6 +24,7 @@ log.txt
 *.jks
 *.keystore
 keystore.properties
+keystore/
 nul
 # Ignore large offline bootstrap archives by default; keep README
 app/src/main/assets/bootstrap/**/*.zip
