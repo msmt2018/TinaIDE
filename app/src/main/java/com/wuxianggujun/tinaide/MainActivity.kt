@@ -22,6 +22,7 @@ import com.wuxianggujun.tinaide.extensions.toastWarning
 import com.wuxianggujun.tinaide.extensions.handleErrorWithToast
 import com.wuxianggujun.tinaide.ui.CompilerViewModel
 import com.wuxianggujun.tinaide.ui.CompileState
+import com.wuxianggujun.tinaide.ui.CompileEvent
 
 import com.wuxianggujun.tinaide.lsp.model.Diagnostic
 import com.wuxianggujun.tinaide.utils.FileUtils
@@ -125,24 +126,37 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                compilerViewModel.state.collect { state ->
-                    when (state) {
-                        is CompileState.Idle -> {
-                            hideLoading()
+                launch {
+                    compilerViewModel.state.collect { state ->
+                        when (state) {
+                            is CompileState.Idle -> {
+                                hideLoading()
+                            }
+                            is CompileState.Compiling -> {
+                                showLoading("正在编译项目...", cancelable = false)
+                                bottomPanelManager.setBuildSucceeded(false)
+                            }
                         }
-                        is CompileState.Compiling -> {
-                            showLoading("正在编译项目...", cancelable = false)
-                            bottomPanelManager.setBuildSucceeded(false)
-                        }
-                        is CompileState.Success -> {
-                            hideLoading()
-                            toastSuccess("编译完成")
-                            bottomPanelManager.setBuildSucceeded(true)
-                        }
-                        is CompileState.Error -> {
-                            hideLoading()
-                            toastError(state.message)
-                            bottomPanelManager.setBuildSucceeded(false)
+                    }
+                }
+                launch {
+                    compilerViewModel.events.collect { event ->
+                        when (event) {
+                            is CompileEvent.Success -> {
+                                bottomPanelManager.setBuildSucceeded(true)
+                                toastSuccess("编译完成")
+                                if (outputManager.getOutputMode() == IOutputManager.OutputMode.ACTIVITY) {
+                                    outputManager.showOutput()
+                                } else {
+                                    bottomPanelManager.expand()
+                                }
+                            }
+                            is CompileEvent.Error -> {
+                                toastError(event.message)
+                                bottomPanelManager.setBuildSucceeded(false)
+                                bottomPanelManager.switchToBuildLog()
+                                bottomPanelManager.expand()
+                            }
                         }
                     }
                 }
@@ -330,16 +344,9 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
     }
 
     private fun onCompileProject() {
-        when (outputManager.getOutputMode()) {
-            IOutputManager.OutputMode.BOTTOM_PANEL -> {
-                bottomPanelManager.clearBuildLog()
-                bottomPanelManager.switchToBuildLog()
-                bottomPanelManager.expand()
-            }
-            IOutputManager.OutputMode.ACTIVITY -> {
-                outputManager.showOutput()
-            }
-        }
+        bottomPanelManager.clearBuildLog()
+        bottomPanelManager.switchToBuildLog()
+        bottomPanelManager.expand()
         compilerViewModel.compile()
     }
 

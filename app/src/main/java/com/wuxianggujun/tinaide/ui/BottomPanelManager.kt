@@ -234,9 +234,9 @@ class BottomPanelManager(
     private fun updateLspStatus(connected: Boolean, message: String) {
         val context = binding.root.context
         val color = if (connected) {
-            ContextCompat.getColor(context, R.color.lsp_status_connected)
+            ContextCompat.getColor(context, R.color.lspStatusConnected)
         } else {
-            ContextCompat.getColor(context, R.color.lsp_status_disconnected)
+            ContextCompat.getColor(context, R.color.lspStatusDisconnected)
         }
         
         binding.lspStatusIndicator.backgroundTintList = 
