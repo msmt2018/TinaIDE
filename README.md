@@ -4,6 +4,26 @@
 
 [English](README_EN.md)
 
+---
+
+## ⚠️ 重要公告
+
+**这是 TinaIDE 的最终开源版本。**
+
+本仓库包含了完整的基础构建和编译功能实现，旨在为社区提供一个可用的 Android C/C++ 移动开发参考实现。后续的功能更新将迁移至私有仓库进行开发，本仓库将不再接收代码更新。
+
+**开源内容包括：**
+- 完整的 Clang/LLVM 17 编译器集成
+- LLD 链接器（含进程隔离解决方案）
+- clangd LSP 语言服务集成
+- Tree-sitter 语法高亮
+- 基于 Sora Editor 的代码编辑器
+- Android NDK sysroot 集成
+
+感谢社区的关注与支持！
+
+---
+
 TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手机或平板上直接编写、编译和运行 C/C++ 代码。内置完整的 Clang/LLVM 工具链和 clangd 语言服务器，提供接近桌面 IDE 的开发体验。
 
 ## 特性
@@ -38,9 +58,42 @@ TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手
 | 功能 | 说明 |
 |------|------|
 | 进程内编译 | Clang/LLVM 以动态库形式集成，无需 fork 外部进程 |
-| LLD 链接器 | 使用 LLVM LLD 进行快速链接 |
+| LLD 链接器 | 使用 LLVM LLD 进行快速链接（进程隔离模式） |
 | 共享库输出 | 编译为 .so 文件，支持进程内加载运行 |
 | 完整 Sysroot | Android NDK 头文件和运行时库 |
+
+#### LLD 进程隔离解决方案
+
+LLVM 17 的 LLD 链接器存在全局状态问题：当作为库多次调用 `lld::elf::link()` 时，内部的全局符号表不会自动重置，导致第二次及后续链接时出现 "duplicate symbol" 错误。
+
+**症状示例：**
+```
+ld.lld: error: duplicate symbol: main
+>>> defined at main.cpp
+>>>            .../main.cpp.o:(main)
+>>> defined at main.cpp
+>>>            .../main.cpp.o:(.text+0x0)
+```
+
+**解决方案：** 采用进程隔离策略，每次链接操作都在独立的子进程（`fork()`）中执行，确保全局状态完全干净。
+
+```
+父进程 (TinaIDE)                    子进程 (链接器)
+      │                                   │
+      ├─ 构建链接参数                      │
+      ├─ 创建管道                          │
+      ├─ fork() ──────────────────────────┤
+      │                                   ├─ 重定向输出到管道
+      ├─ 等待子进程                        ├─ 调用 lld::elf::link()
+      │                                   ├─ 输出诊断信息
+      ├─ 收集输出 ◄────────────────────────┤
+      ├─ 解析结果                          └─ _exit(0/1)
+      └─ 返回 LinkResult
+```
+
+详细的技术实现请参考 [LLD 进程隔离架构文档](docs/LLD-Process-Isolation.md)。
+
+> **注**：LLVM 主分支（预计 LLVM 19+）已完全移除 LLD 的全局变量，届时可考虑移除进程隔离。参考：[Removing global state from LLD](https://maskray.me/blog/2024-11-17-removing-global-state-from-lld)
 
 ### LSP 语言服务
 
@@ -209,9 +262,9 @@ TinaIDE/
 
 ## 许可证
 
-**版本 1.0.0** 采用 [TinaIDE 开源许可证](LICENSE) 发布。
+本仓库为 **TinaIDE 最终开源版本**，采用 [TinaIDE 开源许可证](LICENSE) 发布。
 
-> **注意**：从版本 1.1.0 开始，源代码将不再公开。但预编译的 APK 安装包仍会继续在本仓库发布。
+开源部分包含完整的基础构建编译功能，供学习和参考使用。后续功能更新将在私有仓库进行，本仓库不再接收代码更新。
 
 详见 [LICENSE](LICENSE) 文件。
 
