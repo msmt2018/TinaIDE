@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCpp
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
+import com.wuxianggujun.tinaide.editor.language.common.LspCompletionAwaiter
 import com.wuxianggujun.tinaide.lsp.LspRequestDispatcher
 import com.wuxianggujun.tinaide.lsp.LspResultCache
 import com.wuxianggujun.tinaide.lsp.project.LspProjectManager
@@ -286,35 +287,44 @@ private object CNativeCompletionDispatcher {
         val needsExtendedTimeout = allowEmptyPrefix
         val timeoutOverrideMs = if (needsExtendedTimeout) MEMBER_COMPLETION_TIMEOUT_MS else null
 
-        LspRequestDispatcher.requestCompletion(
-            filePath = filePath,
-            line = position.line,
-            column = position.column,
-            workDir = workDir,
-            onResult = { completionResult ->
-                if (completionResult == null) {
-                    Log.w(TAG, "Completion result empty for key=$key, trying fallback")
-                    if (!deliverFallback(" [fallback]")) {
-                        Log.w(TAG, "Fallback completion also unavailable for key=$key")
-                        publisher.updateList(false)
-                    }
-                    return@requestCompletion
-                }
-                if (completionResult.items.isNotEmpty()) {
-                    LspResultCache.putCompletion(
-                        filePath = filePath,
-                        line = position.line,
-                        identifierStart = identifierStart,
-                        identifierSnapshot = identifierPrefixSnapshot,
-                        scopeSignature = scopeSignature,
-                        documentVersion = documentVersion,
-                        result = completionResult
-                    )
-                }
-                deliverResult(completionResult, "", true, true)
-            },
-            timeoutMs = timeoutOverrideMs
-        )
+        val completionResult = LspCompletionAwaiter.awaitResult(
+            key = key,
+            logTag = TAG,
+            timeoutOverrideMs = timeoutOverrideMs,
+            publisher = publisher
+        ) { callback ->
+            LspRequestDispatcher.requestCompletion(
+                filePath = filePath,
+                line = position.line,
+                column = position.column,
+                workDir = workDir,
+                onResult = callback,
+                timeoutMs = timeoutOverrideMs
+            )
+        }
+
+        if (completionResult == null) {
+            Log.w(TAG, "Completion result empty for key=$key, trying fallback")
+            if (!deliverFallback(" [fallback]")) {
+                Log.w(TAG, "Fallback completion also unavailable for key=$key")
+                publisher.updateList(false)
+            }
+            return true
+        }
+
+        if (completionResult.items.isNotEmpty()) {
+            LspResultCache.putCompletion(
+                filePath = filePath,
+                line = position.line,
+                identifierStart = identifierStart,
+                identifierSnapshot = identifierPrefixSnapshot,
+                scopeSignature = scopeSignature,
+                documentVersion = documentVersion,
+                result = completionResult
+            )
+        }
+
+        deliverResult(completionResult, "", true, true)
         return true
     }
 

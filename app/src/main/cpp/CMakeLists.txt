@@ -26,6 +26,10 @@ add_library(native_compiler SHARED
     lsp/clangd_server.cpp
     lsp/simple/simple_lsp_client.cpp
     lsp/simple/simple_lsp_jni.cpp
+    # Link Server 模块（链接守护进程）
+    server/link_server.cpp
+    server/link_client.cpp
+    server/link_server_jni.cpp
     # Tree-sitter 核心库（使用 lib.c 单文件版本）
     treesitter/lib/src/lib.c
     # Tree-sitter 核心 JNI 绑定
@@ -113,17 +117,67 @@ endif()
 # LLD 静态库（可选）
 set(LLD_COMMON_A ${PREBUILT_LIBS_DIR}/liblldCommon.a)
 set(LLD_ELF_A    ${PREBUILT_LIBS_DIR}/liblldELF.a)
+set(HAVE_LLD_LIBS OFF)
+
 if(EXISTS ${LLD_COMMON_A} AND EXISTS ${LLD_ELF_A})
+    set(HAVE_LLD_LIBS ON)
     add_library(lldCommon STATIC IMPORTED GLOBAL)
     set_target_properties(lldCommon PROPERTIES IMPORTED_LOCATION ${LLD_COMMON_A})
     add_library(lldELF STATIC IMPORTED GLOBAL)
     set_target_properties(lldELF PROPERTIES IMPORTED_LOCATION ${LLD_ELF_A})
-    target_link_libraries(native_compiler PRIVATE lldELF lldCommon)
     add_definitions(-DLLD_LINK_ENABLED=1)
-    message(STATUS "Prebuilt LLD detected. In-process LLD: ON")
+    message(STATUS "Prebuilt LLD detected. LLD linking: ON")
 else()
     add_definitions(-DLLD_LINK_ENABLED=0)
-    message(STATUS "Prebuilt LLD not found. In-process LLD: OFF")
+    message(STATUS "Prebuilt LLD not found. LLD linking: OFF")
+endif()
+
+# ============================================================================
+# liblld_linker.so - 独立的 LLD 链接器库
+# ============================================================================
+# 这个库包含 LLD 链接逻辑，设计为可通过 dlopen/dlclose 动态加载。
+# 每次链接后 dlclose 可以清理 LLD 的全局状态，解决 duplicate symbol 问题。
+
+if(HAVE_LLD_LIBS AND HAVE_LLVM_HEADERS AND HAVE_LLVM_LIBS)
+    add_library(lld_linker SHARED
+        linker/lld_linker_impl.cpp
+        utils/file_utils.cpp
+    )
+
+    target_include_directories(lld_linker PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${COMMON_HEADERS}
+        ${COMMON_HEADERS}/llvm
+        ${COMMON_HEADERS}/llvm/llvm
+        ${COMMON_HEADERS}/llvm/llvm/Config
+        ${COMMON_HEADERS}/clang
+        ${COMMON_HEADERS}/clang-c
+    )
+
+    target_compile_definitions(lld_linker PRIVATE
+        LLVM_HEADERS_AVAILABLE=1
+        LLD_LINK_ENABLED=1
+    )
+
+    # LLD 链接器库需要链接 LLD 静态库和 LLVM 运行时
+    target_link_libraries(lld_linker PRIVATE
+        lldELF
+        lldCommon
+        LLVM-17
+        clang-cpp
+        c++_shared
+        ${log-lib}
+    )
+
+    target_link_options(lld_linker PRIVATE
+        -Wl,--allow-shlib-undefined
+        -Wl,--unresolved-symbols=ignore-in-shared-libs
+        -Wl,-z,undefs
+    )
+
+    message(STATUS "Building liblld_linker.so for dlopen/dlclose usage")
+else()
+    message(STATUS "Skipping liblld_linker.so (missing LLD or LLVM libs)")
 endif()
 
 # ============================================================================

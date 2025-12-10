@@ -487,26 +487,35 @@ public class EditorAutoCompletion extends EditorPopupWindow implements EditorBui
      */
     public boolean select(int pos) {
         if (pos == -1) {
+            Log.d("EditorAutoCompletion", "select() called with pos=-1, returning false");
             return false;
         }
         var adpView = layout.getCompletionList();
         var item = ((EditorCompletionAdapter) adpView.getAdapter()).getItem(pos);
         Cursor cursor = editor.getCursor();
         final var completionThread = this.completionThread;
+        Log.d("EditorAutoCompletion", "select() pos=" + pos + " item=" + (item != null ? item.label : "null")
+            + " cursorSelected=" + cursor.isSelected()
+            + " completionThread=" + (completionThread != null ? "exists" : "NULL"));
         if (!cursor.isSelected() && completionThread != null) {
             cancelShowUp = true;
             editor.beginComposingTextRejection();
             editor.getText().beginBatchEdit();
             editor.restartInput();
             try {
+                Log.d("EditorAutoCompletion", "performCompletion() requestPosition=" + completionThread.requestPosition);
                 item.performCompletion(editor, editor.getText(), completionThread.requestPosition);
                 editor.updateCursor();
+                Log.d("EditorAutoCompletion", "performCompletion() completed successfully");
             } finally {
                 editor.getText().endBatchEdit();
                 editor.endComposingTextRejection();
                 cancelShowUp = false;
             }
             editor.restartInput();
+        } else {
+            Log.w("EditorAutoCompletion", "select() SKIPPED performCompletion! cursorSelected=" + cursor.isSelected()
+                + " completionThread=" + (completionThread != null ? "exists" : "NULL"));
         }
         hide();
         return true;

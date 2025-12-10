@@ -129,6 +129,15 @@ class LogTextView @JvmOverloads constructor(
     private val scaleDetector = ScaleGestureDetector(context, ScaleListener())
     
     private val badgeRect = RectF()
+    private val scrollbarRect = RectF()
+    private val scrollbarTouchRect = RectF()  // 滚动条触摸热区（比可见区域更大）
+    private val scrollbarPaint = Paint().apply { color = 0x80FFFFFF.toInt() }  // 更不透明，更容易看见
+    private var isDraggingScrollbar = false
+    private var scrollbarTouchOffset = 0f
+    private val scrollbarThickness = 8f  // 加粗滚动条
+    private val scrollbarMargin = 4f
+    private val scrollbarTouchPadding = 24f  // 触摸热区向左扩展的距离
+    private val minScrollbarHeight = 48f
 
     init {
         setBackgroundColor(0xFF1E1E1E.toInt())
@@ -632,22 +641,42 @@ class LogTextView @JvmOverloads constructor(
     }
 
     private fun drawScrollbars(canvas: Canvas) {
-        if (maxScrollY > 0) {
-            val scrollbarHeight = (height * height / totalContentHeight).coerceAtLeast(40f)
-            val scrollbarY = scrollY / maxScrollY * (height - scrollbarHeight)
-            
-            val scrollbarPaint = Paint().apply { color = 0x60FFFFFF }
-            canvas.drawRoundRect(
-                width - 8f, scrollbarY,
-                width - 2f, scrollbarY + scrollbarHeight,
-                3f, 3f, scrollbarPaint
+        if (maxScrollY > 0 && totalContentHeight > 0f) {
+            val availableRange = height.toFloat()
+            val thumbHeight = (availableRange * availableRange / totalContentHeight)
+                .coerceAtLeast(minScrollbarHeight)
+                .coerceAtMost(availableRange)
+            val range = (availableRange - thumbHeight).coerceAtLeast(0f)
+            val ratio = if (maxScrollY > 0f) (scrollY / maxScrollY).coerceIn(0f, 1f) else 0f
+            val thumbTop = range * ratio
+            val left = width - scrollbarThickness - scrollbarMargin
+            val right = width - scrollbarMargin
+            scrollbarRect.set(left, thumbTop, right, thumbTop + thumbHeight)
+            // 设置触摸热区（比可见滚动条更宽，方便点击）
+            scrollbarTouchRect.set(
+                left - scrollbarTouchPadding,
+                thumbTop,
+                right,
+                thumbTop + thumbHeight
             )
+            canvas.drawRoundRect(scrollbarRect, 4f, 4f, scrollbarPaint)
+        } else {
+            scrollbarRect.setEmpty()
+            scrollbarTouchRect.setEmpty()
         }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // 使用更大的触摸热区检测滚动条点击
+                if (maxScrollY > 0f && scrollbarTouchRect.contains(event.x, event.y)) {
+                    isDraggingScrollbar = true
+                    scrollbarTouchOffset = event.y - scrollbarRect.top
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return true
+                }
+
                 // 检查是否点击了句柄
                 if (hasSelection()) {
                     val hitHandle = checkHandleHit(event.x, event.y)
@@ -661,6 +690,11 @@ class LogTextView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (isDraggingScrollbar) {
+                    updateScrollFromScrollbar(event.y)
+                    return true
+                }
+
                 // 如果正在拖动句柄
                 if (draggingHandle != DraggingHandle.NONE) {
                     val pos = getLineAndColumnAt(event.x, event.y)
@@ -694,6 +728,11 @@ class LogTextView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (isDraggingScrollbar) {
+                    isDraggingScrollbar = false
+                    return true
+                }
+
                 // 结束句柄拖动
                 if (draggingHandle != DraggingHandle.NONE) {
                     draggingHandle = DraggingHandle.NONE
@@ -719,6 +758,16 @@ class LogTextView @JvmOverloads constructor(
         gestureDetector.onTouchEvent(event)
 
         return true
+    }
+
+    private fun updateScrollFromScrollbar(touchY: Float) {
+        val thumbHeight = scrollbarRect.height().coerceAtLeast(minScrollbarHeight)
+        val availableRange = (height - thumbHeight).coerceAtLeast(0f)
+        if (availableRange <= 0f) return
+        val desiredTop = (touchY - scrollbarTouchOffset).coerceIn(0f, availableRange)
+        val ratio = if (availableRange > 0f) desiredTop / availableRange else 0f
+        scrollY = (ratio * maxScrollY).coerceIn(0f, maxScrollY)
+        invalidate()
     }
 
     /**

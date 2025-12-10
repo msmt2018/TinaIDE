@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -7,40 +8,34 @@
 
     <!-- 查找输入框 -->
     <com.google.android.material.textfield.TextInputLayout
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        style="@style/Widget.App.TextInputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="查找"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        app:boxStrokeColor="@color/dark_secondary"
-        app:hintTextColor="@color/dark_secondary">
+        android:hint="查找">
 
         <com.google.android.material.textfield.TextInputEditText
+            style="@style/Widget.App.TextInputEditText"
             android:id="@+id/et_find"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:textColor="@color/dark_on_surface" />
+            android:singleLine="true" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
     <!-- 替换输入框 -->
     <com.google.android.material.textfield.TextInputLayout
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        style="@style/Widget.App.TextInputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:hint="替换为"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        app:boxStrokeColor="@color/dark_secondary"
-        app:hintTextColor="@color/dark_secondary">
+        android:hint="替换为">
 
         <com.google.android.material.textfield.TextInputEditText
+            style="@style/Widget.App.TextInputEditText"
             android:id="@+id/et_replace"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:textColor="@color/dark_on_surface" />
+            android:singleLine="true" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -82,7 +77,7 @@
 
         <Button
             android:id="@+id/btn_find_previous"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
@@ -91,7 +86,7 @@
 
         <Button
             android:id="@+id/btn_find_next"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
@@ -108,7 +103,7 @@
 
         <Button
             android:id="@+id/btn_replace"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Secondary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
@@ -117,7 +112,7 @@
 
         <Button
             android:id="@+id/btn_replace_all"
-            style="?attr/materialButtonOutlinedStyle"
+            style="@style/Widget.App.Button.Primary"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"

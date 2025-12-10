@@ -10,24 +10,20 @@
     android:paddingBottom="16dp">
 
     <com.google.android.material.textfield.TextInputLayout
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        style="@style/Widget.App.TextInputLayout"
         android:id="@+id/text_input_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:boxStrokeColor="@color/text_input_stroke_color"
-        app:hintTextColor="@color/text_input_hint_color"
         app:errorEnabled="true"
         app:errorTextColor="?attr/colorError">
 
         <com.google.android.material.textfield.TextInputEditText
+            style="@style/Widget.App.TextInputEditText"
             android:id="@+id/edit_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="text"
             android:maxLines="1"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#B3FFFFFF"
-            android:textCursorDrawable="@drawable/cursor_drawable"
             android:imeOptions="actionDone" />
 
     </com.google.android.material.textfield.TextInputLayout>

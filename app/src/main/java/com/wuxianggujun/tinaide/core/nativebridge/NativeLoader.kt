@@ -189,4 +189,83 @@ object NativeLoader {
         allowLibcxx: Boolean = false,
         apiLevel: String? = null
     ) = preloadFromSysrootByName(names.toList(), preferRuntime, allowLibcxx, apiLevel)
+
+    // ========================================================================
+    // 链接服务器相关 JNI 方法
+    // ========================================================================
+
+    /**
+     * 在应用启动最早期 fork 链接服务器守护进程。
+     * 必须在其他线程启动之前调用，以避免 fork 死锁。
+     *
+     * @param nativeLibDir 包含 liblld_linker.so 的目录
+     * @param filesDir 应用的 files 目录
+     * @return 服务器进程 PID，失败返回 -1
+     */
+    @JvmStatic
+    external fun forkLinkServer(nativeLibDir: String, filesDir: String): Int
+
+    /**
+     * 检查链接服务器是否在运行
+     */
+    @JvmStatic
+    external fun isLinkServerRunning(): Boolean
+
+    /**
+     * 终止链接服务器
+     */
+    @JvmStatic
+    external fun killLinkServer()
+
+    /**
+     * 获取链接服务器 PID
+     */
+    @JvmStatic
+    external fun getLinkServerPid(): Int
+
+    // 链接服务器状态
+    @Volatile
+    private var linkServerPid: Int = -1
+
+    /**
+     * 启动链接服务器（如果尚未运行）
+     * 应在 TinaApplication.onCreate() 最早期调用
+     */
+    fun startLinkServerIfNeeded() {
+        if (linkServerPid > 0 && isLinkServerRunning()) {
+            Log.i("NativeLoader", "Link server already running (pid=$linkServerPid)")
+            return
+        }
+
+        try {
+            val ctx = TinaApplication.instance
+            val nativeLibDir = ctx.applicationInfo.nativeLibraryDir
+            val filesDir = ctx.filesDir.absolutePath
+
+            Log.i("NativeLoader", "Starting link server...")
+            Log.i("NativeLoader", "nativeLibDir: $nativeLibDir")
+            Log.i("NativeLoader", "filesDir: $filesDir")
+
+            linkServerPid = forkLinkServer(nativeLibDir, filesDir)
+
+            if (linkServerPid > 0) {
+                Log.i("NativeLoader", "Link server started (pid=$linkServerPid)")
+            } else {
+                Log.e("NativeLoader", "Failed to start link server")
+            }
+        } catch (e: Throwable) {
+            Log.e("NativeLoader", "Error starting link server: ${e.message}")
+        }
+    }
+
+    /**
+     * 停止链接服务器
+     */
+    fun stopLinkServer() {
+        if (linkServerPid > 0) {
+            Log.i("NativeLoader", "Stopping link server (pid=$linkServerPid)")
+            killLinkServer()
+            linkServerPid = -1
+        }
+    }
 }

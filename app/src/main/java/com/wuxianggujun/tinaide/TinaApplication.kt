@@ -30,25 +30,61 @@ class TinaApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        
+
+        // ====== 最早期：启动链接服务器守护进程 ======
+        // 必须在任何其他线程启动之前 fork，以避免 fork 死锁问题
+        // 注意：此时 native_compiler 库尚未加载，需要先加载
+        earlyForkLinkServer()
+
         // 初始化日志缓冲区（在 LogcatMonitor 之前）
         BottomLogBuffer.init(this)
-        
+
         // 启动 Logcat 监听（自动捕获所有 Android Log 输出）
         LogcatMonitor.start(packageName)
-        
+
         // 注册全局 Crash 处理器（仅日志→交还系统处理，避免 UI 卡死）
         CrashHandler.install()
-        
+
         // 预注册核心服务，避免页面首次进入时出现"未注册"竞态
         registerCoreServices()
-        
+
         // 统一在 Application 阶段应用主题，避免首个 Activity 因 setDefaultNightMode 触发重建
         applyTheme()
-        
+
         // 初始化 Native 库
         initializeNativeLibraries()
 
+    }
+
+    /**
+     * 最早期 fork 链接服务器守护进程
+     *
+     * 必须在任何其他线程启动之前调用，以避免 fork() 继承已持有的锁导致死锁。
+     * 此方法会：
+     * 1. 先加载 native_compiler 库
+     * 2. 然后 fork 链接服务器
+     */
+    private fun earlyForkLinkServer() {
+        try {
+            // 先尝试加载 libc++_shared（静默失败也可以，因为可能已经内置）
+            try {
+                System.loadLibrary("c++_shared")
+            } catch (_: Throwable) { }
+
+            // 加载 native_compiler 以获得 forkLinkServer JNI 方法
+            try {
+                System.loadLibrary("native_compiler")
+                Log.i(TAG, "native_compiler loaded for early fork")
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to load native_compiler for early fork: ${t.message}")
+                return
+            }
+
+            // Fork 链接服务器
+            NativeLoader.startLinkServerIfNeeded()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to fork link server: ${t.message}", t)
+        }
     }
     
     /**
@@ -155,6 +191,10 @@ class TinaApplication : Application() {
     
     override fun onTerminate() {
         super.onTerminate()
+        // 停止链接服务器
+        try {
+            NativeLoader.stopLinkServer()
+        } catch (_: Throwable) { }
         BottomLogBuffer.shutdown()
         LogcatMonitor.stop()
     }

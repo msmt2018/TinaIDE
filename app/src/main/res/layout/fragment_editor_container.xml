@@ -9,11 +9,11 @@
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
+        android:background="?attr/colorSurface"
         app:tabMode="scrollable"
-        app:tabTextColor="@android:color/white"
-        app:tabSelectedTextColor="@android:color/white"
-        app:tabIndicatorColor="@android:color/white" />
+        app:tabTextColor="?attr/colorOnSurface"
+        app:tabSelectedTextColor="?attr/colorOnSurface"
+        app:tabIndicatorColor="?attr/colorOnSurface" />
 
     <!-- 编辑器区域容器 -->
     <FrameLayout
@@ -56,7 +56,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_undo"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="撤销"
@@ -65,7 +65,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_redo"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="重做"
@@ -81,7 +81,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_find"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="查找"
@@ -90,7 +90,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_goto_line"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="跳转到行"
@@ -99,7 +99,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_native_definition"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="Native 跳转定义"
@@ -108,7 +108,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_native_references"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="Native 引用列表"
@@ -124,7 +124,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_save"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="保存"
@@ -170,7 +170,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_navigation_results_close"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:contentDescription="@string/native_navigation_close"

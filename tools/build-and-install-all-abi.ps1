@@ -1,6 +1,7 @@
 Param(
     [ValidateSet("debug", "release")]
-    [string]$Variant = "debug"
+    [string]$Variant = "debug",
+    [switch]$FullClean
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,6 +46,20 @@ function Ensure-HostFlatc {
 
 Ensure-HostFlatc
 
+function Clean-AllOutputs {
+    Write-Host "Performing full Gradle clean (app/build et al)..." -ForegroundColor Cyan
+    Invoke-GradleTask -Task "clean" -WarnOnly:$false
+    $pathsToRemove = @(
+        (Join-Path $repoRoot "app/build")
+    )
+    foreach ($path in $pathsToRemove) {
+        if (Test-Path $path) {
+            Write-Host "Removing $path" -ForegroundColor DarkGray
+            Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 function Clean-NativeOutputs {
     Write-Host "Cleaning previous native build outputs..." -ForegroundColor Cyan
     $cleanTasks = @(
@@ -64,6 +79,10 @@ function Clean-NativeOutputs {
             Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue
         }
     }
+}
+
+if ($FullClean) {
+    Clean-AllOutputs
 }
 
 Clean-NativeOutputs

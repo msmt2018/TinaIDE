@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import com.wuxianggujun.tinaide.treesitter.languages.TSLanguageCpp
 import com.wuxianggujun.tinaide.editor.EditorDocumentExtras
+import com.wuxianggujun.tinaide.editor.language.common.LspCompletionAwaiter
 import com.wuxianggujun.tinaide.lsp.LspRequestDispatcher
 import com.wuxianggujun.tinaide.lsp.LspResultCache
 import com.wuxianggujun.tinaide.lsp.project.LspProjectManager
@@ -299,37 +300,46 @@ private object CppNativeCompletionDispatcher {
         // 检测触发字符
         val triggerChar = detectTriggerCharacter(completionContext.lineText, completionContext.identifierStart)
         
-        LspRequestDispatcher.requestCompletion(
-            filePath = filePath,
-            line = position.line,
-            column = position.column,
-            workDir = workDir,
-            onResult = { completionResult ->
-                if (completionResult == null) {
-                    Log.w(TAG, "Completion result empty for key=$key, trying fallback")
-                    if (!deliverFallback(" [fallback]")) {
-                        Log.w(TAG, "Fallback completion also unavailable for key=$key")
-                        publisher.updateList(false)
-                    }
-                    return@requestCompletion
-                }
-                // 只缓存完整的结果，不完整的结果不缓存（因为可能缺少某些前缀的补全项）
-                if (completionResult.items.isNotEmpty() && !completionResult.isIncomplete) {
-                    LspResultCache.putCompletion(
-                        filePath = filePath,
-                        line = position.line,
-                        identifierStart = identifierStart,
-                        identifierSnapshot = cacheSnapshot,
-                        scopeSignature = scopeSignature,
-                        documentVersion = documentVersion,
-                        result = completionResult
-                    )
-                }
-                deliverResult(completionResult, "", true, true)
-            },
-            timeoutMs = timeoutOverrideMs,
-            triggerCharacter = triggerChar
-        )
+        val completionResult = LspCompletionAwaiter.awaitResult(
+            key = key,
+            logTag = TAG,
+            timeoutOverrideMs = timeoutOverrideMs,
+            publisher = publisher
+        ) { callback ->
+            LspRequestDispatcher.requestCompletion(
+                filePath = filePath,
+                line = position.line,
+                column = position.column,
+                workDir = workDir,
+                onResult = callback,
+                timeoutMs = timeoutOverrideMs,
+                triggerCharacter = triggerChar
+            )
+        }
+
+        if (completionResult == null) {
+            Log.w(TAG, "Completion result empty for key=$key, trying fallback")
+            if (!deliverFallback(" [fallback]")) {
+                Log.w(TAG, "Fallback completion also unavailable for key=$key")
+                publisher.updateList(false)
+            }
+            return true
+        }
+
+        // 只缓存完整的结果，不完整的结果不缓存（因为可能缺少某些前缀的补全项）
+        if (completionResult.items.isNotEmpty() && !completionResult.isIncomplete) {
+            LspResultCache.putCompletion(
+                filePath = filePath,
+                line = position.line,
+                identifierStart = identifierStart,
+                identifierSnapshot = cacheSnapshot,
+                scopeSignature = scopeSignature,
+                documentVersion = documentVersion,
+                result = completionResult
+            )
+        }
+
+        deliverResult(completionResult, "", true, true)
         return true
     }
 

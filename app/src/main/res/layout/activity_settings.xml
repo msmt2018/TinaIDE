@@ -18,9 +18,9 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:titleTextColor="@color/dark_on_surface"
-            app:subtitleTextColor="@color/dark_on_surface"
-            app:navigationIconTint="@color/dark_on_primary" />
+            app:titleTextColor="?colorOnSurface"
+            app:subtitleTextColor="?colorOnSurfaceVariant"
+            app:navigationIconTint="?colorOnSurface" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- Settings Fragment 容器，内容由 SettingsFragment 提供 -->

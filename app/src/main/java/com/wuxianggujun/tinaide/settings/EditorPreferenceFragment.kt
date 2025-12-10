@@ -8,6 +8,7 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.wuxianggujun.tinaide.R
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.extensions.toast
@@ -151,7 +152,7 @@ class EditorPreferenceFragment : PreferenceFragmentCompat() {
 
     private fun showFontOptions() {
         val items = arrayOf("使用默认字体", "选择字体文件...")
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext(), R.style.ThemeOverlay_App_MaterialAlertDialog)
             .setTitle("自定义字体")
             .setItems(items) { _, which ->
                 when (which) {

@@ -1,9 +1,9 @@
 // LLD 链接器接口
 // 提供可执行文件和共享库的链接功能
 //
-// 重要：由于 LLVM 17 的 LLD 存在全局状态问题，多次调用 lld::elf::link 会导致
-// "duplicate symbol" 错误。因此所有链接操作都在隔离的子进程中执行，确保每次
-// 链接都有干净的全局状态。
+// 实际链接逻辑委托给独立的 link server 进程（参见 docs/LLD-Process-Isolation.md）。
+// 每次链接通过 IPC 请求 link server，在隔离进程内 dlopen/liblld_linker.so 并清理
+// 其全局状态，避免 duplicate symbol 与 fork 死锁问题。
 
 #ifndef TINAIDE_LLD_LINKER_H
 #define TINAIDE_LLD_LINKER_H

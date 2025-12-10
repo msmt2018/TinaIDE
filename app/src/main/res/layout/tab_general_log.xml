@@ -10,7 +10,7 @@
     <!-- 工具栏 -->
     <HorizontalScrollView
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="40dp"
         android:scrollbars="none"
         android:background="?attr/colorSurfaceVariant">
 
@@ -22,52 +22,35 @@
             android:paddingEnd="8dp"
             android:gravity="center_vertical">
 
+            <!-- 暂停/恢复日志 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_pause"
+                style="@style/Widget.App.Button.Icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="暂停"
+                app:icon="@drawable/ic_pause"
+                app:iconTint="?attr/colorOnSurfaceVariant" />
+
             <!-- 清空日志 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_clear"
-                style="@style/Widget.Material3.Button.IconButton"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:contentDescription="清空"
                 app:icon="@drawable/ic_clear"
                 app:iconTint="?attr/colorOnSurfaceVariant" />
 
-            <!-- 保存日志 -->
+            <!-- 过滤日志 -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_save"
-                style="@style/Widget.Material3.Button.IconButton"
+                android:id="@+id/btn_filter"
+                style="@style/Widget.App.Button.Icon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="保存"
-                app:icon="@drawable/ic_save"
+                android:contentDescription="过滤"
+                app:icon="@drawable/ic_filter"
                 app:iconTint="?attr/colorOnSurfaceVariant" />
-
-            <!-- LSP 状态指示器 -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp">
-
-                <View
-                    android:id="@+id/lsp_status_indicator"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:background="@drawable/lsp_status_indicator"
-                    android:backgroundTint="?attr/colorError" />
-
-                <TextView
-                    android:id="@+id/tv_lsp_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="LSP 未连接"
-                    android:textSize="12sp"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-            </LinearLayout>
 
         </LinearLayout>
 
