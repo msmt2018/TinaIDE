@@ -270,11 +270,12 @@ class MainActivity : BaseActivity<ActivityMainBinding>(ActivityMainBinding::infl
             return
         }
         
-        // 从 URI 中提取文件路径
-        val filePath = if (diagnostic.uri.startsWith("file://")) {
-            diagnostic.uri.substring(7)
-        } else {
-            diagnostic.uri
+        // 从 URI 中提取文件路径（正确处理 %XX 编码的空格/中文等字符）
+        val filePath = try {
+            android.net.Uri.parse(diagnostic.uri).path ?: diagnostic.uri
+        } catch (e: Exception) {
+            // 降级处理：简单截取
+            if (diagnostic.uri.startsWith("file://")) diagnostic.uri.substring(7) else diagnostic.uri
         }
         
         // 创建 Location 对象并导航

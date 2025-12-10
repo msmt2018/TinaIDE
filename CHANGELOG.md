@@ -7,6 +7,17 @@
 
 ---
 
+## [1.0.155] - 2025-12-10
+
+### 改进
+- **诊断 JSON 解析重构：使用 nlohmann/json 库替代手写解析器**
+  - 添加 nlohmann/json v3.11.3 单头文件库 (`app/src/main/cpp/utils/json.hpp`)
+  - 重写 `parseDiagnosticsArray()` 和 `parseUriFromJson()` 函数
+  - 修复：正确处理 `relatedInformation` 等嵌套字段，避免解析到错误的 range/message
+  - 更稳定、更易维护的 JSON 解析实现
+
+---
+
 ## [1.0.154] - 2025-12-10
 
 ### 新增

@@ -85,16 +85,18 @@ class BottomPanelManager(
      */
     private fun setupDiagnosticsListener() {
         diagnosticsListener = LspService.DiagnosticsListener { fileUri, items ->
-            // 将 DiagnosticItem 转换为 Diagnostic
-            val diagnostics = items.map { it.toDiagnostic(fileUri) }
-            
             // 合并所有文件的诊断（获取缓存中的所有诊断）
             val allDiagnostics = mutableListOf<Diagnostic>()
             LspService.getAllCachedDiagnostics().forEach { (uri, cachedItems) ->
                 allDiagnostics.addAll(cachedItems.map { it.toDiagnostic(uri) })
             }
             
-            setDiagnostics(allDiagnostics)
+            // 稳定排序：按 uri -> startLine -> startCharacter 排序，避免 UI 抖动
+            val sortedDiagnostics = allDiagnostics.sortedWith(
+                compareBy({ it.uri }, { it.range.start.line }, { it.range.start.character })
+            )
+            
+            setDiagnostics(sortedDiagnostics)
         }
         diagnosticsListener?.let { LspService.addDiagnosticsListener(it) }
     }
