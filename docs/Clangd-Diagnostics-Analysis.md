@@ -30,16 +30,14 @@
 
 ## 各层实现状态
 
-### 1. UI 层 ✅ 已完成
+### 1. UI 层 ⚠️ 部分实现
 
 #### DiagnosticsFragment.kt
 位置：`app/src/main/java/com/wuxianggujun/tinaide/ui/fragment/DiagnosticsFragment.kt`
 
-功能已实现：
-- RecyclerView 显示诊断列表
-- 点击诊断项跳转到对应代码位置
-- 错误/警告数量统计
-- 清空诊断按钮
+当前状态：
+- RecyclerView 显示诊断列表、统计信息和清空按钮已完成。
+- 点击诊断项仅透传 `onDiagnosticClick` 回调，默认实现（`MainActivity.kt:238-244`）仅弹出 toast，尚未跳转到真实代码位置。
 
 ```kotlin
 fun setDiagnostics(diagnostics: List<Diagnostic>) {
@@ -52,6 +50,12 @@ fun setDiagnostics(diagnostics: List<Diagnostic>) {
 位置：`app/src/main/java/com/wuxianggujun/tinaide/ui/adapter/DiagnosticsAdapter.kt`
 
 - 列表适配器已实现
+
+#### BottomPanelManager.kt
+位置：`app/src/main/java/com/wuxianggujun/tinaide/ui/BottomPanelManager.kt`
+
+- `setDiagnostics/addDiagnostic/clearDiagnostics` 方法仅暴露接口，类内部没有订阅 `LspService` 诊断事件。
+- `rg` 搜索显示这些方法在当前工程中除了定义处没有任何调用，意味着 DiagnosticsFragment Tab 永远收不到数据。
 
 ### 2. 数据模型 ✅ 已完成
 
@@ -103,6 +107,10 @@ fun interface DiagnosticsListener {
     fun onDiagnostics(fileUri: String, diagnostics: List<DiagnosticItem>)
 }
 ```
+
+- 目前没有任何逻辑将 `List<*>` 安全转换成 `List<DiagnosticItem>`，更没有将结果写入 `DiagnosticsContainer` 或转换为 UI 层所需的 `Diagnostic`。
+- `EditorFragment.kt:632-644` 的 TODO 表明 `LspService` 尚未提供“获取最新诊断”的接口，新的监听者无法立即获得缓存数据。
+- 即使 native 层补齐，这里的空列表会让上层始终得不到诊断。
 
 #### DiagnosticsContainer
 位置：`app/src/main/java/com/wuxianggujun/tinaide/lsp/project/LspProject.kt`
@@ -302,7 +310,17 @@ severity 值：
 
 需修改：
 - [ ] `handleNativeDiagnostics` 正确转换 `List<*>` 为 `List<DiagnosticItem>`
-- [ ] 分发实际诊断数据而非空列表
+- [ ] 将结果写入 `LspProject.DiagnosticsContainer` 并缓存最近一次诊断，提供查询方法供监听器初始化时使用
+- [ ] 分发实际诊断数据而非空列表，必要时再映射为 UI 所需的 `Diagnostic`
+
+### 优先级 4：UI 层订阅与跳转串联
+
+**文件**：`BottomPanelManager.kt`、`DiagnosticsFragment.kt`、`MainActivity.kt`
+
+需修改：
+- [ ] BottomPanelManager 主动订阅 `LspService` 或 `DiagnosticsContainer`，调用 `setDiagnostics/addDiagnostic`
+- [ ] 实现诊断项跳转逻辑（例如调用当前编辑器定位 API），替换默认 toast
+- [ ] EditorFragment 中的 TODO（latestDiagnostics）在上层能力完善后同步打通，保证新打开的文件能立即显示已有诊断
 
 ## 相关文件索引
 
