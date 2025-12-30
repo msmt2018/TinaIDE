@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           # Use PAT token for checkout to ensure push permissions
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.PRO_REPO_TOKEN }}
           fetch-depth: 0
       
       - name: Display release info
