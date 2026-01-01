@@ -15,7 +15,6 @@ on:
         required: true
         type: string
 
-# Add permissions configuration
 permissions:
   contents: write
 
@@ -58,9 +57,26 @@ jobs:
           path: ./release
       
       - name: List downloaded files
+        id: list_files
         run: |
           echo "Downloaded files:"
           ls -la ./release/ || echo "No release directory"
+          
+          # Detect available APK files
+          ARM64_APK=$(find ./release -name "*arm64-v8a*.apk" 2>/dev/null | head -1)
+          X86_APK=$(find ./release -name "*x86_64*.apk" 2>/dev/null | head -1)
+          
+          if [ -n "$ARM64_APK" ]; then
+            ARM64_SIZE=$(du -h "$ARM64_APK" | cut -f1)
+            echo "arm64_apk=$(basename $ARM64_APK)" >> $GITHUB_OUTPUT
+            echo "arm64_size=$ARM64_SIZE" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ -n "$X86_APK" ]; then
+            X86_SIZE=$(du -h "$X86_APK" | cut -f1)
+            echo "x86_apk=$(basename $X86_APK)" >> $GITHUB_OUTPUT
+            echo "x86_size=$X86_SIZE" >> $GITHUB_OUTPUT
+          fi
       
       # Set version variables
       - name: Set version
@@ -78,6 +94,7 @@ jobs:
       - name: Generate Release Notes
         run: |
           BUILD_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          VERSION="${{ steps.version.outputs.tag }}"
           
           # Decode changelog content (base64 encoded content from private repo)
           CHANGELOG_CONTENT=""
@@ -90,23 +107,54 @@ jobs:
             CHANGELOG_CONTENT="No release notes available"
           fi
           
+          # Get APK file information
+          ARM64_APK="${{ steps.list_files.outputs.arm64_apk }}"
+          ARM64_SIZE="${{ steps.list_files.outputs.arm64_size }}"
+          X86_APK="${{ steps.list_files.outputs.x86_apk }}"
+          X86_SIZE="${{ steps.list_files.outputs.x86_size }}"
+          
           cat > release_notes.md << EOF
-          ## TinaIDE ${{ steps.version.outputs.tag }}
+          ## TinaIDE ${VERSION}
           
           ### 📥 Download
           
-          | File | Description |
-          |------|-------------|
-          | \`TinaIDE-*.apk\` | Android APK installer |
+          Please select the APK file that matches your device architecture:
+          
+          | File | Architecture | Size | Target Devices |
+          |------|--------------|------|----------------|
+          EOF
+          
+          # Add arm64-v8a APK info
+          if [ -n "$ARM64_APK" ]; then
+            cat >> release_notes.md << EOF
+          | \`${ARM64_APK}\` | arm64-v8a | ${ARM64_SIZE} | 📱 **Most modern phones** (Recommended) |
+          EOF
+          fi
+          
+          # Add x86_64 APK info
+          if [ -n "$X86_APK" ]; then
+            cat >> release_notes.md << EOF
+          | \`${X86_APK}\` | x86_64 | ${X86_SIZE} | 💻 Chromebook / Emulator |
+          EOF
+          fi
+          
+          cat >> release_notes.md << EOF
+          
+          ### 🤔 Which version should I download?
+          
+          - **arm64-v8a**: For 99% of modern Android phones (most phones released after 2016 use this architecture)
+          - **x86_64**: For Chromebooks, Intel-based tablets, and Android emulators
+          
+          > 💡 **Not sure which one to choose?** Just download the **arm64-v8a** version - it's the most common architecture.
           
           ### 📱 System Requirements
           
           - Android 9.0 (API 28) or higher
-          - Supported architectures: arm64-v8a, x86_64
+          - Storage: ~500MB (after installation)
           
           ### 🔧 Installation Guide
           
-          1. Download the APK file
+          1. Download the APK file for your device architecture
           2. Enable "Install from unknown sources" on your Android device
           3. Open the APK file to install
           
@@ -172,3 +220,13 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag**: ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Release URL**: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Published APKs" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------------|------|------|" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.list_files.outputs.arm64_apk }}" ]; then
+            echo "| arm64-v8a | ${{ steps.list_files.outputs.arm64_apk }} | ${{ steps.list_files.outputs.arm64_size }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "${{ steps.list_files.outputs.x86_apk }}" ]; then
+            echo "| x86_64 | ${{ steps.list_files.outputs.x86_apk }} | ${{ steps.list_files.outputs.x86_size }} |" >> $GITHUB_STEP_SUMMARY
+          fi
