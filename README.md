@@ -8,6 +8,42 @@
 
 TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手机或平板上直接编写、编译和运行 C/C++ 代码。内置完整的 Clang/LLVM 工具链和 clangd 语言服务器，提供接近桌面 IDE 的开发体验。
 
+## 分支说明
+
+本项目采用多分支开发模式，不同分支对应不同的功能特性和开发阶段：
+
+| 分支 | 状态 | 说明 |
+|------|------|------|
+| **`opensource-llvm-latest`** | 🚀 **主分支** | 最新稳定版本，包含完整的 LLVM/Clangd 集成和实时诊断功能 |
+| `main` | 📦 历史版本 | 早期开发版本，建议切换到 `opensource-llvm-latest` |
+| `feature/*` | 🔧 功能分支 | 实验性功能开发分支 |
+
+### 推荐使用主分支
+
+```bash
+# 克隆仓库并切换到主分支
+git clone https://github.com/wuxianggujun/TinaIDE.git
+cd TinaIDE
+git checkout opensource-llvm-latest
+
+# 或者直接克隆主分支
+git clone -b opensource-llvm-latest https://github.com/wuxianggujun/TinaIDE.git
+```
+
+### 主分支特性 (opensource-llvm-latest)
+
+- ✅ **完整的 Clang/LLVM 17 工具链集成**
+- ✅ **实时诊断功能** (v1.0.154-155) - 编辑时实时显示错误和警告
+- ✅ **优化的 LSP 服务** - 使用 nlohmann/json 库进行稳定的 JSON 解析
+- ✅ **LLD 链接器隔离模式** - dlopen/dlclose 机制避免全局状态污染
+- ✅ **完善的文档和示例** - 包含架构文档、开发指南和 API 文档
+
+### 版本历史
+
+- **v1.0.155** (2025-12-10) - 使用 nlohmann/json 重构诊断解析
+- **v1.0.154** (2025-12-10) - 实现 Clangd 诊断功能完整数据流
+- 更多版本信息请查看 [CHANGELOG.md](CHANGELOG.md)
+
 ## 特性
 
 - **嵌入式编译器**: 内置 Clang/LLVM 17，进程内编译，无需外部工具
