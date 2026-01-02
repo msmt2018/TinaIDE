@@ -12,11 +12,23 @@ TinaIDE 是一个专为 Android 设备设计的集成开发环境，支持在手
 
 本项目采用多分支开发模式，不同分支对应不同的功能特性和开发阶段：
 
+### 主要分支
+
 | 分支 | 状态 | 说明 |
 |------|------|------|
-| **`opensource-llvm-latest`** | 🚀 **主分支** | 最新稳定版本，包含完整的 LLVM/Clangd 集成和实时诊断功能 |
-| `main` | 📦 历史版本 | 早期开发版本，建议切换到 `opensource-llvm-latest` |
-| `feature/*` | 🔧 功能分支 | 实验性功能开发分支 |
+| **`opensource-llvm-latest`** | 🚀 **主分支（推荐）** | 最新稳定版本，完整的 LLVM/Clangd 集成 + 实时诊断 |
+| `main` | 📦 稳定版本 | 集成 PRoot + Termux 终端模拟器，支持完整 Linux 环境 |
+| `feature/simple-lsp` | 🔧 LSP 优化 | 简化的 LSP 客户端实现，LLD 进程隔离 |
+
+### 功能分支
+
+| 分支 | 功能特性 | 适用场景 |
+|------|---------|---------|
+| `feat/integrate-termux-app` | 集成 AIDE-Termux 模块，完整终端支持 | 需要终端环境和包管理器 |
+| `feat/proot-rootfs` | PRoot 根文件系统实验 | Linux 容器化运行环境 |
+| `exp-cmake-ninja-sysroot` | CMake + Ninja + xmake 构建系统集成 | 复杂项目构建支持 |
+| `feature/clangd-diagnostics` | Clangd 诊断功能开发（已合并到主分支） | 实时错误检测 |
+| `feature/lld-server-dlclose` | LLD 链接器隔离模式（已合并到主分支） | 链接器稳定性优化 |
 
 ### 推荐使用主分支
 
@@ -30,19 +42,84 @@ git checkout opensource-llvm-latest
 git clone -b opensource-llvm-latest https://github.com/wuxianggujun/TinaIDE.git
 ```
 
-### 主分支特性 (opensource-llvm-latest)
+### 分支详细说明
 
-- ✅ **完整的 Clang/LLVM 17 工具链集成**
+#### 🚀 opensource-llvm-latest（主分支）
+
+**核心特性**:
+- ✅ **完整的 Clang/LLVM 17 工具链** - 进程内编译，无需外部工具
 - ✅ **实时诊断功能** (v1.0.154-155) - 编辑时实时显示错误和警告
 - ✅ **优化的 LSP 服务** - 使用 nlohmann/json 库进行稳定的 JSON 解析
 - ✅ **LLD 链接器隔离模式** - dlopen/dlclose 机制避免全局状态污染
-- ✅ **完善的文档和示例** - 包含架构文档、开发指南和 API 文档
+- ✅ **智能代码补全** - 语义级补全、跳转定义、查找引用
+- ✅ **Tree-sitter 语法高亮** - C/C++/CMake 支持
+- ✅ **完善的文档** - 架构文档、开发指南、API 文档
 
-### 版本历史
+**适用场景**: 日常 C/C++ 开发、学习编译原理、移动端 IDE 开发
 
+**版本历史**:
 - **v1.0.155** (2025-12-10) - 使用 nlohmann/json 重构诊断解析
 - **v1.0.154** (2025-12-10) - 实现 Clangd 诊断功能完整数据流
-- 更多版本信息请查看 [CHANGELOG.md](CHANGELOG.md)
+
+#### 📦 main（稳定版本）
+
+**核心特性**:
+- ✅ **PRoot 集成** - 支持 LINKER64 模式，完整 Linux 环境
+- ✅ **Termux 终端模拟器** - 集成终端，支持命令行操作
+- ✅ **基础编译功能** - Clang/LLVM 编译器支持
+- ✅ **文件管理** - 项目文件树导航
+
+**适用场景**: 需要完整 Linux 环境、终端操作、包管理器
+
+**最新更新**: v0.6.91 - 修复 PRoot LINKER64 启动问题
+
+#### 🔧 feature/simple-lsp（LSP 优化）
+
+**核心特性**:
+- ✅ **简化的 LSP 客户端** - 直接 pipe 通信，降低延迟
+- ✅ **LLD 进程隔离** - 独立链接服务器，提高稳定性
+- ✅ **文件树懒加载** - 优化大型项目加载性能
+- ✅ **输出面板增强** - 构建日志、诊断信息分离显示
+- ✅ **自动版本管理** - Gradle 自动递增版本号
+- ✅ **代码混淆** - Release 构建优化
+
+**适用场景**: LSP 性能优化、大型项目开发
+
+#### 🔧 feat/integrate-termux-app（Termux 集成）
+
+**核心特性**:
+- ✅ **AIDE-Termux 模块** - 完整的 Termux 环境
+- ✅ **多架构支持** - arm64-v8a, armeabi-v7a, x86, x86_64
+- ✅ **包管理器** - apt/pkg 包管理支持
+- ✅ **终端工具链** - bash, vim, git 等工具
+
+**适用场景**: 需要完整 Linux 工具链、终端开发环境
+
+**注意事项**:
+- 模拟器兼容性问题（工具栏重叠）
+- 需要 Legacy External Storage 权限（API 29）
+
+#### 🔧 exp-cmake-ninja-sysroot（构建系统集成）
+
+**核心特性**:
+- ✅ **CMake 支持** - 标准 CMake 项目构建
+- ✅ **Ninja 构建** - 快速增量编译
+- ✅ **xmake 集成** - 现代化构建工具支持
+- ✅ **tbox 库支持** - Android 平台适配
+
+**适用场景**: 复杂项目构建、多构建系统支持
+
+### 分支选择建议
+
+| 需求 | 推荐分支 |
+|------|---------|
+| 日常 C/C++ 开发 | `opensource-llvm-latest` |
+| 需要终端环境 | `main` 或 `feat/integrate-termux-app` |
+| LSP 性能优化 | `feature/simple-lsp` |
+| 复杂项目构建 | `exp-cmake-ninja-sysroot` |
+| 学习编译原理 | `opensource-llvm-latest` |
+
+更多版本信息请查看 [CHANGELOG.md](CHANGELOG.md)
 
 ## 特性
 
