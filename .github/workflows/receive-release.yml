@@ -113,7 +113,7 @@ jobs:
           
           # If no changelog content, use default text
           if [ -z "$CHANGELOG_CONTENT" ]; then
-            CHANGELOG_CONTENT="No release notes available"
+            CHANGELOG_CONTENT="No release notes available."
           fi
           
           # Get APK file information
@@ -121,54 +121,52 @@ jobs:
           ARM64_SIZE="${{ steps.list_files.outputs.arm64_size }}"
           X86_APK="${{ steps.list_files.outputs.x86_apk }}"
           X86_SIZE="${{ steps.list_files.outputs.x86_size }}"
-          
+
           cat > release_notes.md << EOF
           ## TinaIDE ${VERSION}
           
           ### 📥 Download
-          
+
           Please select the APK file that matches your device architecture:
-          
+
           | File | Architecture | Size | Target Devices |
           |------|--------------|------|----------------|
           EOF
-          
+
           # Add arm64-v8a APK info
           if [ -n "$ARM64_APK" ]; then
             cat >> release_notes.md << EOF
           | \`${ARM64_APK}\` | arm64-v8a | ${ARM64_SIZE} | 📱 **Most modern phones** (Recommended) |
           EOF
           fi
-          
+
           # Add x86_64 APK info
           if [ -n "$X86_APK" ]; then
             cat >> release_notes.md << EOF
           | \`${X86_APK}\` | x86_64 | ${X86_SIZE} | 💻 Chromebook / Emulator |
           EOF
           fi
-          
+
           cat >> release_notes.md << EOF
-          
+
           ### 🤔 Which version should I download?
-          
-          - **arm64-v8a**: For 99% of modern Android phones (most phones released after 2016 use this architecture)
+
+          - **arm64-v8a**: For most modern Android phones (recommended)
           - **x86_64**: For Chromebooks, Intel-based tablets, and Android emulators
-          
-          > 💡 **Not sure which one to choose?** Just download the **arm64-v8a** version - it's the most common architecture.
-          
+
           ### 📱 System Requirements
-          
+
           - Android 9.0 (API 28) or higher
           - Storage: ~500MB (after installation)
-          
+
           ### 🔧 Installation Guide
-          
+
           1. Download the APK file for your device architecture
           2. Enable "Install from unknown sources" on your Android device
           3. Open the APK file to install
-          
+
           ### 📝 What's New
-          
+
           EOF
           
           # Append changelog content
