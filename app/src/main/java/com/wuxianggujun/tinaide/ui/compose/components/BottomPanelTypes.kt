@@ -1,0 +1,57 @@
+package com.wuxianggujun.tinaide.ui.compose.components
+
+import androidx.annotation.StringRes
+import com.wuxianggujun.tinaide.core.i18n.Strings
+
+/**
+ * 底部面板的状态
+ */
+enum class BottomPanelState {
+    COLLAPSED, // 收起（只显示拖拽手柄）
+    PEEK, // 半展开（显示工具栏）
+    EXPANDED // 完全展开
+}
+
+/**
+ * 底部面板 Tab 枚举
+ */
+enum class BottomPanelTab(@param:StringRes @get:StringRes val titleRes: Int) {
+    BUILD_LOG(Strings.bottom_panel_build_log),
+    RUN_OUTPUT(Strings.bottom_panel_run_output),
+    DIAGNOSTICS(Strings.bottom_panel_diagnostics),
+    PERFORMANCE(Strings.bottom_panel_performance),
+    OUTLINE(Strings.bottom_panel_outline),
+    SYMBOLS(Strings.bottom_panel_symbols),
+    BOOKMARKS(Strings.bottom_panel_bookmarks),
+    TERMINAL(Strings.bottom_panel_terminal),
+    GIT(Strings.bottom_panel_git)
+}
+
+private val defaultNormalModeBottomTabs = listOf(
+    BottomPanelTab.BUILD_LOG,
+    BottomPanelTab.DIAGNOSTICS,
+    BottomPanelTab.PERFORMANCE,
+    BottomPanelTab.OUTLINE,
+    BottomPanelTab.SYMBOLS,
+    BottomPanelTab.BOOKMARKS,
+    BottomPanelTab.GIT
+)
+
+internal fun shouldShowEditorPerformanceTab(
+    developerOptionsEnabled: Boolean,
+    diagnosticsEnabled: Boolean,
+    activeTabSupportsEditorPerformancePanel: Boolean
+): Boolean = developerOptionsEnabled && diagnosticsEnabled && activeTabSupportsEditorPerformancePanel
+
+internal fun resolveNormalModeBottomTabs(
+    showEditorPerformanceTab: Boolean
+): List<BottomPanelTab> = if (showEditorPerformanceTab) {
+    defaultNormalModeBottomTabs
+} else {
+    defaultNormalModeBottomTabs.filterNot { it == BottomPanelTab.PERFORMANCE }
+}
+
+internal fun resolveSelectedBottomPanelTab(
+    selectedBottomTab: BottomPanelTab,
+    normalModeTabs: List<BottomPanelTab>
+): BottomPanelTab = selectedBottomTab.takeIf { it in normalModeTabs } ?: BottomPanelTab.BUILD_LOG

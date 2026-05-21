@@ -1,0 +1,9 @@
+<resources>
+    <!--
+        System bar icon appearance.
+        - true  => dark icons (light system bar background)
+        - false => light icons (dark system bar background)
+     -->
+    <bool name="window_light_status_bar">true</bool>
+    <bool name="window_light_navigation_bar">true</bool>
+</resources>

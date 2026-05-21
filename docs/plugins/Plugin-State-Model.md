@@ -1,0 +1,184 @@
+# 插件状态模型
+
+> 文档更新：2026-04-22
+> 目标：统一 TinaIDE 插件系统中的安装态、启用态、运行态与页面态，避免状态漂移。
+
+---
+
+## 1. 为什么需要这份文档
+
+插件页面、插件市场、脚本运行时、LSP、Snippet、菜单与 APK 导出都依赖插件状态。
+
+如果每个模块都自己推导一次状态，就很容易出现这些问题：
+
+- 已卸载插件的详情页还停留在屏幕上
+- 市场页仍显示“已安装 / 可更新”
+- 禁用插件后，进入项目仍继续生效
+- 某些模块读取“已安装列表”，另一些模块读取“已启用列表”，行为不一致
+
+这份文档定义当前版本的**单一状态来源**和**消费规则**。
+
+---
+
+## 2. 四层状态
+
+### 2.1 安装态（Installed State）
+
+定义：插件目录和 `manifest.json` 是否存在于本地。
+
+来源：
+
+- `PluginManager.refreshInstalledPlugins()`
+- 本地目录：`filesDir/plugins/<pluginId>/`
+
+数据表现：
+
+- `PluginStateSnapshot.installedPlugins`
+- `PluginStateSnapshot.installedPluginIds`
+- `PluginStateSnapshot.installedVersions`
+
+### 2.2 启用态（Enabled State）
+
+定义：插件虽然已安装，但当前是否允许向宿主贡献能力。
+
+来源：
+
+- `SharedPreferences` 中的 `enabled_<pluginId>`
+- `PluginManager.resolvePluginEnabled()`
+
+数据表现：
+
+- `PluginStateSnapshot.enabledPlugins`
+- `PluginStateSnapshot.enabledPluginIds`
+- `PluginStateSnapshot.enabledCapabilities`
+- `PluginManager.enabledPluginsFlow`
+
+### 2.3 运行态（Runtime State）
+
+定义：对需要运行时的插件，当前是否真的加载并在内存中工作。
+
+当前主要包含：
+
+- `script`
+- `hybrid`
+- `lsp`（更准确地说是“可服务态 / 工具链就绪态”）
+
+来源：
+
+- `ScriptPluginManager`
+- `LspPluginManager`
+
+关键约束：
+
+- **禁用插件必须先影响启用态，再驱动运行态卸载**
+- 运行态绝不能绕过启用态独立存在
+
+### 2.4 页面态（UI State）
+
+定义：页面当前选中了哪个插件、是否在详情页、是否在管理模式。
+
+规则：
+
+- 页面层**只保存稳定 ID**，不要保存整块插件对象快照
+- 详情展示时，始终根据 `pluginId` 从最新列表回查
+
+当前约束：
+
+- 设置页插件详情：保存 `selectedPluginIdForDetail`
+- 设置里的插件市场：保存 `selectedPluginId`
+- 主市场页：保存 `selectedPluginId`
+
+---
+
+## 3. 单一状态来源
+
+当前插件系统的中心状态源是：
+
+- `PluginManager.pluginStateFlow`
+
+其快照类型为：
+
+- `PluginStateSnapshot`
+
+它负责一次性产出：
+
+- 安装列表
+- 启用列表
+- 已安装版本映射
+- 已启用 capability 集合
+
+### 3.1 消费规则
+
+不同模块必须按下面规则取状态：
+
+- 插件管理页、卸载页、批量管理页：读取**安装态**
+- 代码片段、菜单、文件图标、APK 导出模板、项目模板、LSP 注册：读取**启用态**
+- 脚本运行时、事件总线绑定：读取**启用态**，并在禁用时卸载运行态
+- 市场页“已安装 / 可更新”：读取**安装态 + 版本映射**
+- 页面详情选中：保存 `pluginId`，展示时从最新列表回查
+
+---
+
+## 4. 当前实现映射
+
+### 4.1 中心状态
+
+- `core/plugin/.../PluginManager.kt`
+- `core/plugin/.../PluginStateSnapshot.kt`
+
+### 4.2 安装态派生
+
+- `PluginMarketplaceInstallStateResolver`
+
+用途：
+
+- 市场页统一计算“已安装 / 可更新”
+
+### 4.3 运行态
+
+- `ScriptPluginManager`
+- `LspPluginManager`
+
+### 4.4 页面态
+
+- `SettingsScreen`
+- `PluginsSettingsSection`
+- `PluginMarketplaceViewModel`
+- `MarketScreenViewModel`
+
+---
+
+## 5. 开发约束
+
+后续新增插件相关代码时，必须遵守下面规则：
+
+1. 不要在页面或 ViewModel 中缓存 `InstalledPlugin` / `PluginSummary` 作为长期选中态。
+2. 不要让模块自己重新维护一份“已安装 / 已启用 / 可更新”集合，优先复用中心快照或仓库解析器。
+3. 任何“会影响宿主行为”的模块都只能消费“启用态”，不能直接消费“安装态”。
+4. 对脚本 / hybrid 这类有运行时的插件，禁用时必须同步卸载运行时和事件订阅。
+5. 如果新增插件能力，先明确它属于“安装态”“启用态”“运行态”还是“页面态”，再决定挂在哪层。
+
+---
+
+## 6. 反模式
+
+以下写法禁止继续新增：
+
+- `var selectedPlugin by mutableStateOf<InstalledPlugin?>(...)`
+- `var selectedPlugin by mutableStateOf<PluginSummary?>(...)`
+- 在多个 ViewModel 中重复拷贝版本比较逻辑
+- 菜单、Snippet、LSP、APK 导出直接遍历“所有已安装插件”再临时过滤
+- 禁用插件时只更新 UI，不处理运行时或事件订阅
+
+---
+
+## 7. 推荐新增能力方式
+
+如果后续还要扩展插件系统，推荐优先按下面顺序落地：
+
+1. 先补 `PluginStateSnapshot` 的字段
+2. 再在 `PluginManager.refreshInstalledPlugins()` 中统一生成
+3. 再让消费方订阅中心状态流
+4. 最后再补页面展示和测试
+
+不要反过来先在页面里拼状态，最后再补宿主层。

@@ -1,0 +1,107 @@
+name: 提交厂商适配问题
+description: 厂商系统的新增适配或者适配有误的问题
+title: "[Adaptation]："
+labels: ["adaptation"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## [【警告：请务必按照 issue 模板填写，不要抱有侥幸心理，一旦发现 issue 没有按照模板认真填写，一律直接关闭】](https://github.com/getActivity/IssueTemplateGuide)
+  - type: input
+    id: input_id_1
+    attributes:
+      label: 框架版本【必填】
+      description: 请输入你使用的框架版本
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_2
+    attributes:
+      label: 框架最新的版本是否存在这个问题【必答】
+      description: 如果用的是旧版本的话，建议升级看问题是否还存在
+      multiple: false
+      options:
+        - "未选择"
+        - "是"
+        - "否"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_3
+    attributes:
+      label: 框架文档是否提及了该问题【必答】
+      description: 文档会提供最常见的问题解答，可以先看看是否有自己想要的
+      multiple: false
+      options:
+        - "未选择"
+        - "是"
+        - "否"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_4
+    attributes:
+      label: issue 列表中是否有人曾提过类似的问题【必答】
+      description: 可以在 issue 列表在搜索问题关键字，参考一下别人的解决方案
+      multiple: false
+      options:
+        - "未选择"
+        - "是"
+        - "否"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_5
+    attributes:
+      label: 是否已经搜索过了 issue 列表但还未能解决的【必答】
+      description: 如果搜索过了 issue 列表但是问题没有解决的话，可以选择是
+      multiple: false
+      options:
+        - "未选择"
+        - "是"
+        - "否"
+    validations:
+      required: true
+  - type: input
+    id: input_id_6
+    attributes:
+      label: 出现问题的设备信息【必填】
+      description: 请填写出现问题设备的品牌和机型
+    validations:
+      required: true
+  - type: input
+    id: input_id_7
+    attributes:
+      label: 出现问题的 Android 版本【必填】
+      description: 请填写出现问题的 Android 版本
+    validations:
+      required: true
+  - type: input
+    id: input_id_8
+    attributes:
+      label: 出现问题的厂商 Os 类型【必填】
+      description: 请输入设备厂商的 Os 名称
+    validations:
+      required: true
+  - type: input
+    id: input_id_9
+    attributes:
+      label: 出现问题的厂商 Os 版本【必填】
+      description: 请输入设备厂商的 Os 版本
+    validations:
+      required: true
+  - type: textarea
+    id: input_id_10
+    attributes:
+      label: 出现问题的设备系统属性【必填】
+      description: 请用 adb shell getprop 命令获取所有的系统属性并且填写到此处
+    validations:
+      required: true
+  - type: textarea
+    id: input_id_11
+    attributes:
+      label: 出现问题的设备信息截图【必填】
+      description: 如果是手机，请截图关于手机页面并且上传到此处，截图中应该有厂商 Os 名称和版本，其他设备也是同理
+    validations:
+      required: true

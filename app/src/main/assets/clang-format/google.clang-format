@@ -1,0 +1,111 @@
+# Google 风格配置
+# 基于 Google C++ 编码规范
+# 文档: https://google.github.io/styleguide/cppguide.html
+
+BasedOnStyle: Google
+Language: Cpp
+
+# 缩进设置
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 4
+
+# 列宽限制
+ColumnLimit: 80
+
+# 大括号换行风格
+BreakBeforeBraces: Attach
+
+# 指针和引用对齐
+PointerAlignment: Left
+DerivePointerAlignment: true
+
+# 空格设置
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+SpacesInAngles: Never
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# 对齐设置
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: false
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments: true
+
+# 换行设置
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: Yes
+
+# 二元运算符换行
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakStringLiterals: true
+
+# 构造函数初始化列表
+BreakConstructorInitializers: BeforeColon
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+
+# 访问修饰符
+AccessModifierOffset: -1
+IndentAccessModifiers: false
+
+# Include 排序
+IncludeBlocks: Regroup
+SortIncludes: CaseSensitive
+IncludeCategories:
+  - Regex:           '^<ext/.*\.h>'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*'
+    Priority:        3
+    SortPriority:    0
+    CaseSensitive:   false
+
+# 命名空间
+NamespaceIndentation: None
+CompactNamespaces: false
+FixNamespaceComments: true
+
+# 其他
+MaxEmptyLinesToKeep: 1
+ReflowComments: true
+SortUsingDeclarations: true
+DeriveLineEnding: true
+PackConstructorInitializers: NextLine

@@ -1,0 +1,109 @@
+package com.wuxianggujun.tinaide.core.compile
+
+import android.content.Context
+import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
+import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
+import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
+import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner.shellQuotePosix
+import java.io.File
+
+/**
+ * 终端运行命令组装器。
+ *
+ * 把一个已构建产物 + 运行工作目录 + 参数组装成可直接喂给 TerminalBackend 的
+ * 完整 shell 命令字符串,内含:
+ * - sysroot `libc++_shared.so` 存在时的 `LD_LIBRARY_PATH` 注入
+ * - 产物 staged copy 到 app 私有 run-bin(规避公有目录 noexec)
+ * - 运行结束后"按 Enter 键关闭"交互(靠 OSC 777;tina-run-end 通知 Activity)
+ *
+ * 历史:这段逻辑原来以私有方法的形式嵌在 `CompileProjectUseCase.buildTerminalCommand`;
+ * Phase C.1 抽成独立 class 以便新 Facade / UI 层(CompileActionsHelper) 直接复用,
+ * 同时保留旧 UseCase 的旧路径继续工作到 Phase D 删除为止。
+ */
+class TerminalCommandBuilder(context: Context) {
+
+    private val appContext = context.applicationContext
+
+    /**
+     * 组装终端运行 shell 命令。
+     *
+     * @param workingDir 运行工作目录(通常来自 RunConfiguration 解析后的绝对路径)
+     * @param outputPath 产物绝对路径,会被 staged 到 run-bin 再启动
+     * @param args 命令行参数(已经过变量替换)
+     * @param projectRoot 项目根目录,用于解析已安装包的 runtime lib 目录
+     * @param extraEnvironment 额外注入到运行 shell 的环境变量（仅终端/LOG 启动路径使用）
+     */
+    fun build(
+        workingDir: String,
+        outputPath: String,
+        args: List<String>,
+        projectRoot: File,
+        extraEnvironment: Map<String, String> = emptyMap(),
+    ): String {
+        val outputFile = File(outputPath)
+        val stageDir = File(appContext.filesDir, "run-bin")
+        val stageKey = outputFile.absolutePath.hashCode().toUInt().toString(16)
+        val stagedOutput = File(stageDir, "${outputFile.name}.$stageKey")
+
+        // 对**真实存在**的源文件做 shebang 探测;stagedOutput 此时尚未拷贝到位,
+        // 若对它探测会误判为 ELF,脚本产物会被套上 linker64 导致启动失败。
+        val sourceKind = NativeExecutableRunner.ExecutableKind.probe(outputFile)
+
+        // 仅在 sysroot 中存在 libc++_shared.so 时设置 LD_LIBRARY_PATH(供 C++ 程序使用)。
+        // 不能把整个 sysroot lib 目录加入 LD_LIBRARY_PATH,因为其中包含 NDK stub 库
+        // (libc.so 等),这些 stub 没有实际代码,运行时加载会导致 SIGSEGV。
+        val arch = AndroidSysrootManager.Companion.Arch.current()
+        val sysrootDir = AndroidSysrootManager(appContext).getSysrootDir(arch)
+        val sysrootLibDir = File(sysrootDir, "usr/lib/${arch.triple}")
+        val hasRuntimeLibs = File(sysrootLibDir, "libc++_shared.so").isFile
+        val packagePaths = InstalledPackagePathResolver.resolve(appContext, projectRoot)
+        val runtimeLibPaths = buildList {
+            outputFile.parentFile?.absolutePath?.takeIf { it.isNotBlank() }?.let(::add)
+            if (hasRuntimeLibs) add(sysrootLibDir.absolutePath)
+            addAll(packagePaths.runtimeLibDirs.map { it.absolutePath })
+        }.distinct()
+        val ldLibraryPrefix = if (runtimeLibPaths.isNotEmpty()) {
+            "LD_LIBRARY_PATH=${shellQuotePosix(runtimeLibPaths.joinToString(":"))}:\$LD_LIBRARY_PATH "
+        } else {
+            ""
+        }
+        val envPrefix = LaunchEnvironment.buildShellPrefix(extraEnvironment)
+
+        val waitForEnterSuffix = buildWaitForEnterSuffix()
+
+        return assembleTerminalRunShellCommand(
+            layout = TerminalRunLayout(
+                workingDir = workingDir,
+                sourcePath = outputPath,
+                stageDirPath = stageDir.absolutePath,
+                stagedTargetPath = stagedOutput.absolutePath,
+                args = args,
+                envPrefix = envPrefix,
+                ldLibraryPrefix = ldLibraryPrefix,
+                waitForEnterSuffix = waitForEnterSuffix,
+                kind = sourceKind,
+            )
+        )
+    }
+
+    /**
+     * 运行结束后"按 Enter 键关闭"交互后缀。
+     *
+     * 细节见旧 `CompileProjectUseCase.buildWaitForEnterSuffix` 的文档注释(OSC 协议、
+     * 不回显、exitCode 透传等)。
+     */
+    private fun buildWaitForEnterSuffix(): String {
+        val rawTemplate = Strings.compile_run_press_enter_to_close.strOr(appContext)
+        val shellTemplate = rawTemplate
+            .replace("%1\$d", "%d")
+            .replace("\n", "\\n")
+        val quotedPrompt = shellQuotePosix(shellTemplate)
+        return "; __tina_rc=\$?" +
+            "; printf $quotedPrompt \"\$__tina_rc\"" +
+            "; printf '\\033]777;tina-run-end;%d\\a' \"\$__tina_rc\"" +
+            "; cat > /dev/null"
+    }
+
+}

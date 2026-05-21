@@ -1,0 +1,57 @@
+{
+  "id": "com.tinaide.test.script-tools",
+  "name": "Test Script Tools",
+  "version": "1.0.0",
+  "description": "A test Lua script plugin demonstrating editor and file operations",
+  "author": "TinaIDE Test",
+  "type": "script",
+  "main": "main.lua",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "editor.read",
+    "editor.write",
+    "clipboard.read",
+    "clipboard.write",
+    "ui.notification"
+  ],
+  "contributions": {
+    "commands": [
+      {
+        "id": "test.uppercase",
+        "title": "Convert to Uppercase"
+      },
+      {
+        "id": "test.lowercase",
+        "title": "Convert to Lowercase"
+      },
+      {
+        "id": "test.trimLines",
+        "title": "Trim Trailing Whitespace"
+      },
+      {
+        "id": "test.sortLines",
+        "title": "Sort Lines"
+      },
+      {
+        "id": "test.duplicateLine",
+        "title": "Duplicate Current Line"
+      },
+      {
+        "id": "test.countWords",
+        "title": "Count Words"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "test.uppercase",
+          "group": "transform"
+        },
+        {
+          "command": "test.lowercase",
+          "group": "transform"
+        }
+      ]
+    }
+  }
+}

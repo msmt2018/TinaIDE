@@ -1,0 +1,11 @@
+[submodule "external/tina-android-tree-sitter"]
+	path = external/tina-android-tree-sitter
+	url = https://github.com/wuxianggujun/tina-android-tree-sitter.git
+	ignore = untracked
+[submodule "external/android-rsync"]
+	path = external/android-rsync
+	url = https://github.com/wuxianggujun/android-rsync.git
+	ignore = untracked
+[submodule "external/termux-proot"]
+	path = external/termux-proot
+	url = https://github.com/wuxianggujun/Android-Proot-Builder.git

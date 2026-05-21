@@ -1,0 +1,12 @@
+{
+  "id": "com.tinaide.test.dark-theme",
+  "name": "Test Dark Theme",
+  "version": "1.0.0",
+  "description": "A test dark theme plugin for TinaIDE marketplace testing",
+  "author": "TinaIDE Test",
+  "type": "config",
+  "minAppVersion": "1.0.0",
+  "contributions": {
+    "themes": ["theme.json"]
+  }
+}

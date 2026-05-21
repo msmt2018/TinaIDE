@@ -1,0 +1,88 @@
+{
+  "language": "kotlin",
+  "snippets": [
+    {
+      "prefix": "fun",
+      "name": "Function",
+      "description": "Create a Kotlin function",
+      "body": [
+        "fun ${1:functionName}(${2:params}): ${3:Unit} {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "class",
+      "name": "Class",
+      "description": "Create a Kotlin class",
+      "body": [
+        "class ${1:ClassName}(${2:params}) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "data",
+      "name": "Data Class",
+      "description": "Create a Kotlin data class",
+      "body": [
+        "data class ${1:ClassName}(",
+        "    val ${2:property}: ${3:Type}",
+        ")"
+      ]
+    },
+    {
+      "prefix": "iflet",
+      "name": "If Let",
+      "description": "Kotlin safe call with let",
+      "body": [
+        "${1:variable}?.let { ${2:it} ->",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "when",
+      "name": "When Expression",
+      "description": "Kotlin when expression",
+      "body": [
+        "when (${1:variable}) {",
+        "    ${2:value} -> ${3:result}",
+        "    else -> ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "coroutine",
+      "name": "Launch Coroutine",
+      "description": "Launch a coroutine scope",
+      "body": [
+        "viewModelScope.launch {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "flow",
+      "name": "Flow Collect",
+      "description": "Collect a Kotlin Flow",
+      "body": [
+        "${1:flow}.collect { ${2:value} ->",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "try",
+      "name": "Try Catch",
+      "description": "Try-catch block",
+      "body": [
+        "try {",
+        "    ${1}",
+        "} catch (e: ${2:Exception}) {",
+        "    ${0}",
+        "}"
+      ]
+    }
+  ]
+}

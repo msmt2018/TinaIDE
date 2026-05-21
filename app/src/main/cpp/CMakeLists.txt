@@ -1,0 +1,89 @@
+cmake_minimum_required(VERSION 3.22)
+project(tina_native)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(TINA_BUILD_PROOT_FROM_SOURCE "Build TinaIDE PRoot binaries from external/termux-proot" ON)
+get_filename_component(TINA_PROJECT_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
+
+# ============================================================================
+# 编译优化 - 减小 .so 体积
+# ============================================================================
+# -Os: 优化大小
+# -ffunction-sections -fdata-sections: 将每个函数/数据放入独立 section
+# -Wl,--gc-sections: 链接时移除未使用的 section
+# -fvisibility=hidden: 隐藏不需要导出的符号
+# ============================================================================
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Os -ffunction-sections -fdata-sections -fvisibility=hidden")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Os -ffunction-sections -fdata-sections -fvisibility=hidden")
+set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,--gc-sections -Wl,--strip-all")
+
+# ============================================================================
+# 16KB 页面对齐 - 支持 Android 15+ 设备
+# ============================================================================
+# Android 15 (API 35) 开始部分设备使用 16KB 页面大小
+# 必须确保 ELF LOAD 段按 16KB 边界对齐，否则无法安装
+# ============================================================================
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+
+# ============================================================================
+# 源文件列表
+# ============================================================================
+#
+# PRoot 迁移后，编译/链接/运行功能已移至 PRoot 容器化执行。
+# 默认从 external/termux-proot 直接编译 PRoot；需要预编译产物时可关闭 TINA_BUILD_PROOT_FROM_SOURCE。
+# Tree-sitter 已完全迁移到 external/tina-android-tree-sitter 模块。
+# 此 native 库仅保留 Utils 工具函数。
+# ============================================================================
+
+if(TINA_BUILD_PROOT_FROM_SOURCE)
+    set(TINA_TERMUX_PROOT_DIR "${TINA_PROJECT_ROOT}/external/termux-proot")
+    if(NOT EXISTS "${TINA_TERMUX_PROOT_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR "external/termux-proot is missing; run git submodule update --init --recursive")
+    endif()
+    add_subdirectory("${TINA_TERMUX_PROOT_DIR}" "${CMAKE_BINARY_DIR}/termux-proot")
+endif()
+
+add_library(tina_native SHARED
+    # Utils 模块
+    utils/jni_utils.cpp
+    utils/file_utils.cpp
+)
+
+# ============================================================================
+# PTY（终端伪设备）
+# ============================================================================
+
+add_library(tina_pty SHARED
+    pty/pty_jni.cpp
+)
+
+# ============================================================================
+# GUI 运行时桥接（加载用户 .so 并拉取 ARGB32 帧）
+# ============================================================================
+
+add_library(tina_gui_runtime SHARED
+    gui/gui_runtime_jni.cpp
+)
+
+# ============================================================================
+# 头文件路径
+# ============================================================================
+
+target_include_directories(tina_native PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# ============================================================================
+# 链接库
+# ============================================================================
+
+find_library(log-lib log)
+target_link_libraries(tina_native PRIVATE c++_shared ${log-lib})
+target_link_libraries(tina_pty PRIVATE c++_shared ${log-lib})
+target_link_libraries(tina_gui_runtime PRIVATE c++_shared ${log-lib} dl)
+
+# ============================================================================
+# 注意：proot-loader (libproot-loader.so) 可以来自预编译 source set，
+# 也可以由 external/termux-proot 直接编译。它是 PRoot 内部使用的 ELF 加载器。
+# ============================================================================

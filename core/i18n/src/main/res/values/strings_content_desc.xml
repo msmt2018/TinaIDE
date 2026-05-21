@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Content descriptions -->
+  <string name="content_desc_copy">复制</string>
+  <string name="content_desc_scroll_to_bottom">滚动到底部</string>
+  <string name="content_desc_clear_logs">清空日志</string>
+  <string name="content_desc_navigate_back">返回</string>
+  <string name="content_desc_clear_input">清除输入</string>
+  <string name="content_desc_search">搜索</string>
+  <string name="content_desc_more_options">更多选项</string>
+  <string name="content_desc_close">关闭</string>
+</resources>

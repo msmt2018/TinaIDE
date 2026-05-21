@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- 打开的文件夹 - 黄色/橙色风格 -->
+    <!-- 文件夹底部 -->
+    <path
+        android:pathData="M4,8 L4,18 C4,19.1 4.9,20 6,20 L18,20 C19.1,20 20,19.1 20,18 L20,10 C20,8.9 19.1,8 18,8 L12,8 L10,6 L6,6 C4.9,6 4,6.9 4,8 Z"
+        android:fillColor="#FFA726"/>
+    
+    <!-- 文件夹顶部翻盖 -->
+    <path
+        android:pathData="M4,10 L6,10 C7,10 7.5,9 8,8.5 L10,8.5 C10.5,8.5 11,9 12,10 L20,10"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FB8C00"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+</vector>

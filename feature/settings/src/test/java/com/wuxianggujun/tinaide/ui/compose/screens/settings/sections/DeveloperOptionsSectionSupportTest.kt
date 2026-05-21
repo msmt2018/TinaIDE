@@ -1,0 +1,258 @@
+package com.wuxianggujun.tinaide.ui.compose.screens.settings.sections
+
+import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.network.server.ClientConfig
+import com.wuxianggujun.tinaide.core.network.server.FeatureFlags
+import com.wuxianggujun.tinaide.core.network.server.ServerConfigResponse
+import com.wuxianggujun.tinaide.core.i18n.Strings
+import org.junit.Test
+
+class DeveloperOptionsSectionSupportTest {
+
+    @Test
+    fun resolveDiagnosticsControlsState_shouldDisableAllDependentControlsWhenDiagnosticsOff() {
+        val state = DeveloperOptionsSectionSupport.resolveDiagnosticsControlsState(
+            diagnosticsEnabled = false,
+            editorTouchDiagnosticsEnabled = true
+        )
+
+        assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isFalse()
+        assertThat(state.lspClangdStartupLogControlEnabled).isFalse()
+        assertThat(state.editorTouchDiagnosticsControlEnabled).isFalse()
+        assertThat(state.gestureTraceControlEnabled).isFalse()
+        assertThat(state.editorInternalTouchLogControlEnabled).isFalse()
+        assertThat(state.editorScaleLogControlEnabled).isFalse()
+        assertThat(state.editorFocusLogControlEnabled).isFalse()
+        assertThat(state.editorScrollLogControlEnabled).isFalse()
+        assertThat(state.editorFlingLogControlEnabled).isFalse()
+    }
+
+    @Test
+    fun resolveDiagnosticsControlsState_shouldEnableOnlyTopLevelControlsWhenTouchDiagnosticsOff() {
+        val state = DeveloperOptionsSectionSupport.resolveDiagnosticsControlsState(
+            diagnosticsEnabled = true,
+            editorTouchDiagnosticsEnabled = false
+        )
+
+        assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
+        assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
+        assertThat(state.gestureTraceControlEnabled).isTrue()
+        assertThat(state.editorInternalTouchLogControlEnabled).isFalse()
+        assertThat(state.editorScaleLogControlEnabled).isFalse()
+        assertThat(state.editorFocusLogControlEnabled).isFalse()
+        assertThat(state.editorScrollLogControlEnabled).isFalse()
+        assertThat(state.editorFlingLogControlEnabled).isFalse()
+    }
+
+    @Test
+    fun resolveDiagnosticsControlsState_shouldEnableAllDependentControlsWhenPrerequisitesMet() {
+        val state = DeveloperOptionsSectionSupport.resolveDiagnosticsControlsState(
+            diagnosticsEnabled = true,
+            editorTouchDiagnosticsEnabled = true
+        )
+
+        assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
+        assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
+        assertThat(state.gestureTraceControlEnabled).isTrue()
+        assertThat(state.editorInternalTouchLogControlEnabled).isTrue()
+        assertThat(state.editorScaleLogControlEnabled).isTrue()
+        assertThat(state.editorFocusLogControlEnabled).isTrue()
+        assertThat(state.editorScrollLogControlEnabled).isTrue()
+        assertThat(state.editorFlingLogControlEnabled).isTrue()
+    }
+
+    @Test
+    fun resolveTestingToolsState_shouldKeepBuiltinCmakeToggleEnabled() {
+        assertThat(
+            DeveloperOptionsSectionSupport.resolveTestingToolsState()
+                .builtinCmakeLspControlEnabled
+        ).isTrue()
+    }
+
+    @Test
+    fun createServerUrlDialogState_shouldResetFeedbackAndKeepCurrentUrl() {
+        val state = DeveloperOptionsSectionSupport.createServerUrlDialogState(
+            "https://mirror.example.com"
+        )
+
+        assertThat(state.urlText).isEqualTo("https://mirror.example.com")
+        assertThat(state.feedback).isNull()
+    }
+
+    @Test
+    fun normalizeServerUrlInput_shouldTrimBlankAndTrailingSlash() {
+        assertThat(
+            DeveloperOptionsSectionSupport.normalizeServerUrlInput("  https://mirror.example.com/  ")
+        ).isEqualTo("https://mirror.example.com")
+        assertThat(DeveloperOptionsSectionSupport.normalizeServerUrlInput("   ")).isNull()
+    }
+
+    @Test
+    fun resolveServerUrlSaveResult_shouldKeepPersistedUrlAndExposeConnectionStatus() {
+        val successState = DeveloperOptionsSectionSupport.resolveServerUrlSaveResult(
+            persistedServerUrl = "https://ok.example.com",
+            connectionOk = true
+        )
+        val failureState = DeveloperOptionsSectionSupport.resolveServerUrlSaveResult(
+            persistedServerUrl = "https://fail.example.com",
+            connectionOk = false
+        )
+
+        assertThat(successState.urlText).isEqualTo("https://ok.example.com")
+        assertThat(successState.feedback).isEqualTo(DeveloperServerUrlFeedback.TestSuccess)
+        assertThat(failureState.urlText).isEqualTo("https://fail.example.com")
+        assertThat(failureState.feedback).isEqualTo(DeveloperServerUrlFeedback.TestFailure)
+    }
+
+    @Test
+    fun resolveServerUrlRestoreResult_shouldExposeDefaultRestoreFeedback() {
+        val state = DeveloperOptionsSectionSupport.resolveServerUrlRestoreResult(
+            "https://tinaide.wuxianggujun.com"
+        )
+
+        assertThat(state.urlText).isEqualTo("https://tinaide.wuxianggujun.com")
+        assertThat(state.feedback).isEqualTo(DeveloperServerUrlFeedback.RestoredDefault)
+    }
+
+    @Test
+    fun resolveServerUrlFeedbackMessage_shouldMapStableMessageResources() {
+        val successMessage = DeveloperOptionsSectionSupport.resolveServerUrlFeedbackMessage(
+            DeveloperServerUrlFeedback.TestSuccess
+        )
+        val failureMessage = DeveloperOptionsSectionSupport.resolveServerUrlFeedbackMessage(
+            DeveloperServerUrlFeedback.TestFailure
+        )
+        val restoredMessage = DeveloperOptionsSectionSupport.resolveServerUrlFeedbackMessage(
+            DeveloperServerUrlFeedback.RestoredDefault
+        )
+
+        assertThat(
+            DeveloperOptionsSectionSupport.resolveServerUrlFeedbackMessage(null)
+        ).isNull()
+        assertThat(successMessage)
+            .isEqualTo(DeveloperMessageSpec(Strings.toast_tina_server_test_ok))
+        assertThat(failureMessage)
+            .isEqualTo(DeveloperMessageSpec(Strings.toast_tina_server_test_failed))
+        assertThat(restoredMessage)
+            .isEqualTo(DeveloperMessageSpec(Strings.toast_tina_server_restored_default))
+    }
+
+    @Test
+    fun bundledPackagesReinstallStates_shouldKeepStartSuccessAndFailureStable() {
+        val startedState = DeveloperOptionsSectionSupport.createBundledPackagesReinstallStartedState()
+        val successState = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallResult(null)
+        val blankFailureState =
+            DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallResult("   ")
+        val failureState =
+            DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallResult("network error")
+
+        assertThat(startedState.feedback).isEqualTo(DeveloperBundledPackagesReinstallFeedback.Started)
+        assertThat(successState.feedback).isEqualTo(DeveloperBundledPackagesReinstallFeedback.Success)
+        assertThat(successState.errorMessage).isNull()
+        assertThat(blankFailureState.feedback)
+            .isEqualTo(DeveloperBundledPackagesReinstallFeedback.Success)
+        assertThat(failureState.feedback).isEqualTo(DeveloperBundledPackagesReinstallFeedback.Failure)
+        assertThat(failureState.errorMessage).isEqualTo("network error")
+    }
+
+    @Test
+    fun resolveBundledPackagesReinstallToast_shouldExposeStableMessagesAndDurations() {
+        val startedToast = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
+            state = DeveloperOptionsSectionSupport.createBundledPackagesReinstallStartedState(),
+            unknownErrorMessage = "unknown"
+        )
+        val successToast = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
+            state = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallResult(null),
+            unknownErrorMessage = "unknown"
+        )
+        val failureToast = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
+            state = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallResult("network error"),
+            unknownErrorMessage = "unknown"
+        )
+        val fallbackFailureToast = DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
+            state = DeveloperBundledPackagesReinstallState(
+                feedback = DeveloperBundledPackagesReinstallFeedback.Failure
+            ),
+            unknownErrorMessage = "unknown",
+            useLongDuration = true
+        )
+
+        assertThat(startedToast.message)
+            .isEqualTo(DeveloperMessageSpec(Strings.toast_reinstalling_bundled_packages))
+        assertThat(startedToast.duration).isEqualTo(DeveloperToastDuration.Short)
+
+        assertThat(successToast.message)
+            .isEqualTo(DeveloperMessageSpec(Strings.toast_reinstall_bundled_packages_success))
+        assertThat(successToast.duration).isEqualTo(DeveloperToastDuration.Short)
+
+        assertThat(failureToast.message).isEqualTo(
+            DeveloperMessageSpec(
+                messageRes = Strings.toast_reinstall_bundled_packages_failed,
+                formatArgs = listOf("network error")
+            )
+        )
+        assertThat(failureToast.duration).isEqualTo(DeveloperToastDuration.Short)
+
+        assertThat(fallbackFailureToast.message).isEqualTo(
+            DeveloperMessageSpec(
+                messageRes = Strings.toast_reinstall_bundled_packages_failed,
+                formatArgs = listOf("unknown")
+            )
+        )
+        assertThat(fallbackFailureToast.duration).isEqualTo(DeveloperToastDuration.Long)
+    }
+
+    @Test
+    fun resolveServerConfigPreview_shouldNormalizeUpdatedAtAndPreserveFeatureFlags() {
+        val preview = DeveloperOptionsSectionSupport.resolveServerConfigPreview(
+            ServerConfigResponse(
+                version = 12,
+                updatedAt = "   ",
+                configRefreshIntervalSecs = 600,
+                features = FeatureFlags(
+                    feedbackEnabled = true,
+                    pluginMarketEnabled = false,
+                    packageManagerEnabled = true,
+                    developerOptionsEnabled = false
+                ),
+                client = ClientConfig(
+                    minClientVersion = "1.0.0",
+                    recommendedClientVersion = "1.2.0",
+                    forceUpdate = true
+                )
+            )
+        )
+
+        assertThat(preview.version).isEqualTo(12)
+        assertThat(preview.updatedAt).isNull()
+        assertThat(preview.configRefreshIntervalSecs).isEqualTo(600)
+        assertThat(preview.feedbackEnabled).isTrue()
+        assertThat(preview.pluginMarketEnabled).isFalse()
+        assertThat(preview.packageManagerEnabled).isTrue()
+        assertThat(preview.developerOptionsEnabled).isFalse()
+        assertThat(preview.minClientVersion).isEqualTo("1.0.0")
+        assertThat(preview.recommendedClientVersion).isEqualTo("1.2.0")
+        assertThat(preview.forceUpdate).isTrue()
+    }
+
+    @Test
+    fun resolveActionEffect_shouldKeepCriticalNavigationActionsStable() {
+        val disableEffect = DeveloperOptionsSectionSupport.resolveActionEffect(
+            DeveloperOptionsAction.DisableDeveloperOptions
+        )
+        val openTestingToolsEffect = DeveloperOptionsSectionSupport.resolveActionEffect(
+            DeveloperOptionsAction.OpenTestingTools
+        )
+
+        assertThat(disableEffect.disableDeveloperOptions).isTrue()
+        assertThat(disableEffect.navigateBack).isTrue()
+        assertThat(disableEffect.openTestingTools).isFalse()
+        assertThat(disableEffect.targetDevTestId).isNull()
+        assertThat(openTestingToolsEffect.disableDeveloperOptions).isFalse()
+        assertThat(openTestingToolsEffect.navigateBack).isFalse()
+        assertThat(openTestingToolsEffect.openTestingTools).isTrue()
+        assertThat(openTestingToolsEffect.targetDevTestId).isNull()
+    }
+}

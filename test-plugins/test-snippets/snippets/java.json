@@ -1,0 +1,87 @@
+{
+  "language": "java",
+  "snippets": [
+    {
+      "prefix": "main",
+      "name": "Main Method",
+      "description": "Java main method",
+      "body": [
+        "public static void main(String[] args) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "sout",
+      "name": "System.out.println",
+      "description": "Print to console",
+      "body": [
+        "System.out.println(${1:\"message\"});"
+      ]
+    },
+    {
+      "prefix": "for",
+      "name": "For Loop",
+      "description": "Standard for loop",
+      "body": [
+        "for (int ${1:i} = 0; ${1:i} < ${2:length}; ${1:i}++) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "foreach",
+      "name": "For Each Loop",
+      "description": "Enhanced for loop",
+      "body": [
+        "for (${1:Type} ${2:item} : ${3:collection}) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "if",
+      "name": "If Statement",
+      "description": "If statement",
+      "body": [
+        "if (${1:condition}) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "ifelse",
+      "name": "If Else Statement",
+      "description": "If-else statement",
+      "body": [
+        "if (${1:condition}) {",
+        "    ${2}",
+        "} else {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "try",
+      "name": "Try Catch",
+      "description": "Try-catch block",
+      "body": [
+        "try {",
+        "    ${1}",
+        "} catch (${2:Exception} e) {",
+        "    ${0}",
+        "}"
+      ]
+    },
+    {
+      "prefix": "class",
+      "name": "Class",
+      "description": "Java class",
+      "body": [
+        "public class ${1:ClassName} {",
+        "    ${0}",
+        "}"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+name: Submit Manufacturer Adaptation Issue
+description: Issues related to new adaptations or incorrect adaptations of manufacturer systems
+title: "[Adaptation]:"
+labels: ["adaptation"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## [【Warning: Please fill in according to the issue template. Do not take chances. Any issue found not seriously filled in according to the template will be closed directly】](https://github.com/getActivity/IssueTemplateGuide)
+  - type: input
+    id: input_id_1
+    attributes:
+      label: Framework Version【Required】
+      description: Please enter the version of the framework you are using
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_2
+    attributes:
+      label: Does the latest version of the framework have this issue【Required】
+      description: If you are using an older version, it is recommended to upgrade to see if the issue still exists
+      multiple: false
+      options:
+        - "Not selected"
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_3
+    attributes:
+      label: Does the framework documentation mention this issue【Required】
+      description: The documentation provides answers to the most common questions. You can check if it contains what you need first
+      multiple: false
+      options:
+        - "Not selected"
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_4
+    attributes:
+      label: Has anyone raised a similar issue in the issue list【Required】
+      description: You can search for keywords in the issue list to refer to others' solutions
+      multiple: false
+      options:
+        - "Not selected"
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: dropdown
+    id: input_id_5
+    attributes:
+      label: Have you searched the issue list but still couldn't solve it【Required】
+      description: If you have searched the issue list but the problem remains unsolved, you can select "Yes"
+      multiple: false
+      options:
+        - "Not selected"
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+  - type: input
+    id: input_id_6
+    attributes:
+      label: Device Information with the Issue【Required】
+      description: Please fill in the brand and model of the device with the issue
+    validations:
+      required: true
+  - type: input
+    id: input_id_7
+    attributes:
+      label: Android Version with the Issue【Required】
+      description: Please fill in the Android version where the issue occurs
+    validations:
+      required: true
+  - type: input
+    id: input_id_8
+    attributes:
+      label: Manufacturer's OS Type with the Issue【Required】
+      description: Please enter the manufacturer's OS name of the device
+    validations:
+      required: true
+  - type: input
+    id: input_id_9
+    attributes:
+      label: Manufacturer's OS Version with the Issue【Required】
+      description: Please enter the manufacturer's OS version of the device
+    validations:
+      required: true
+  - type: textarea
+    id: input_id_10
+    attributes:
+      label: System Properties of the Device with the Issue【Required】
+      description: Please use the adb shell getprop command to obtain all system properties and fill them in here
+    validations:
+      required: true
+  - type: textarea
+    id: input_id_11
+    attributes:
+      label: Screenshot of Device Information with the Issue【Required】
+      description: If it's a mobile phone, please take a screenshot of the "About Phone" page and upload it here. The screenshot should include the manufacturer's OS name and version. The same applies to other devices
+    validations:
+      required: true

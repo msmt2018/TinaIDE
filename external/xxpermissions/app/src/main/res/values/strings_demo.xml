@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">XXPermissions</string>
+
+    <string name="demo_obtain_permission_success_hint">Obtained %s successfully</string>
+    <string name="demo_return_activity_result_hint">Detected that you just returned from the permission settings interface</string>
+
+    <string name="demo_android_12_bluetooth_permission_hint">The current version is not Android 12 and above, the old version requires location permission to scan Bluetooth</string>
+    <string name="demo_android_13_wifi_permission_hint">The current version is not Android 13 and above, the old version needs location permission to scan WIFI</string>
+    <string name="demo_android_10_read_media_location_permission_hint">The current version is not Android 10 and above, the old version needs read storage permission to get media location permission</string>
+    <string name="demo_android_13_read_media_permission_hint">The current version is not Android 13 and above, it will automatically change to the old version of the request method</string>
+    <string name="demo_android_11_manage_storage_permission_hint">The current version is not Android 11 and above, it will automatically change to the old version of the request method</string>
+    <string name="demo_android_13_post_notification_permission_hint">The current version is not Android 13 and above, it will automatically change to the old version of the request method</string>
+    <string name="demo_android_14_full_screen_notifications_permission_hint">The current version is not Android 14 and above, it will automatically change to the old version of the request method</string>
+    <string name="demo_android_14_health_permission_hint">The current version is not Android 14 or above, and it will be replaced with sensor permissions to request</string>
+
+    <string name="demo_notification_listener_toast">A new notification message was listened for with the title: %s and the content: %s</string>
+
+    <string name="test_notification_channel_id">test</string>
+    <string name="test_notification_channel_name">test notification channel name</string>
+
+    <string name="test_device_admin_extra_add_explanation">Additional instructions for testing device management permissions</string>
+    <string name="test_accessibility_service_description">test description for accessibility services</string>
+
+    <string name="demo_request_single_dangerous_permission">Request single dangerous permission</string>
+    <string name="demo_request_multiple_dangerous_permission">Request multiple dangerous permission</string>
+    <string name="demo_request_location_permission">Request location permission</string>
+    <string name="demo_request_health_data_permission">Request fitness and wellness data permission</string>
+    <string name="demo_request_activity_recognition_permission">Request activity recognition permission</string>
+    <string name="demo_request_bluetooth_permission">Request bluetooth permission</string>
+    <string name="demo_request_wifi_permission">Request wifi permission</string>
+    <string name="demo_request_access_media_location_information_permission">Request access media location information permission</string>
+    <string name="demo_request_read_media_permission">Request media read permission</string>
+    <string name="demo_request_all_file_access_permission">Request all file access permission</string>
+    <string name="demo_request_install_unknown_apps_permission">Request install unknown apps permission</string>
+    <string name="demo_request_display_over_other_apps_permission">Request display over other apps permission</string>
+    <string name="demo_request_modify_system_settings_permission">Request modify system settings permission</string>
+    <string name="demo_request_allow_notifications_permission">Request allow notifications permission</string>
+    <string name="demo_request_post_notifications_permission_api33">Request allow send notifications permission (api 33)</string>
+    <string name="demo_request_allow_notifications_access_permission">Request allow notifications access permission</string>
+    <string name="demo_request_apps_with_usage_access_permission">Request apps with usage access permission</string>
+    <string name="demo_request_alarms_reminders_permission">Request alarms &amp; reminders permission</string>
+    <string name="demo_request_do_not_disturb_access_permission">Request do not disturb access permission</string>
+    <string name="demo_request_ignore_battery_optimize_permission">Request ignore battery optimize permission</string>
+    <string name="demo_request_picture_in_picture_permission">Request picture-in-picture permission</string>
+    <string name="demo_request_vpn_permission">Request vpn permission</string>
+    <string name="demo_request_full_screen_notifications_permission">Request full screen notifications permission</string>
+    <string name="demo_request_device_admin_permission">Request device admin permission</string>
+    <string name="demo_request_accessibility_service_permission">Request accessibility service permission</string>
+    <string name="demo_request_manage_media_permission">Request manage media permission</string>
+    <string name="demo_request_get_installed_apps_permission">Request get installed application information permission</string>
+    <string name="demo_request_multiple_type_permission">Request dangerous permission and special permission</string>
+    <string name="demo_start_app_details_activity">Start app details activity</string>
+
+    <string name="privacy_policy_title">Health Data Privacy Policy</string>
+
+    <string name="privacy_policy_content">
+        1. How We Collect and Use Your Health Data\n\n
+        Based on the permissions you granted in 「Health Data Sharing」 (e.g., step count, sleep, heart rate), application is only used to provide health management services. We will not use the data for unauthorized commercial purposes.\n\n
+        2. Data Storage and Protection\n\n
+        Your health data (e.g., medical treatment records, vaccination history) will be encrypted and stored with strict access restrictions to ensure data security.\n\n
+        3. Permission Changes and Withdrawal\n\n
+        You can adjust or disable health data access permissions at any time in 「App Permission Settings」, and we will immediately stop collecting and using the corresponding data.\n\n
+        4. Third-Party Cooperation Instructions\n\n
+        If involving third-party services (e.g., data analysis), we will ensure they follow the same privacy standards and will not disclose your sensitive health information (e.g., personal medical history, pregnancy status, etc.).\n\n
+        5. Minor Privacy Protection\n\n
+        If you are a minor, you need to authorize health data (e.g., height, weight related to growth and development) with the guardian’s consent. Guardians can assist in managing permissions.
+    </string>
+
+</resources>

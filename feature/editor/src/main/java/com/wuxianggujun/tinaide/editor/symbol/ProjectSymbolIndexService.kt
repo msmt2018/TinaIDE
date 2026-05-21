@@ -1,0 +1,772 @@
+package com.wuxianggujun.tinaide.editor.symbol
+
+import android.content.Context
+import com.itsaky.androidide.treesitter.TSParser
+import com.itsaky.androidide.treesitter.TSTree
+import com.wuxianggujun.tinaide.core.ServiceLifecycle
+import com.wuxianggujun.tinaide.core.symbol.FuzzySymbolMatch
+import com.wuxianggujun.tinaide.core.symbol.IProjectSymbolIndexService
+import com.wuxianggujun.tinaide.core.symbol.SymbolIndexStatus
+import com.wuxianggujun.tinaide.core.symbol.SymbolInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.Closeable
+import java.io.File
+import java.util.Locale
+import java.util.TreeMap
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
+import timber.log.Timber
+
+/**
+ * 项目级符号索引（基于 Tree-sitter 的语法级索引）
+ *
+ * 目标：
+ * - 全局符号搜索/跳转（例如 Outline、Symbols 面板）
+ * - 后台构建 + 增量更新（保存文件时刷新该文件索引）
+ * - 持久化缓存：启动时快速加载，避免重建索引
+ *
+ * 非目标（请走 LSP/clangd）：
+ * - 语义级补全/类型推断/继承链遍历/宏展开/重命名
+ */
+class ProjectSymbolIndexService(
+    private val context: Context? = null,
+    providers: List<LanguageSymbolProvider> = listOf(CxxSymbolProvider()),
+) : ServiceLifecycle, Closeable, IProjectSymbolIndexService {
+
+    companion object {
+        private const val TAG = "ProjectSymbolIndex"
+
+        private val IGNORED_DIR_NAMES = setOf(
+            ".git", ".gradle", ".idea", ".vscode", ".tinaide",
+            "build", "out", "dist", "node_modules",
+            "cmake-build-debug", "cmake-build-release",
+        )
+
+        /** 单个文件最大字节数 - 避免解析超大文件导致 OOM */
+        private const val MAX_FILE_BYTES_DEFAULT = 1 * 1024 * 1024 // 1MB
+
+        /** 解析超时时间（毫秒）- 防止恶意代码导致解析挂起 */
+        private const val PARSE_TIMEOUT_MS = 5000L // 5 秒
+    }
+
+    data class IndexStatus(
+        val projectRoot: String? = null,
+        val isIndexing: Boolean = false,
+        val indexedFiles: Int = 0,
+        val totalFiles: Int = 0,
+        val lastIndexedAt: Long? = null,
+        val lastError: String? = null,
+        val revision: Long = 0L,
+        val cacheLoaded: Boolean = false,  // 是否从缓存加载
+        val cacheHitFiles: Int = 0,        // 缓存命中的文件数
+    )
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lock = ReentrantReadWriteLock()
+    private val revision = AtomicLong(0L)
+
+    private val _status = MutableStateFlow(IndexStatus())
+    private val _statusInternal: StateFlow<IndexStatus> = _status.asStateFlow()
+
+    override val status: StateFlow<SymbolIndexStatus> = _statusInternal.map { it.toSymbolIndexStatus() }
+        .stateIn(scope, SharingStarted.Eagerly, SymbolIndexStatus())
+
+    @Volatile
+    private var activeProjectRoot: File? = null
+
+    // Per-file extracted snapshot (for removal on update)
+    private val fileSnapshots = HashMap<String, FileSnapshot>()
+
+    // Global indexes (case-sensitive keys, but queried by lowercase prefix)
+    private val globalSymbolsByLower = TreeMap<String, MutableList<ProjectSymbol>>()
+
+    private val providers = providers.ifEmpty { listOf(CxxSymbolProvider()) }
+
+    private data class ProviderParserState(
+        val provider: LanguageSymbolProvider,
+        val parser: TSParser,
+        val lock: Any = Any(),
+    )
+
+    private val parserStates: List<ProviderParserState> = this.providers.map { provider ->
+        ProviderParserState(
+            provider = provider,
+            parser = TSParser.create().apply { setLanguage(provider.createLanguage()) },
+        )
+    }
+    private val parserStateByExt: Map<String, ProviderParserState> = buildMap {
+        for (state in parserStates) {
+            for (ext in state.provider.supportedExtensions) {
+                val normalizedExt = ext.lowercase(Locale.ROOT)
+                val previous = putIfAbsent(normalizedExt, state)
+                if (previous != null && previous.provider::class != state.provider::class) {
+                    Timber.tag(TAG).w(
+                        "Duplicate symbol provider extension '%s': keep %s, ignore %s",
+                        normalizedExt,
+                        previous.provider::class.java.simpleName,
+                        state.provider::class.java.simpleName,
+                    )
+                }
+            }
+        }
+    }
+
+    // 持久化缓存
+    private val indexCache: SymbolIndexCache? = context?.let { SymbolIndexCache(it) }
+
+    // 文件时间戳（用于缓存验证）
+    private val fileTimestamps = HashMap<String, Long>()
+
+    override fun onCreate() {
+        Timber.tag(TAG).i("ProjectSymbolIndexService created")
+    }
+
+    override fun onDestroy() {
+        close()
+    }
+
+    override fun onProjectOpened(projectRoot: File) {
+        if (!projectRoot.isDirectory) return
+        if (activeProjectRoot?.absolutePath == projectRoot.absolutePath) return
+        activeProjectRoot = projectRoot
+        clearIndex("project switched")
+        startIndexWithCache(projectRoot)
+    }
+
+    override fun onProjectClosed() {
+        activeProjectRoot = null
+        clearIndex("project closed")
+    }
+
+    override fun onFileSaved(file: File, content: String) {
+        val root = activeProjectRoot ?: return
+        if (!isUnderRoot(file, root)) return
+        if (!isSupportedFile(file)) return
+        scope.launch {
+            val errorMessage = updateSingleFile(file, content)
+            if (errorMessage != null) {
+                _status.value = _status.value.copy(lastError = errorMessage)
+            } else if (_status.value.lastError != null) {
+                _status.value = _status.value.copy(lastError = null)
+            }
+        }
+    }
+
+    /**
+     * 查询全局符号（前缀匹配）
+     *
+     * @param prefix 搜索前缀
+     * @param limit 返回数量限制
+     * @return 匹配的符号列表
+     */
+    override fun queryGlobals(prefix: String, limit: Int): List<SymbolInfo> {
+        return queryGlobalsInternal(prefix, limit).map { it.toSymbolInfo() }
+    }
+
+    /**
+     * 内部查询方法（返回 ProjectSymbol）
+     */
+    private fun queryGlobalsInternal(prefix: String, limit: Int): List<ProjectSymbol> {
+        val max = limit.coerceIn(10, 500)
+        val p = prefix.trim()
+        val needle = p.lowercase(Locale.ROOT)
+        return lock.read {
+            val view = if (needle.isEmpty()) {
+                globalSymbolsByLower
+            } else {
+                prefixView(globalSymbolsByLower, needle)
+            }
+            val out = ArrayList<ProjectSymbol>(minOf(max, 64))
+            val seenKeys = HashSet<String>(minOf(max * 2, 512))
+            for ((_, symbols) in view) {
+                for (symbol in symbols) {
+                    val key = symbol.composeStableKey()
+                    if (!seenKeys.add(key)) continue
+                    out.add(symbol)
+                    if (out.size >= max) return@read out
+                }
+            }
+            out
+        }
+    }
+
+    /**
+     * 模糊查询全局符号
+     *
+     * 支持多种匹配模式：
+     * - 前缀匹配（最高优先级）
+     * - 驼峰匹配（如 "gAL" 匹配 "getArrayLength"）
+     * - 子序列匹配（如 "gal" 匹配 "getArrayLength"）
+     * - 包含匹配（如 "array" 匹配 "getArrayLength"）
+     *
+     * @param pattern 搜索模式
+     * @param limit 返回数量限制
+     * @return 匹配的符号列表（按匹配分数降序排列）
+     */
+    override fun queryGlobalsFuzzy(pattern: String, limit: Int): List<FuzzySymbolMatch> {
+        return queryGlobalsFuzzyInternal(pattern, limit).map { it.toFuzzySymbolMatch() }
+    }
+
+    /**
+     * 内部模糊查询方法（返回 FuzzySymbolResult）
+     */
+    private fun queryGlobalsFuzzyInternal(pattern: String, limit: Int): List<FuzzySymbolResult> {
+        val max = limit.coerceIn(10, 500)
+        val p = pattern.trim()
+
+        if (p.isEmpty()) {
+            return lock.read {
+                val out = ArrayList<FuzzySymbolResult>(minOf(max, 64))
+                val seenKeys = HashSet<String>(minOf(max * 2, 512))
+                for (symbol in globalSymbolsByLower.values.flatten()) {
+                    val key = symbol.composeStableKey()
+                    if (!seenKeys.add(key)) continue
+                    out.add(FuzzySymbolResult(symbol, FuzzyMatcher.MatchResult(matched = true, score = 0)))
+                    if (out.size >= max) break
+                }
+                out
+            }
+        }
+
+        return lock.read {
+            val allSymbols = globalSymbolsByLower.values.flatten()
+            val matched = FuzzyMatcher.matchAndSort(p, allSymbols, { it.name }, max)
+            val out = ArrayList<FuzzySymbolResult>(minOf(matched.size, max))
+            val seenKeys = HashSet<String>(minOf(max * 2, 512))
+            for ((symbol, matchResult) in matched) {
+                val key = symbol.composeStableKey()
+                if (!seenKeys.add(key)) continue
+                out.add(FuzzySymbolResult(symbol, matchResult))
+                if (out.size >= max) break
+            }
+            out
+        }
+    }
+
+    /**
+     * 启动索引（优先从缓存加载）
+     */
+    private fun startIndexWithCache(projectRoot: File) {
+        scope.launch {
+            runCatching {
+                val files = collectProjectFiles(projectRoot)
+                _status.value = _status.value.copy(
+                    projectRoot = projectRoot.absolutePath,
+                    isIndexing = true,
+                    indexedFiles = 0,
+                    totalFiles = files.size,
+                    lastError = null,
+                    cacheLoaded = false,
+                    cacheHitFiles = 0,
+                )
+
+                // 尝试加载缓存
+                val cached = indexCache?.loadIndex(projectRoot.absolutePath)
+                var filesToIndex = files
+                var cacheHitCount = 0
+
+                if (cached != null) {
+                    // 验证缓存有效性
+                    val invalidFiles = indexCache.validateCache(cached, files)
+                    val invalidPathSet = invalidFiles.asSequence()
+                        .map { it.absolutePath }
+                        .toHashSet()
+                    val validPathSet = files.asSequence()
+                        .map { it.absolutePath }
+                        .filter { it !in invalidPathSet }
+                        .toHashSet()
+
+                    if (validPathSet.isNotEmpty()) {
+                        val symbolCount = cached.fileSnapshots
+                            .asSequence()
+                            .filter { it.filePath in validPathSet }
+                            .sumOf { it.globals.size }
+                        Timber.tag(TAG).i(
+                            "Loading partial cache: %d symbols, %d cache hits, %d files need update",
+                            symbolCount,
+                            validPathSet.size,
+                            invalidFiles.size
+                        )
+
+                        // 应用有效缓存，剩余文件增量更新（不再按 50% 阈值放弃缓存）
+                        applyCachedIndex(cached, validPathSet)
+                        cacheHitCount = validPathSet.size
+                        filesToIndex = invalidFiles
+
+                        _status.value = _status.value.copy(
+                            cacheLoaded = true,
+                            cacheHitFiles = cacheHitCount,
+                            indexedFiles = cacheHitCount,
+                        )
+                    } else {
+                        Timber.tag(TAG).i("Cache invalid for all files, rebuilding index")
+                    }
+                }
+
+                // 索引需要更新的文件
+                var done = cacheHitCount
+                for (file in filesToIndex) {
+                    val readResult = runCatching { file.readText() }
+                    if (readResult.isFailure) {
+                        val error = readResult.exceptionOrNull()
+                        _status.value = _status.value.copy(
+                            lastError = "Read file failed: ${file.name} (${error?.messageOrClass() ?: "unknown"})"
+                        )
+                        done++
+                        if (done % 20 == 0) {
+                            _status.value = _status.value.copy(indexedFiles = done)
+                        }
+                        continue
+                    }
+                    val text = readResult.getOrThrow()
+                    val fileError = updateSingleFile(file, text)
+                    if (fileError != null) {
+                        _status.value = _status.value.copy(lastError = fileError)
+                    }
+                    done++
+                    if (done % 20 == 0) {
+                        _status.value = _status.value.copy(indexedFiles = done)
+                    }
+                }
+
+                val now = System.currentTimeMillis()
+                _status.value = _status.value.copy(
+                    isIndexing = false,
+                    indexedFiles = done,
+                    lastIndexedAt = now,
+                    revision = revision.get(),
+                )
+
+                // 保存缓存
+                saveIndexCache(projectRoot.absolutePath)
+            }.onFailure { e ->
+                Timber.tag(TAG).w(e, "Index failed: ${e.message}")
+                _status.value = _status.value.copy(
+                    isIndexing = false,
+                    lastError = e.messageOrClass(),
+                )
+            }
+        }
+    }
+
+    /**
+     * 应用缓存的索引数据
+     */
+    private fun applyCachedIndex(
+        cached: SymbolIndexCache.CachedIndex,
+        allowedPaths: Set<String>
+    ) {
+        lock.write {
+            // 只应用允许复用的缓存文件，避免陈旧索引污染。
+            var applied = 0
+            var skipped = 0
+            for (cachedSnapshot in cached.fileSnapshots) {
+                if (cachedSnapshot.filePath !in allowedPaths) {
+                    skipped++
+                    continue
+                }
+                val snapshot = FileSnapshot.fromCached(cachedSnapshot)
+                applyFileSnapshotLocked(snapshot)
+                fileSnapshots[snapshot.filePath] = snapshot
+                cached.fileTimestamps[snapshot.filePath]?.let { fileTimestamps[snapshot.filePath] = it }
+                applied++
+            }
+
+            Timber.tag(TAG).i("Cache applied: $applied files, skipped: $skipped")
+            bumpRevisionLocked()
+        }
+    }
+
+    /**
+     * 保存索引到缓存
+     */
+    private suspend fun saveIndexCache(projectRoot: String) {
+        val cache = indexCache ?: return
+
+        val (snapshots, timestamps) = lock.read {
+            val cachedSnapshots = fileSnapshots.values.map { snapshot ->
+                SymbolIndexCache.CachedFileSnapshot(
+                    filePath = snapshot.filePath,
+                    globals = snapshot.globals,
+                )
+            }
+            cachedSnapshots to fileTimestamps.toMap()
+        }
+
+        cache.saveIndex(
+            projectRoot = projectRoot,
+            fileSnapshots = snapshots,
+            fileTimestamps = timestamps,
+        )
+    }
+
+    /**
+     * 带超时的解析方法
+     * 防止恶意代码导致解析挂起
+     */
+    private sealed interface ParseResult {
+        data class Success(val tree: TSTree) : ParseResult
+        data object Timeout : ParseResult
+        data class Failure(val cause: Throwable) : ParseResult
+    }
+
+    private suspend fun parseWithTimeout(content: String, parserState: ProviderParserState): ParseResult {
+        return try {
+            val tree = withTimeoutOrNull(PARSE_TIMEOUT_MS) {
+                synchronized(parserState.lock) {
+                    parserState.parser.parseString(content)
+                }
+            }
+            if (tree == null) {
+                Timber.tag(TAG).w("Parse timeout after %d ms", PARSE_TIMEOUT_MS)
+                ParseResult.Timeout
+            } else {
+                ParseResult.Success(tree)
+            }
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            Timber.tag(TAG).w(t, "Parse failed with exception")
+            ParseResult.Failure(t)
+        }
+    }
+
+    private suspend fun updateSingleFile(file: File, content: String): String? {
+        val path = file.absolutePath
+        val parserState = parserStateByExt[file.extension.lowercase(Locale.ROOT)]
+        if (parserState == null) {
+            lock.write {
+                removeFileSnapshotLocked(path)
+                fileTimestamps.remove(path)
+            }
+            bumpRevisionLocked()
+            return null
+        }
+
+        if (!file.exists() || !file.isFile) {
+            lock.write {
+                removeFileSnapshotLocked(path)
+                fileTimestamps.remove(path)
+            }
+            bumpRevisionLocked()
+            return null
+        }
+
+        val size = runCatching { file.length() }.getOrDefault(0L)
+        if (size > MAX_FILE_BYTES_DEFAULT) {
+            Timber.tag(TAG).d("Skipping large file: %s (%d bytes)", path, size)
+            return null
+        }
+
+        val parseResult = parseWithTimeout(content, parserState)
+        val tree = when (parseResult) {
+            is ParseResult.Success -> parseResult.tree
+            ParseResult.Timeout -> {
+                val message = "Parse timeout: ${file.name}"
+                Timber.tag(TAG).w("Failed to parse file (timeout): %s", path)
+                return message
+            }
+            is ParseResult.Failure -> {
+                val message = "Parse failed: ${file.name} (${parseResult.cause.messageOrClass()})"
+                Timber.tag(TAG).w(parseResult.cause, "Failed to parse file: %s", path)
+                return message
+            }
+        }
+
+        var warningMessage: String? = null
+        try {
+            val globals = runCatching {
+                parserState.provider.extractSymbols(tree.rootNode, content)
+            }.getOrElse { e ->
+                warningMessage = "Extract symbols failed: ${file.name} (${e.messageOrClass()})"
+                Timber.tag(TAG).w(
+                    e,
+                    "Failed to extract symbols: provider=%s file=%s",
+                    parserState.provider::class.java.simpleName,
+                    path,
+                )
+                emptyList()
+            }
+            val snapshot = FileSnapshot.from(file, globals)
+            lock.write {
+                removeFileSnapshotLocked(path)
+                applyFileSnapshotLocked(snapshot)
+                fileSnapshots[path] = snapshot
+                fileTimestamps[path] = file.lastModified()
+                bumpRevisionLocked()
+            }
+        } finally {
+            tree.close()
+        }
+        return warningMessage
+    }
+
+    private fun bumpRevisionLocked() {
+        val newRev = revision.incrementAndGet()
+        _status.value = _status.value.copy(revision = newRev)
+    }
+
+    private fun applyFileSnapshotLocked(snapshot: FileSnapshot) {
+        for (s in snapshot.globals) {
+            val key = s.name.lowercase(Locale.ROOT)
+            globalSymbolsByLower.getOrPut(key) { mutableListOf() }.add(s)
+        }
+    }
+
+    private fun removeFileSnapshotLocked(path: String) {
+        val old = fileSnapshots.remove(path) ?: return
+
+        for (s in old.globals) {
+            val key = s.name.lowercase(Locale.ROOT)
+            val list = globalSymbolsByLower[key] ?: continue
+            list.removeAll { it.filePath == old.filePath && it.name == s.name && it.kind == s.kind }
+            if (list.isEmpty()) globalSymbolsByLower.remove(key)
+        }
+    }
+
+    private fun clearIndex(reason: String) {
+        lock.write {
+            fileSnapshots.clear()
+            globalSymbolsByLower.clear()
+            fileTimestamps.clear()
+            val newRev = revision.incrementAndGet()
+            _status.value = IndexStatus(
+                projectRoot = activeProjectRoot?.absolutePath,
+                isIndexing = false,
+                indexedFiles = 0,
+                totalFiles = 0,
+                lastIndexedAt = null,
+                lastError = null,
+                revision = newRev,
+                cacheLoaded = false,
+                cacheHitFiles = 0,
+            )
+        }
+        Timber.tag(TAG).i("Index cleared: $reason")
+    }
+
+    /**
+     * 清除项目缓存
+     */
+    override fun clearCache() {
+        val projectRoot = activeProjectRoot?.absolutePath ?: return
+        indexCache?.clearCache(projectRoot)
+    }
+
+    private fun collectProjectFiles(projectRoot: File): List<File> {
+        val out = ArrayList<File>(1024)
+        projectRoot.walkTopDown()
+            .onEnter { dir -> dir.name !in IGNORED_DIR_NAMES }
+            .forEach { f ->
+                if (!f.isFile) return@forEach
+                if (!isSupportedFile(f)) return@forEach
+                val size = runCatching { f.length() }.getOrDefault(0L)
+                if (size <= MAX_FILE_BYTES_DEFAULT) {
+                    out.add(f)
+                }
+            }
+        return out
+    }
+
+    private fun isSupportedFile(file: File): Boolean {
+        return file.extension.lowercase(Locale.ROOT) in parserStateByExt
+    }
+
+    private fun isUnderRoot(file: File, root: File): Boolean {
+        val rp = root.absolutePath.trimEnd(File.separatorChar) + File.separator
+        return file.absolutePath.startsWith(rp)
+    }
+
+    private fun <V> prefixView(map: TreeMap<String, V>, prefix: String): Map<String, V> {
+        val fromKey = prefix
+        val toKey = prefix + '\uFFFF'
+        return map.subMap(fromKey, true, toKey, true)
+    }
+
+    override fun close() {
+        // 关闭前保存缓存
+        val projectRoot = activeProjectRoot?.absolutePath
+        if (projectRoot != null) {
+            scope.launch {
+                saveIndexCache(projectRoot)
+            }
+        }
+        scope.cancel()
+        parserStates.forEach { state ->
+            runCatching { synchronized(state.lock) { state.parser.close() } }
+        }
+        Timber.tag(TAG).i("ProjectSymbolIndexService closed")
+    }
+}
+
+data class ProjectSymbol(
+    val name: String,
+    val kind: SymbolKind,
+    val detail: String,
+    val filePath: String,
+    val location: SymbolLocation? = null,
+    val signature: String? = null,
+    val documentation: String? = null,
+) {
+    val displayDetail: String
+        get() {
+            val fileName = File(filePath).name
+            return when {
+                signature != null -> "$signature ($fileName)"
+                detail.isNotBlank() -> "$detail ($fileName)"
+                else -> fileName
+            }
+        }
+    
+    val displayDocumentation: String?
+        get() = documentation?.takeIf { it.isNotBlank() }
+}
+
+private fun ProjectSymbol.composeStableKey(): String {
+    val location = this.location
+    return buildString {
+        append(filePath)
+        append("|")
+        append(kind.name)
+        append("|")
+        append(name)
+        append("|")
+        append(location?.line ?: -1)
+        append("|")
+        append(location?.column ?: -1)
+    }
+}
+
+/**
+ * 模糊匹配结果：全局符号
+ */
+data class FuzzySymbolResult(
+    val symbol: ProjectSymbol,
+    val matchResult: FuzzyMatcher.MatchResult,
+) {
+    val score: Int get() = matchResult.score
+    val matchedIndices: List<Int> get() = matchResult.matchedIndices
+}
+
+private data class FileSnapshot(
+    val filePath: String,
+    val globals: List<ProjectSymbol>,
+) {
+    companion object {
+        fun fromCached(snapshot: SymbolIndexCache.CachedFileSnapshot): FileSnapshot {
+            return FileSnapshot(
+                filePath = snapshot.filePath,
+                globals = snapshot.globals,
+            )
+        }
+
+        fun from(file: File, globals: List<GlobalSymbol>): FileSnapshot {
+            val filePath = file.absolutePath
+            val symbols = globals.map {
+                ProjectSymbol(
+                    name = it.name,
+                    kind = it.kind,
+                    detail = it.detail,
+                    filePath = filePath,
+                    location = it.location,
+                    signature = it.signature,
+                    documentation = it.documentation,
+                )
+            }
+            return FileSnapshot(
+                filePath = filePath,
+                globals = symbols,
+            )
+        }
+    }
+}
+
+// ========== 类型转换扩展函数 ==========
+
+/**
+ * 将内部 IndexStatus 转换为接口 SymbolIndexStatus
+ */
+private fun ProjectSymbolIndexService.IndexStatus.toSymbolIndexStatus(): SymbolIndexStatus {
+    return SymbolIndexStatus(
+        projectRoot = projectRoot,
+        isIndexing = isIndexing,
+        indexedFiles = indexedFiles,
+        totalFiles = totalFiles,
+        lastIndexedAt = lastIndexedAt,
+        lastError = lastError,
+        revision = revision,
+        cacheLoaded = cacheLoaded,
+        cacheHitFiles = cacheHitFiles,
+    )
+}
+
+/**
+ * 将内部 ProjectSymbol 转换为接口 SymbolInfo
+ */
+private fun ProjectSymbol.toSymbolInfo(): SymbolInfo {
+    return SymbolInfo(
+        name = name,
+        kind = kind.toCoreSymbolKind(),
+        detail = detail,
+        filePath = filePath,
+        location = location?.let {
+            com.wuxianggujun.tinaide.core.symbol.SymbolLocation(
+                startLine = it.line,
+                startColumn = it.column,
+                endLine = it.line,
+                endColumn = it.column,
+            )
+        },
+        signature = signature,
+        documentation = documentation,
+    )
+}
+
+/**
+ * 将 feature:editor 层的 SymbolKind 转换为 core:common 层的 SymbolKind
+ */
+private fun com.wuxianggujun.tinaide.editor.symbol.SymbolKind.toCoreSymbolKind(): com.wuxianggujun.tinaide.core.symbol.SymbolKind {
+    return when (this) {
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Class -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.CLASS
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Struct -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.STRUCT
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Enum -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.ENUM
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Namespace -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.NAMESPACE
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Function -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.FUNCTION
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Method -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.METHOD
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Field -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.FIELD
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Variable -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.VARIABLE
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Constant -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.CONSTANT
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Interface -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.INTERFACE
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Module -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.MODULE
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Property -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.PROPERTY
+        com.wuxianggujun.tinaide.editor.symbol.SymbolKind.Trait -> com.wuxianggujun.tinaide.core.symbol.SymbolKind.INTERFACE // Trait 映射到 INTERFACE
+    }
+}
+
+/**
+ * 将内部 FuzzySymbolResult 转换为接口 FuzzySymbolMatch
+ */
+private fun FuzzySymbolResult.toFuzzySymbolMatch(): FuzzySymbolMatch {
+    return FuzzySymbolMatch(
+        symbol = symbol.toSymbolInfo(),
+        score = score,
+        matchedIndices = matchedIndices,
+    )
+}
+
+private fun Throwable.messageOrClass(): String {
+    return message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
+}

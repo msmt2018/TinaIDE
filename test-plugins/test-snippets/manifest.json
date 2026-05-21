@@ -1,0 +1,18 @@
+{
+  "id": "com.tinaide.test.snippets",
+  "name": "Test Code Snippets",
+  "version": "1.0.1",
+  "description": "A test code snippets plugin with common programming patterns",
+  "author": {
+    "name": "TinaIDE Test"
+  },
+  "type": "config",
+  "minAppVersion": "1.0.0",
+  "contributions": {
+    "snippets": [
+      "snippets/java.json",
+      "snippets/kotlin.json",
+      "snippets/python.json"
+    ]
+  }
+}

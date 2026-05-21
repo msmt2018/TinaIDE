@@ -1,0 +1,42 @@
+package com.tinaide.template.sdl3;
+
+import android.os.Bundle;
+import android.view.Window;
+
+import com.tinaide.template.common.TemplatePermissionFlow;
+
+import org.libsdl.app.SDLActivity;
+
+/**
+ * 模板专用 SDL Activity。
+ * SDL 上游默认会在启动时调用 setWindowStyle(false)，导致状态栏/顶栏重新出现。
+ * 这里在关键生命周期里强制恢复全屏沉浸式样式；权限 flow 统一由 {@link TemplatePermissionFlow} 驱动。
+ */
+public class TemplateSDLActivity extends SDLActivity {
+
+    private TemplatePermissionFlow permissionFlow;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        super.onCreate(savedInstanceState);
+        setWindowStyle(true);
+        permissionFlow = new TemplatePermissionFlow(this);
+        permissionFlow.advance("onCreate");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        setWindowStyle(true);
+        permissionFlow.advance("onResume");
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            setWindowStyle(true);
+        }
+    }
+}

@@ -1,0 +1,8 @@
+app/src/main/assets/proot/**/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+app/src/**/assets/tina-toolchain/*.tar.xz filter=lfs diff=lfs merge=lfs -text
+
+# Ensure bash scripts/patches stay LF for Docker/Linux.
+*.sh text eol=lf
+*.patch text eol=lf
+Dockerfile text eol=lf
+gradlew text eol=lf

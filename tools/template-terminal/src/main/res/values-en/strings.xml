@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="terminal_template_default_title">Terminal App</string>
+    <string name="terminal_template_launch_failed">Failed to start terminal: %1$s</string>
+    <string name="terminal_template_runtime_badge">Standalone Runtime</string>
+    <string name="terminal_template_toolbar_hint_running">Tap to type, long-press to copy</string>
+    <string name="terminal_template_toolbar_hint_finished">Session ended, long-press still works</string>
+    <string name="terminal_template_status_running">Running</string>
+    <string name="terminal_template_status_finished">Finished</string>
+</resources>

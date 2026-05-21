@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SplashScreen 专用图标
+    
+    Android 12+ SplashScreen API 会将图标裁剪为圆形，只显示中心 2/3 区域（约 66%）
+    为了确保图标完整显示（包括圆角矩形的四个角不被圆形遮罩裁剪），需要：
+    1. 使用 288dp x 288dp 的画布（包含安全边距）
+    2. 实际内容放在中心 192dp x 192dp 区域内
+    3. 使用更大的 inset 来缩小图标，确保圆角矩形完全在圆形内
+    
+    计算：圆角矩形要完全在圆形内，需要 inset ≈ 1 - 1/√2 ≈ 29.3%
+    加上 SplashScreen 的安全区域裁剪，总 inset ≈ 17% + 12% = 29%
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_app_logo"
+    android:inset="29%" />

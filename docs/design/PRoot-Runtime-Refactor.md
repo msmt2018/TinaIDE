@@ -1,0 +1,101 @@
+# PRoot 运行时重构说明
+
+## 目标
+
+- 将 `PRoot` 明确收缩为 **Linux 运行时层**。
+- 删除已废弃的编译兼容代码，不再保留空实现与伪兼容接口。
+- 保留真实仍在使用的能力：`rootfs` 安装、命令执行、交互进程、路径映射。
+
+## 新边界
+
+### `PRootEnvironment`
+
+现在只负责：
+
+- `isInstalled()` / `needsUpdate()` / `isReady()`
+- `initialize()` / `clean()`
+- `execute()` / `executeWithOutput()` / `startInteractive()`
+- `executeShell()` / `executeShellWithEnv()`
+- `toGuestPath()` / `buildPRootCommandLine()` / `buildExecEnvironment()`
+
+不再负责：
+
+- 编译器实例创建
+- PRoot 内工具链安装
+- 调试器空安装逻辑
+- 旧的 `ICompilerEnvironment` 兼容接口
+
+### `ToolchainPathResolver`
+
+现在仅根据 rootfs 真实文件布局解析工具路径：
+
+- 优先使用 `ToolchainBinaryLocator` 动态探测
+- 找不到时回退到标准路径（如 `/usr/bin/clangd`）
+
+已移除依赖：
+
+- `ToolchainManifestStore`
+- `SymlinkConfigStore`
+- `SymlinkManager`
+
+## 已删除遗留代码
+
+- `ICompilerEnvironment`
+- `PRootCompiler`
+- `ToolchainInstallResult`
+- `ToolchainManifest*`
+- `toolchain/Symlink*`
+- `LlvmVersions`
+
+## 调用链调整
+
+### Guest 工具链安装
+
+现在 `PRoot` 编译链不再依赖历史兼容层，而是通过新的 guest 安装服务显式安装：
+
+- `PRootGuestToolchainInstaller`
+- 使用 `apk update` + `apk add --no-cache`
+- 根据 `ToolchainConfig` 解析需要的 Linux 工具
+- 安装结果通过 `ToolchainPathResolver` 动态发现
+
+这意味着：
+
+- `proot` 运行模式使用的是 **rootfs 内真实存在的 clang/cmake/make/clangd/lldb**
+- 如果没有安装 guest 工具链，`proot` 编译不会再“假装可用”
+
+### 编译前检查
+
+`CompileEnvironmentChecker` 改为直接探测可执行文件：
+
+- 编译器：`<compiler> --version`
+- 调试器：`lldb --version`
+
+不再尝试自动安装已废弃的 PRoot 工具链。
+
+### LSP
+
+`PRootClangdConnectionProvider` 不再读取 manifest，统一使用 `ToolchainPathResolver`。
+
+### 调试
+
+`DebugSessionService` 启动前直接检查 `lldb` 是否存在，避免依赖旧的
+`isDebuggerAvailable()` 伪能力。
+
+## 设置联动
+
+当 Linux 环境插件关闭时：
+
+- 编译 / LSP 设置中的 `proot` 选项不再展示
+- 存储页的 Linux 系统分区隐藏
+- 终端后端中的 `PROOT` 选项隐藏，并自动回退到 `HOST`
+- 关于页中的 PRoot 日志入口隐藏
+- 插件从关闭切换为开启时，如果 rootfs 未安装，会弹出安装引导
+
+## 资源策略
+
+为避免并行任务与 Gradle 自身并发叠加导致资源争抢，项目已配置：
+
+- `org.gradle.parallel=false`
+- `org.gradle.workers.max=1`
+
+这保证 Gradle 在当前重构阶段仅使用单 worker 执行。

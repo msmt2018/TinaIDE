@@ -1,0 +1,203 @@
+package com.wuxianggujun.tinaide.plugin.lsp
+
+import com.wuxianggujun.tinaide.core.linux.LinuxEnvironment
+import com.wuxianggujun.tinaide.core.linux.LinuxEnvironmentProvider
+import com.wuxianggujun.tinaide.core.linux.LinuxInteractiveProcess
+import com.wuxianggujun.tinaide.core.linux.UnavailableLinuxEnvironmentProvider
+import com.wuxianggujun.tinaide.core.lsp.LspConnectionProvider
+import kotlinx.coroutines.runBlocking
+import timber.log.Timber
+import java.io.InputStream
+import java.io.OutputStream
+import kotlin.concurrent.thread
+
+/**
+ * 通用的插件 LSP 连接提供者
+ *
+ * 根据 LspServerConfig 配置启动 LSP 服务器进程
+ */
+class PluginLspConnectionProvider(
+    private val config: LspServerConfig,
+    private val workingDir: String,
+    private val projectRoot: String,
+    private val linuxEnvironmentProvider: LinuxEnvironmentProvider = UnavailableLinuxEnvironmentProvider,
+    private val onStderrLine: (String) -> Unit = {},
+) : LspConnectionProvider {
+
+    companion object {
+        private const val TAG = "PluginLspConnection"
+        private const val COMMAND_PROBE_TIMEOUT_MS = 5_000L
+    }
+
+    private val linuxEnvironment: LinuxEnvironment by lazy { linuxEnvironmentProvider.get() }
+
+    @Volatile
+    private var process: LinuxInteractiveProcess? = null
+
+    @Volatile
+    private var stderrThread: Thread? = null
+
+    @Volatile
+    private var stopping = false
+
+    override fun start() {
+        val serverConfig = config.server
+
+        when (serverConfig.type) {
+            "stdio" -> startStdioServer(serverConfig)
+            "socket" -> throw UnsupportedOperationException("Socket server not yet implemented")
+            "websocket" -> throw UnsupportedOperationException("WebSocket server not yet implemented")
+            else -> throw IllegalArgumentException("Unsupported server type: ${serverConfig.type}")
+        }
+    }
+
+    private fun startStdioServer(serverConfig: LspServerConnectionConfig) {
+        val command = serverConfig.command
+            ?: throw IllegalArgumentException("No command specified for stdio server")
+
+        val args = (serverConfig.args ?: emptyList()).map { arg ->
+            expandVariables(arg)
+        }
+
+        val env = (serverConfig.env ?: emptyMap()).mapValues { (_, value) ->
+            expandVariables(value)
+        }
+
+        val escapedCommand = shellEscape(command)
+        val commandMissingMessage = shellEscape("LSP server command not found: $command")
+
+        // 构建完整命令：先确认命令存在，再用 exec 接管 shell 进程。
+        val fullCommand = buildString {
+            append("command -v ")
+            append(escapedCommand)
+            append(" >/dev/null 2>&1 || { echo ")
+            append(commandMissingMessage)
+            append(" >&2; exit 127; }; exec ")
+            append(escapedCommand)
+            if (args.isNotEmpty()) {
+                append(" ")
+                append(args.joinToString(" ") { shellEscape(it) })
+            }
+        }
+
+        Timber.tag(TAG).i("Starting LSP server [${config.id}]: $fullCommand")
+        Timber.tag(TAG).d("Working dir: $workingDir, Project root: $projectRoot")
+
+        stopping = false
+        check(linuxEnvironment.isAvailable()) { "Linux environment is unavailable" }
+
+        // 合并环境变量
+        val mergedEnv = buildMap {
+            // 添加 PATH 以确保能找到用户安装的工具
+            put("PATH", "/root/.local/bin:/usr/local/bin:/usr/bin:/bin")
+            // 添加配置的环境变量
+            putAll(env)
+        }
+        val guestWorkingDir = linuxEnvironment.toGuestPath(workingDir)
+        verifyServerCommandAvailable(
+            command = command,
+            escapedCommand = escapedCommand,
+            guestWorkingDir = guestWorkingDir,
+            env = mergedEnv,
+        )
+
+        process = linuxEnvironment.startInteractive(
+            command = listOf("/bin/sh", "-c", fullCommand),
+            workDir = guestWorkingDir,
+            env = mergedEnv
+        )
+
+        // 消费 stderr，防止缓冲区满导致阻塞
+        val p = process ?: return
+        stderrThread = thread(name = "lsp-stderr-${config.id}", isDaemon = true) {
+            runCatching {
+                p.stderr.bufferedReader().useLines { lines ->
+                    for (line in lines) {
+                        if (stopping) break
+                        if (line.isNotBlank()) {
+                            Timber.tag(TAG).d("[${config.id}] stderr: $line")
+                            onStderrLine(line)
+                        }
+                    }
+                }
+            }.onFailure { e ->
+                if (!stopping) {
+                    Timber.tag(TAG).d("stderr reader stopped for ${config.id}: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun verifyServerCommandAvailable(
+        command: String,
+        escapedCommand: String,
+        guestWorkingDir: String,
+        env: Map<String, String>,
+    ) {
+        val probeResult = runBlocking {
+            linuxEnvironment.execute(
+                command = listOf("/bin/sh", "-lc", "command -v $escapedCommand >/dev/null 2>&1"),
+                workDir = guestWorkingDir,
+                env = env,
+                timeout = COMMAND_PROBE_TIMEOUT_MS,
+            )
+        }
+        if (probeResult.exitCode == 0) return
+
+        val message = "LSP server command not found: $command"
+        Timber.tag(TAG).w("[%s] %s", config.id, message)
+        onStderrLine(message)
+        throw IllegalStateException(message)
+    }
+
+    /**
+     * 展开变量
+     *
+     * 支持的变量：
+     * - ${workspaceRoot} / ${workspaceFolder}: 项目根目录
+     * - ${userHome}: 用户主目录
+     * - ${pluginDir}: 插件目录（如果需要）
+     */
+    private fun expandVariables(value: String): String {
+        val guestProjectRoot = linuxEnvironment.toGuestPath(projectRoot)
+        return value
+            .replace("\${workspaceRoot}", guestProjectRoot)
+            .replace("\${workspaceFolder}", guestProjectRoot)
+            .replace("\${userHome}", "/root")
+            .replace("\${HOME}", "/root")
+    }
+
+    /**
+     * Shell 转义
+     */
+    private fun shellEscape(value: String): String {
+        // 如果值不包含特殊字符，直接返回
+        if (value.matches(Regex("^[a-zA-Z0-9_/.-]+$"))) {
+            return value
+        }
+        // 使用单引号转义
+        return "'" + value.replace("'", "'\\''") + "'"
+    }
+
+    override val inputStream: InputStream
+        get() = requireNotNull(process) { "LSP process not started" }.stdout
+
+    override val outputStream: OutputStream
+        get() = requireNotNull(process) { "LSP process not started" }.stdin
+
+    override fun close() {
+        Timber.tag(TAG).i("Closing LSP connection for ${config.id}")
+        stopping = true
+        runCatching { stderrThread?.interrupt() }
+        stderrThread = null
+        runCatching { process?.destroy() }
+        process = null
+    }
+
+    /**
+     * 检查进程是否存活
+     */
+    fun isAlive(): Boolean {
+        return process?.isRunning() == true
+    }
+}

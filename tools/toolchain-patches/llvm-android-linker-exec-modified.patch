@@ -1,0 +1,205 @@
+--- a/llvm/lib/Support/Unix/Path.inc
++++ b/llvm/lib/Support/Unix/Path.inc
+@@ -268,6 +268,59 @@
+     len = std::min(len, ssize_t(sizeof(exe_path) - 1));
+     exe_path[len] = '\0';
+ 
++#if defined(__ANDROID__)
++#ifndef TINAIDE_LLVM_EXEC_TRACE_DEFAULT
++#define TINAIDE_LLVM_EXEC_TRACE_DEFAULT 0
++#endif
++    bool TraceExec = false;
++    if (const char *Trace = std::getenv("TINAIDE_LLVM_EXEC_TRACE"))
++      TraceExec = Trace[0] != '\0' && strcmp(Trace, "0") != 0;
++    if (!TraceExec)
++      TraceExec = TINAIDE_LLVM_EXEC_TRACE_DEFAULT != 0;
++
++    if (TraceExec) {
++      fprintf(stderr, "[TinaIDE][Path.inc] /proc/self/exe=%s argv0=%s\n",
++              exe_path, argv0 ? argv0 : "(null)");
++    }
++
++    // Android 上通过 linker/linker64 手动启动可执行文件时，/proc/self/exe 会指向
++    // 动态链接器本身，导致 InstalledDir 推导错误（例如落到 /apex/...）。
++    // 这里在检测到当前进程名为 linker/linker64 时，优先回退 argv0 的真实路径。
++    const char *ExeName = strrchr(exe_path, '/');
++    ExeName = ExeName ? ExeName + 1 : exe_path;
++    if (argv0 && argv0[0] != '\0' &&
++        (strcmp(ExeName, "linker") == 0 || strcmp(ExeName, "linker64") == 0)) {
++      if (TraceExec)
++        fprintf(stderr, "[TinaIDE][Path.inc] detected launcher=%s\n", ExeName);
++      char argv_path[PATH_MAX];
++      if (getprogpath(argv_path, argv0) != nullptr) {
++        if (TraceExec)
++          fprintf(stderr, "[TinaIDE][Path.inc] getprogpath=%s\n", argv_path);
++#if _POSIX_VERSION >= 200112 || defined(__GLIBC__)
++        if (char *argv_real = realpath(argv_path, nullptr)) {
++          if (TraceExec)
++            fprintf(stderr, "[TinaIDE][Path.inc] selected argv realpath=%s\n",
++                    argv_real);
++          std::string ret = std::string(argv_real);
++          free(argv_real);
++          return ret;
++        }
++#else
++        char argv_real[PATH_MAX];
++        if (realpath(argv_path, argv_real)) {
++          if (TraceExec)
++            fprintf(stderr, "[TinaIDE][Path.inc] selected argv realpath=%s\n",
++                    argv_real);
++          return std::string(argv_real);
++        }
++#endif
++      } else if (TraceExec) {
++        fprintf(stderr, "[TinaIDE][Path.inc] getprogpath failed for argv0=%s\n",
++                argv0);
++      }
++    }
++#endif
++
+     // On Linux, /proc/self/exe always looks through symlinks. However, on
+     // GNU/Hurd, /proc/self/exe is a symlink to the path that was used to start
+     // the program, and not the eventual binary file. Therefore, call realpath
+--- a/llvm/lib/Support/Unix/Program.inc
++++ b/llvm/lib/Support/Unix/Program.inc
+@@ -25,6 +25,7 @@
+ #include "llvm/Support/Errc.h"
+ #include "llvm/Support/FileSystem.h"
+ #include "llvm/Support/Path.h"
++#include "llvm/ADT/SmallVector.h"
+ #include "llvm/Support/StringSaver.h"
+ #include "llvm/Support/raw_ostream.h"
+ #include <fcntl.h>
+@@ -30,6 +31,9 @@
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <sys/resource.h>
++#if defined(__ANDROID__)
++#include <sys/system_properties.h>
++#endif
+ #include <sys/stat.h>
+ #if HAVE_UNISTD_H
+ #include <unistd.h>
+@@ -161,6 +165,104 @@
+   return Result;
+ }
+ 
++#if defined(__ANDROID__)
++#ifndef TINAIDE_LLVM_EXEC_TRACE_DEFAULT
++#define TINAIDE_LLVM_EXEC_TRACE_DEFAULT 0
++#endif
++
++static bool isAndroidExecTraceEnabled() {
++  if (const char *Trace = std::getenv("TINAIDE_LLVM_EXEC_TRACE"))
++    return Trace[0] != '\0' && strcmp(Trace, "0") != 0;
++  return TINAIDE_LLVM_EXEC_TRACE_DEFAULT != 0;
++}
++
++static int getAndroidSdkVersion() {
++  char SdkVersion[PROP_VALUE_MAX];
++  if (__system_property_get("ro.build.version.sdk", SdkVersion) <= 0)
++    return 0;
++  char *End = nullptr;
++  long Value = std::strtol(SdkVersion, &End, 10);
++  if (End == SdkVersion || Value <= 0)
++    return 0;
++  return static_cast<int>(Value);
++}
++
++static bool shouldWrapAndroidExecWithLinker() {
++  if (const char *Override = std::getenv("TINAIDE_LLVM_WRAP_EXEC_LINKER64"))
++    return Override[0] != '\0' && strcmp(Override, "0") != 0 &&
++           strcmp(Override, "false") != 0 && strcmp(Override, "disable") != 0;
++  return getAndroidSdkVersion() >= 29;
++}
++
++static bool isAndroidLinkerProgram(StringRef ProgramPath) {
++  StringRef FileName = sys::path::filename(ProgramPath);
++  return FileName == "linker" || FileName == "linker64";
++}
++
++static StringRef resolveAndroidLinkerPath() {
++  static const char *Candidates[] = {
++      "/system/bin/linker64",
++      "/apex/com.android.runtime/bin/linker64",
++      "/system/bin/linker",
++      "/apex/com.android.runtime/bin/linker"};
++  for (const char *Path : Candidates) {
++    if (::access(Path, X_OK) == 0)
++      return StringRef(Path);
++  }
++  return StringRef();
++}
++
++static void maybeWrapWithAndroidLinker(StringRef &Program, ArrayRef<StringRef> &Args,
++                                       SmallVectorImpl<StringRef> &WrappedArgsStorage) {
++  if (!shouldWrapAndroidExecWithLinker()) {
++    if (isAndroidExecTraceEnabled()) {
++      errs() << "[TinaIDE][Program.inc] skip wrap: linker64 disabled, sdk="
++             << getAndroidSdkVersion() << " for " << Program << "\n";
++    }
++    return;
++  }
++  if (Program.empty() || !Program.starts_with('/'))
++    return;
++  if (isAndroidLinkerProgram(Program))
++    return;
++
++  StringRef Linker = resolveAndroidLinkerPath();
++  if (Linker.empty()) {
++    if (isAndroidExecTraceEnabled()) {
++      errs() << "[TinaIDE][Program.inc] skip wrap: linker64 not found for "
++             << Program << "\n";
++    }
++    return;
++  }
++
++  const bool FirstArgIsTarget = !Args.empty() && Args.front() == Program;
++  WrappedArgsStorage.clear();
++  WrappedArgsStorage.reserve(Args.size() + 2);
++  // linker64 argv 约定：
++  // argv[0] = linker64 本身
++  // argv[1] = 目标 ELF 的绝对路径
++  WrappedArgsStorage.push_back(Linker);
++  WrappedArgsStorage.push_back(Program);
++  if (FirstArgIsTarget) {
++    WrappedArgsStorage.append(Args.begin() + 1, Args.end());
++  } else {
++    WrappedArgsStorage.append(Args.begin(), Args.end());
++  }
++  Args = WrappedArgsStorage;
++
++  if (isAndroidExecTraceEnabled()) {
++    errs() << "[TinaIDE][Program.inc] wrap exec via linker64: "
++           << Program << " -> " << Linker
++           << ", argc=" << Args.size()
++           << ", argv0=" << (Args.empty() ? StringRef("(empty)") : Args[0])
++           << ", argv1="
++           << (Args.size() > 1 ? Args[1] : StringRef("(missing)"))
++           << "\n";
++  }
++  Program = Linker;
++}
++#endif
++
+ static bool Execute(ProcessInfo &PI, StringRef Program,
+                     ArrayRef<StringRef> Args,
+                     std::optional<ArrayRef<StringRef>> Env,
+@@ -170,6 +272,17 @@
+   assert(!AffinityMask && "Starting a process with an affinity mask is "
+                           "currently not supported on Unix!");
+ 
++#if defined(__ANDROID__)
++  SmallVector<StringRef, 32> AndroidWrappedArgs;
++  maybeWrapWithAndroidLinker(Program, Args, AndroidWrappedArgs);
++  if (isAndroidExecTraceEnabled()) {
++    errs() << "[TinaIDE][Program.inc] Execute program=" << Program
++           << ", argc=" << Args.size()
++           << ", argv0=" << (Args.empty() ? StringRef("(empty)") : Args.front())
++           << "\n";
++  }
++#endif
++
+   BumpPtrAllocator Allocator;
+   StringSaver Saver(Allocator);
+   std::vector<const char *> ArgVector, EnvVector;

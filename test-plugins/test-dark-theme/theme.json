@@ -1,0 +1,40 @@
+{
+  "name": "Test Dark Theme",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e2e",
+    "editor.foreground": "#cdd6f4",
+    "editor.lineNumber": "#6c7086",
+    "editor.lineNumberActive": "#cdd6f4",
+    "editor.selection": "#45475a",
+    "editor.selectionHighlight": "#585b70",
+    "editor.cursor": "#f5e0dc",
+    "editor.cursorLine": "#313244",
+    "editor.matchingBracket": "#f9e2af",
+    "editor.indentGuide": "#45475a",
+    "editor.whitespace": "#45475a",
+
+    "syntax.keyword": "#cba6f7",
+    "syntax.string": "#a6e3a1",
+    "syntax.number": "#fab387",
+    "syntax.comment": "#6c7086",
+    "syntax.function": "#89b4fa",
+    "syntax.variable": "#cdd6f4",
+    "syntax.type": "#f9e2af",
+    "syntax.operator": "#89dceb",
+    "syntax.punctuation": "#9399b2",
+    "syntax.constant": "#fab387",
+    "syntax.class": "#f9e2af",
+    "syntax.property": "#89dceb",
+    "syntax.parameter": "#eba0ac",
+    "syntax.annotation": "#f38ba8",
+
+    "gutter.background": "#1e1e2e",
+    "gutter.foreground": "#6c7086",
+    "gutter.divider": "#313244",
+
+    "scrollbar.track": "#1e1e2e",
+    "scrollbar.thumb": "#45475a",
+    "scrollbar.thumbHover": "#585b70"
+  }
+}

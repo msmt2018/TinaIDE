@@ -1,0 +1,89 @@
+--- a/llvm/lib/Support/Unix/Path.inc
++++ b/llvm/lib/Support/Unix/Path.inc
+@@ -268,6 +268,86 @@
+     len = std::min(len, ssize_t(sizeof(exe_path) - 1));
+     exe_path[len] = '\0';
+
++#if defined(__ANDROID__)
++#ifndef TINAIDE_LLVM_EXEC_TRACE_DEFAULT
++#define TINAIDE_LLVM_EXEC_TRACE_DEFAULT 0
++#endif
++    bool TraceExec = false;
++    if (const char *Trace = std::getenv("TINAIDE_LLVM_EXEC_TRACE"))
++      TraceExec = Trace[0] != '\0' && strcmp(Trace, "0") != 0;
++    if (!TraceExec)
++      TraceExec = TINAIDE_LLVM_EXEC_TRACE_DEFAULT != 0;
++
++    if (TraceExec) {
++      fprintf(stderr, "[TinaIDE][Path.inc] /proc/self/exe=%s argv0=%s\n",
++              exe_path, argv0 ? argv0 : "(null)");
++    }
++
++    // Android 上通过 linker/linker64 手动启动可执行文件时，/proc/self/exe 会指向
++    // 动态链接器本身，导致 InstalledDir 推导错误（例如落到 /apex/...）。
++    // 这里在检测到当前进程名为 linker/linker64 时，优先读取 TinaIDE 传入的真实路径，
++    // 再回退 argv0 的真实路径。
++    const char *ExeName = strrchr(exe_path, '/');
++    ExeName = ExeName ? ExeName + 1 : exe_path;
++    if (argv0 && argv0[0] != '\0' &&
++        (strcmp(ExeName, "linker") == 0 || strcmp(ExeName, "linker64") == 0)) {
++      if (TraceExec)
++        fprintf(stderr, "[TinaIDE][Path.inc] detected launcher=%s\n", ExeName);
++      if (const char *TinaSelfExe = std::getenv("TINA_EXEC__PROC_SELF_EXE")) {
++        if (TinaSelfExe[0] == '/') {
++          if (TraceExec)
++            fprintf(stderr, "[TinaIDE][Path.inc] env TINA_EXEC__PROC_SELF_EXE=%s\n",
++                    TinaSelfExe);
++#if _POSIX_VERSION >= 200112 || defined(__GLIBC__)
++          if (char *tina_real = realpath(TinaSelfExe, nullptr)) {
++            if (TraceExec)
++              fprintf(stderr, "[TinaIDE][Path.inc] selected env realpath=%s\n",
++                      tina_real);
++            std::string ret = std::string(tina_real);
++            free(tina_real);
++            return ret;
++          }
++#else
++          char tina_real[PATH_MAX];
++          if (realpath(TinaSelfExe, tina_real)) {
++            if (TraceExec)
++              fprintf(stderr, "[TinaIDE][Path.inc] selected env realpath=%s\n",
++                      tina_real);
++            return std::string(tina_real);
++          }
++#endif
++          return std::string(TinaSelfExe);
++        }
++      }
++      char argv_path[PATH_MAX];
++      if (getprogpath(argv_path, argv0) != nullptr) {
++        if (TraceExec)
++          fprintf(stderr, "[TinaIDE][Path.inc] getprogpath=%s\n", argv_path);
++#if _POSIX_VERSION >= 200112 || defined(__GLIBC__)
++        if (char *argv_real = realpath(argv_path, nullptr)) {
++          if (TraceExec)
++            fprintf(stderr, "[TinaIDE][Path.inc] selected argv realpath=%s\n",
++                    argv_real);
++          std::string ret = std::string(argv_real);
++          free(argv_real);
++          return ret;
++        }
++#else
++        char argv_real[PATH_MAX];
++        if (realpath(argv_path, argv_real)) {
++          if (TraceExec)
++            fprintf(stderr, "[TinaIDE][Path.inc] selected argv realpath=%s\n",
++                    argv_real);
++          return std::string(argv_real);
++        }
++#endif
++      } else if (TraceExec) {
++        fprintf(stderr, "[TinaIDE][Path.inc] getprogpath failed for argv0=%s\n",
++                argv0);
++      }
++    }
++#endif
++
+     // On Linux, /proc/self/exe always looks through symlinks. However, on
+     // GNU/Hurd, /proc/self/exe is a symlink to the path that was used to start
+     // the program, and not the eventual binary file. Therefore, call realpath

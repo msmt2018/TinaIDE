@@ -1,0 +1,34 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+# ktlint 规则配置
+ktlint_code_style = android_studio
+
+# 禁用一些对现有代码影响过大的规则，后续逐步启用
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_package-name = disabled
+ktlint_standard_max-line-length = disabled
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+ktlint_standard_function-naming = disabled
+ktlint_standard_filename = disabled
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.xml]
+indent_size = 4
+
+[gradlew.bat]
+end_of_line = crlf

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="56dp"
+    android:viewportWidth="56"
+    android:viewportHeight="56">
+    
+    <!-- 文件夹主体 - 打开的文件夹样式 -->
+    <!-- 使用黑色作为基础色，通过 Compose tint 属性应用主题颜色 -->
+    
+    <!-- 底部文件夹形状 -->
+    <path
+        android:pathData="M8,18 L8,44 C8,46.2 9.8,48 12,48 L44,48 C46.2,48 48,46.2 48,44 L48,22 C48,19.8 46.2,18 44,18 L28,18 L24,12 L12,12 C9.8,12 8,13.8 8,16 L8,18 Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#000000"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+    
+    <!-- 文件夹顶部翻盖 -->
+    <path
+        android:pathData="M8,22 L12,22 C14,22 15.5,20.5 16,19 L20,19 C21.5,19 23,20 24,22 L48,22"
+        android:strokeWidth="2.5"
+        android:strokeColor="#000000"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+    
+    <!-- 文件夹内部文档线条 -->
+    <path
+        android:pathData="M16,32 L40,32"
+        android:strokeWidth="2"
+        android:strokeColor="#000000"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"/>
+    
+    <path
+        android:pathData="M16,38 L32,38"
+        android:strokeWidth="2"
+        android:strokeColor="#000000"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"/>
+</vector>

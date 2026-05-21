@@ -1,0 +1,11 @@
+# This directory contains PRoot build outputs
+# Generated files:
+#   arm64/
+#     libproot.so
+#     libproot-loader.so
+#     libproot-loader32.so
+#     libtalloc.so.2
+#   x86_64/
+#     libproot.so
+#     libproot-loader.so
+#     libtalloc.so.2

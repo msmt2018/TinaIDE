@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="restricted_settings_title">需要手动开启权限</string>
+    <string name="restricted_settings_message">系统不允许应用直接申请部分受限权限，需要你在应用设置中手动开启。点击“去设置”，在跳转到的页面将其打开即可正常运行。</string>
+    <string name="restricted_settings_go">去设置</string>
+    <string name="restricted_settings_cancel">稍后</string>
+</resources>

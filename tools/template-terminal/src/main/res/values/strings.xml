@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="terminal_template_default_title">终端应用</string>
+    <string name="terminal_template_launch_failed">终端启动失败：%1$s</string>
+    <string name="terminal_template_runtime_badge">独立运行环境</string>
+    <string name="terminal_template_toolbar_hint_running">轻点输入，长按复制文本</string>
+    <string name="terminal_template_toolbar_hint_finished">进程已结束，长按仍可复制</string>
+    <string name="terminal_template_status_running">运行中</string>
+    <string name="terminal_template_status_finished">已结束</string>
+</resources>

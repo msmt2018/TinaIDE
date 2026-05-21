@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 缓存目录，用于导出的 ZIP/APK 文件 -->
+    <cache-path
+        name="exports"
+        path="exports/" />
+
+    <!-- 缓存根目录，用于头像裁剪等临时文件 -->
+    <cache-path
+        name="cache"
+        path="." />
+
+    <!-- 外部缓存目录 -->
+    <external-cache-path
+        name="external_exports"
+        path="exports/" />
+
+    <!-- 应用私有文件目录 -->
+    <files-path
+        name="files"
+        path="." />
+
+    <!-- 外部应用专属文件目录 -->
+    <external-files-path
+        name="external_files"
+        path="." />
+</paths>

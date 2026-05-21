@@ -1,0 +1,102 @@
+# TinaIDE 文档中心
+
+> 更新日期：2026-04-29
+
+这里汇总 TinaIDE 当前仍然有效的项目文档，并标出应该优先回看的源码入口。
+
+## 优先阅读
+
+- [快速开始](快速开始.md)：构建 APK、首次启动、默认运行资产与常见问题
+- [架构概览](架构概览.md)：启动入口、模块分层、编辑器语言服务分流
+- [模块功能说明](模块功能说明.md)：当前 Gradle 模块、外部本地模块与复合构建职责
+- [开发指南](开发指南.md)：本地开发、验证命令、提交与协作约束
+- [项目 README](../README.md)：项目定位、功能概览、仓库结构
+
+## 当前事实源
+
+当文档和代码冲突时，以下文件优先：
+
+- 模块清单与 included builds：`settings.gradle.kts`
+- App 构建、ABI flavor、工具链校验任务：`app/build.gradle.kts`
+- 首页与主编辑器入口：`app/src/main/java/com/wuxianggujun/tinaide/ui/MainPortalActivity.kt`、`app/src/main/java/com/wuxianggujun/tinaide/MainActivity.kt`
+- 本地构建脚本：`tools/build-apk.ps1`
+- 首次启动与依赖安装：`app/src/main/java/com/wuxianggujun/tinaide/startup/StartupFlowManager.kt`
+- 依赖安装页状态机：`feature/workspace/src/main/java/com/wuxianggujun/tinaide/ui/workspace/DependencyInstallViewModel.kt`
+- Native 工具链与 sysroot：`core/ndk/src/main/java/com/wuxianggujun/tinaide/core/ndk/AndroidNativeToolchainManager.kt`、`core/ndk/src/main/java/com/wuxianggujun/tinaide/core/ndk/AndroidSysrootManager.kt`
+- 编译与运行主流程：`core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/CompileProjectUseCase.kt`
+- 编辑器语言服务分流：`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/LspEditorManager.kt`
+- 内建 CMake / Make 语言服务：`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/BuiltinLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/CMakeLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/MakeLanguageServiceSession.kt`
+- LSP 会话与连接提供者：`core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/LspClientSession.kt`
+- 插件 LSP：`core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspPluginManager.kt`
+- AI 工具注册：`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolInitializer.kt`、`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolRegistry.kt`
+- 帮助文档入口：`feature/help/src/main/java/com/wuxianggujun/tinaide/core/help/HelpRepository.kt`
+- PRoot / Linux 环境：PRootBootstrap.kt、SelfHostedLinuxDistroRuntime.kt、core/linux-distro manifest
+
+## 文档导航
+
+### 入门
+
+- [快速开始](快速开始.md)
+- [开发指南](开发指南.md)
+- [国际化规范](i18n.md)
+- [项目约定](project-conventions.md)
+
+### 架构与设计
+
+- [架构概览](架构概览.md)
+- [模块功能说明](模块功能说明.md)
+- [架构整改计划](架构整改计划.md)
+- [设计文档索引](design/README.md)
+
+### 功能与实现
+
+- [Clangd 补全 Fast Path](clangd-completion-fast-path.md)
+- [Android-hosted LLVM 工具链对比与风险分析](android-hosted-llvm-toolchain-analysis.md)
+- [Clang Android 执行权限修复](clang-android-exec-fix.md)
+- [Toolchain 构建与同步指南](toolchain-build-guide.md)
+- [ProGuard / R8 规则参考](proguard-rules-reference.md)
+- [自研 Linux 发行版运行时](linux-distro-self-hosted-runtime.md)
+
+### 使用指南
+
+- [LSP 调试指南](guides/LSP-Debug-Guide.md)
+- [远程 LSP 指南](guides/Remote-LSP-Guide.md)
+- [PC LSP 代理配置](guides/PC-LSP-Proxy-Setup-Guide.md)
+- [文件预览指南](guides/File-Viewer-Guide.md)
+- [分支管理指南](guides/Branch-Management-Guide.md)
+
+### 测试与排障
+
+- [测试文档索引](testing/README.md)
+- [故障排查目录](troubleshooting)
+- [LSP 明文通信错误](troubleshooting/LSP-CLEARTEXT-ERROR.md)
+
+### 插件与规划
+
+- [插件文档索引](plugins/README.md)
+- [规划文档索引](planning/README.md)
+
+## 当前文档口径
+
+为了避免继续沿用旧叙事，先明确四点：
+
+- 默认编译 / 运行链路依赖的是 `Android sysroot + native tina-toolchain`，不是 PRoot。
+- PRoot 是可选 Linux 环境，主要服务终端、Linux 工具和插件 / 调试扩展能力。
+- 编辑器语言服务不是单一路径：C/C++ 走 `clangd`，CMake / Make 走内建语言服务，其他语言可走插件 LSP。
+- App 首次启动默认只安装内置运行资产；只有显式进入 Linux 环境相关流程时，才会通过自研 Linux 发行版管理器安装 rootfs 与 guest toolchain。
+
+## 本轮清理说明
+
+- 已删除空占位文档 `TinaEditor性能优化指南-高级技术.md`，避免继续作为“高级指南”被误读。
+- 已删除 `TinaEditor-Audit-2026-04-18` 的 R2 / R3 / R4-LSP 阶段性审计草稿，仅保留最终汇总与当前索引文档。
+- 已进一步清空 `docs/design/` 中未纳入索引的旧设计稿，避免历史方案继续干扰当前实现口径。
+- 已删除一组一次性问题分析、修复提示词、阶段性审查与调试复盘文档，包括旧 TinaEditor 分析稿、缩放偏移调试稿、一次性 smoke 记录和若干重构任务单。
+- 已删除旧 SDL3 快速开始、vcpkg 移植方案、代码统计指南及若干一次性测试说明，继续收缩非核心专题文档。
+- 已删除后端 API/许可证专题文档、通用 Material Design 指南，以及两份辅助测试手册，主文档集继续聚焦当前 IDE 的核心协作资料。
+- 已删除维护者专用的 SDL3 长篇打包指南和 `docs/plugins/sample-*` 示例资产，避免 `docs/` 继续承担样例仓库角色。
+- 仍保留的设计文档以 `docs/design/README.md` 中列出的索引为准。
+
+## 说明
+
+- 遇到运行时、构建或模块边界问题，优先回到“当前事实源”校对。
+- 版本变更请以 [CHANGELOG.md](../CHANGELOG.md) 为准。

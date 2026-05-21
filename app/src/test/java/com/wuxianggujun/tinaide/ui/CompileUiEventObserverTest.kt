@@ -1,0 +1,125 @@
+package com.wuxianggujun.tinaide.ui
+
+import com.wuxianggujun.tinaide.core.terminal.TerminalBackend
+import com.wuxianggujun.tinaide.ui.compose.components.FileTreeState
+import io.mockk.coVerify
+import io.mockk.mockk
+import io.mockk.verify
+import java.io.File
+import java.nio.file.Files
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class CompileUiEventObserverTest {
+
+    @Test
+    fun `handleUiEvent delegates toast events`() = runTest {
+        val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
+        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
+        val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
+        val observer = CompileUiEventObserver(
+            toastPresenter = toastPresenter,
+            guiLauncher = guiLauncher,
+            terminalLauncher = terminalLauncher,
+            projectTreeRevealer = projectTreeRevealer
+        )
+
+        observer.handleUiEvent(
+            CompileActionsHelper.UiEvent.ShowToast(
+                message = "done",
+                type = CompileActionsHelper.ToastType.SUCCESS
+            )
+        )
+
+        verify(exactly = 1) {
+            toastPresenter.show("done", CompileActionsHelper.ToastType.SUCCESS)
+        }
+    }
+
+    @Test
+    fun `handleUiEvent delegates gui and terminal launch events`() = runTest {
+        val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
+        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
+        val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
+        val observer = CompileUiEventObserver(
+            toastPresenter = toastPresenter,
+            guiLauncher = guiLauncher,
+            terminalLauncher = terminalLauncher,
+            projectTreeRevealer = projectTreeRevealer
+        )
+
+        observer.handleUiEvent(
+            CompileActionsHelper.UiEvent.OpenGui(
+                libraryPath = "/tmp/libdemo.so",
+                environment = emptyMap(),
+            )
+        )
+        observer.handleUiEvent(
+            CompileActionsHelper.UiEvent.OpenTerminal(
+                command = "cmake --build .",
+                workDir = "/tmp/project",
+                backend = TerminalBackend.HOST
+            )
+        )
+
+        verify(exactly = 1) { guiLauncher.open("/tmp/libdemo.so", emptyMap()) }
+        verify(exactly = 1) {
+            terminalLauncher.open(
+                command = "cmake --build .",
+                workDir = "/tmp/project",
+                backend = TerminalBackend.HOST
+            )
+        }
+    }
+
+    @Test
+    fun `handleUiEvent delegates reveal requests`() = runTest {
+        val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
+        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
+        val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
+        val observer = CompileUiEventObserver(
+            toastPresenter = toastPresenter,
+            guiLauncher = guiLauncher,
+            terminalLauncher = terminalLauncher,
+            projectTreeRevealer = projectTreeRevealer
+        )
+        val file = File("/tmp/demo")
+
+        observer.handleUiEvent(
+            CompileActionsHelper.UiEvent.RevealInProjectTree(
+                file = file,
+                selectTarget = false
+            )
+        )
+
+        coVerify(exactly = 1) {
+            projectTreeRevealer.reveal(file, selectTarget = false)
+        }
+    }
+
+    @Test
+    fun `file tree revealer reveals target without redundant refresh`() = runTest {
+        val fileTreeState = mockk<FileTreeState>(relaxed = true)
+        val revealer = FileTreeStateCompileProjectTreeRevealer { fileTreeState }
+        val target = Files.createTempFile("compile-ui-event-observer", ".bin").toFile()
+
+        try {
+            revealer.reveal(target, selectTarget = false)
+
+            coVerify(exactly = 0) { fileTreeState.refresh() }
+            coVerify(exactly = 1) {
+                fileTreeState.reveal(
+                    match { it.absolutePath == target.absolutePath },
+                    selectTarget = false
+                )
+            }
+        } finally {
+            target.delete()
+        }
+    }
+}

@@ -1,0 +1,124 @@
+package com.wuxianggujun.tinaide.editor.bookmark.persistence
+
+import android.content.Context
+import com.wuxianggujun.tinaide.editor.bookmark.db.BookmarkDatabase
+import com.wuxianggujun.tinaide.editor.bookmark.db.BookmarkEntity
+import com.wuxianggujun.tinaide.editor.bookmark.model.ProjectBookmarkState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import timber.log.Timber
+import java.io.File
+
+/**
+ * 书签状态存储工具
+ *
+ * 使用 Room 数据库持久化书签数据。
+ *
+ * 支持版本迁移，确保旧版本数据能正确加载。
+ */
+class BookmarkStateStorage(context: Context) {
+    private val database = BookmarkDatabase.getInstance(context)
+    private val bookmarkDao = database.bookmarkDao()
+
+    companion object {
+        private const val TAG = "BookmarkStateStorage"
+    }
+
+    /**
+     * 转换为持久化路径（相对路径）
+     * 
+     * Android 系统统一使用 / 作为路径分隔符，无需特殊处理。
+     */
+    private fun toPersistedPath(projectPath: String, filePath: String): String {
+        if (filePath.isBlank()) return filePath
+        val file = File(filePath)
+        if (!file.isAbsolute) {
+            return filePath
+        }
+
+        return runCatching {
+            val root = File(projectPath).canonicalFile
+            val target = file.canonicalFile
+            if (target.path == root.path) return@runCatching target.name
+            if (!target.path.startsWith(root.path + File.separator)) return@runCatching filePath
+            target.relativeTo(root).path
+        }.getOrElse {
+            filePath
+        }
+    }
+
+    /**
+     * 转换为绝对路径
+     */
+    private fun toAbsolutePath(projectPath: String, storedPath: String): String {
+        if (storedPath.isBlank()) return storedPath
+        val file = File(storedPath)
+        if (file.isAbsolute) return storedPath
+        return File(projectPath, storedPath).path
+    }
+
+    /**
+     * 加载书签状态
+     *
+     * 自动处理版本迁移和旧路径迁移。
+     */
+    suspend fun load(projectPath: String): ProjectBookmarkState? = withContext(Dispatchers.IO) {
+        return@withContext runCatching {
+            val entities = bookmarkDao.getBookmarks(projectPath)
+            val bookmarks = entities.map { entity ->
+                entity.toDomainModel().copy(
+                    filePath = toAbsolutePath(projectPath, entity.filePath)
+                )
+            }
+            ProjectBookmarkState(bookmarks = bookmarks).normalized()
+        }.onFailure { e ->
+            Timber.tag(TAG).e(e, "Failed to load bookmark state for project: %s", projectPath)
+        }.getOrNull()
+    }
+
+    /**
+     * 保存书签状态
+     */
+    suspend fun save(projectPath: String, state: ProjectBookmarkState) = withContext(Dispatchers.IO) {
+        runCatching {
+            val normalized = state.copy(
+                bookmarks = state.bookmarks.map { bm ->
+                    bm.copy(filePath = toPersistedPath(projectPath, bm.filePath))
+                }
+            ).normalized()
+
+            // 先删除旧数据，再插入新数据
+            bookmarkDao.deleteAllBookmarks(projectPath)
+            val entities = normalized.bookmarks.map { bookmark ->
+                BookmarkEntity.fromDomainModel(projectPath, bookmark)
+            }
+            bookmarkDao.insertBookmarks(entities)
+
+            Timber.tag(TAG).d("Saved bookmark state for project: %s (count=%d)", projectPath, normalized.bookmarks.size)
+        }.onFailure { e ->
+            Timber.tag(TAG).e(e, "Failed to save bookmark state for project: %s", projectPath)
+        }
+    }
+
+    /**
+     * 清空书签状态
+     */
+    suspend fun clear(projectPath: String) = withContext(Dispatchers.IO) {
+        runCatching {
+            val count = bookmarkDao.deleteAllBookmarks(projectPath)
+            Timber.tag(TAG).d("Cleared bookmark state for project: %s (deleted=%d)", projectPath, count)
+        }.onFailure { e ->
+            Timber.tag(TAG).e(e, "Failed to clear bookmark state for project: %s", projectPath)
+        }
+    }
+
+    /**
+     * 检查书签是否存在
+     */
+    suspend fun exists(projectPath: String): Boolean = withContext(Dispatchers.IO) {
+        return@withContext runCatching {
+            bookmarkDao.getBookmarksCount(projectPath) > 0
+        }.getOrElse { false }
+    }
+}
+

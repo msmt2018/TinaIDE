@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Internet access -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- SDL3 按需使用相机时由运行时权限弹窗申请 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <!-- Storage permissions -->
+    <!-- Android 12 及以下：READ/WRITE_EXTERNAL_STORAGE；Android 13+ 不再生效 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"
+        tools:ignore="ScopedStorage" />
+    <!-- Android 11+：所有文件访问权限（跳转系统设置页授予） -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- Termux required permissions -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Android 11+ 查询其他应用的权限（用于检测 QQ 是否安装） -->
+    <application
+        android:name=".TinaApplication"
+        android:allowNativeHeapPointerTagging="false"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TinaIDE"
+        android:largeHeap="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="true">
+
+        <meta-data
+            android:name="com.wuxianggujun.tinaide.BASE_VERSION_CODE"
+            android:value="${TINA_BASE_VERSION_CODE}" />
+
+        <!-- 主入口 Activity（底部导航） -->
+        <activity
+            android:name=".ui.MainPortalActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TinaIDE.Starting">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false"
+            android:label="@string/menu_settings"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".ui.UserContentActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainPortalActivity" />
+        <activity
+            android:name=".settings.OpenSourceLicensesActivity"
+            android:exported="false"
+            android:label="@string/about_licenses_title"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <activity
+            android:name=".ui.compose.screens.testing.ThemePreviewTestActivity"
+            android:exported="false"
+            android:label="@string/dev_options_theme_preview_test"
+            android:theme="@style/Theme.TinaIDE"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <activity
+            android:name=".ui.compose.screens.testing.TreeSitterTestActivity"
+            android:exported="false"
+            android:label="@string/dev_options_tree_sitter_test"
+            android:theme="@style/Theme.TinaIDE"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <activity
+            android:name=".ui.compose.screens.testing.EditorScrollTestActivity"
+            android:exported="false"
+            android:label="@string/dev_options_editor_scroll_test"
+            android:theme="@style/Theme.TinaIDE"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <activity
+            android:name=".ui.compose.screens.testing.ClangdTestActivity"
+            android:exported="false"
+            android:label="@string/clangd_test_title"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <activity
+            android:name=".ui.compose.screens.testing.DevTestActivity"
+            android:exported="false"
+            android:label="@string/dev_options_testing_tools"
+            android:theme="@style/Theme.TinaIDE"
+            android:parentActivityName=".settings.SettingsActivity" />
+        <!-- 终端 Activity（基于 Termux 的 terminal-view 和 terminal-emulator） -->
+        <activity
+            android:name=".ui.TerminalActivity"
+            android:exported="false"
+            android:label="@string/menu_terminal"
+            android:parentActivityName=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ui.gui.GuiHostActivity"
+            android:exported="false"
+            android:label="@string/gui_host_title"
+            android:parentActivityName=".MainActivity"
+            android:process=":gui"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+        <activity
+            android:name=".ui.sdl.ExternalSdlActivity"
+            android:exported="false"
+            android:label="@string/sdl_host_title"
+            android:parentActivityName=".MainActivity"
+            android:process=":sdl"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" />
+        <activity
+            android:name=".ui.GlobalSearchActivity"
+            android:exported="false"
+            android:label="@string/global_search_title"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".ui.activity.CrashActivity"
+            android:exported="false"
+            android:label="@string/crash_activity_title"
+            android:theme="@style/Theme.TinaIDE"
+            android:process=":crash" />
+
+        <service
+            android:name=".core.crash.CrashLogUploadJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <!-- 编辑器保活服务 -->
+        <service
+            android:name=".service.EditorKeepAliveService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="编辑器后台运行保活" />
+        </service>
+
+        <!-- 新建项目向导 -->
+        <activity
+            android:name=".ui.wizard.NewProjectWizardActivity"
+            android:exported="false"
+            android:label="@string/wizard_title_new_project"
+            android:theme="@style/Theme.TinaIDE" />
+
+        <!-- 工具链配置 -->
+        <activity
+            android:name=".ui.workspace.ToolchainConfigActivity"
+            android:exported="false"
+            android:label="@string/toolchain_config_title"
+            android:theme="@style/Theme.TinaIDE" />
+
+        <!-- 依赖库安装（Ubuntu） -->
+        <activity
+            android:name=".ui.workspace.DependencyInstallActivity"
+            android:exported="false"
+            android:label="@string/dependency_install_title"
+            android:theme="@style/Theme.TinaIDE" />
+
+        <!-- 安装日志查看 -->
+        <activity
+            android:name=".ui.workspace.InstallLogActivity"
+            android:exported="false"
+            android:label="@string/install_log_title"
+            android:theme="@style/Theme.TinaIDE" />
+
+        <!-- 文件分享 Provider -->
+        <!-- PRoot 日志查看 -->
+        <activity
+            android:name=".ui.workspace.PRootLogActivity"
+            android:exported="false"
+            android:label="@string/proot_logs_title"
+            android:theme="@style/Theme.TinaIDE" />
+
+        <provider
+            android:name="com.wuxianggujun.tinaide.storage.TinaFileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- MT 管理器文件提供器（默认禁用，可在设置中启用） -->
+        <provider
+            android:name=".provider.MTDataFilesProvider"
+            android:authorities="${applicationId}.MTDataFilesProvider"
+            android:exported="true"
+            android:enabled="false"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
+        <!-- MT 管理器唤醒 Activity（默认禁用） -->
+        <activity
+            android:name=".provider.MTDataFilesWakeUpActivity"
+            android:taskAffinity="${applicationId}.MTDataFilesWakeUp"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:enabled="false"
+            android:noHistory="true" />
+
+        <!-- Termux components declared in library manifest -->
+    </application>
+
+</manifest>

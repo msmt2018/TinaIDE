@@ -1,0 +1,67 @@
+apply plugin: 'com.android.application'
+apply from : '../common.gradle'
+
+android {
+
+    namespace 'com.hjq.permissions.demo'
+
+    defaultConfig {
+        applicationId "com.hjq.permissions.demo"
+        // 最低安装版本
+        minSdkVersion 18
+    }
+
+    // Apk 签名的那些事：https://www.jianshu.com/p/a1f8e5896aa2
+    signingConfigs {
+        config {
+            storeFile file(StoreFile)
+            storePassword StorePassword
+            keyAlias KeyAlias
+            keyPassword KeyPassword
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.config
+        }
+
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.config
+        }
+    }
+
+    applicationVariants.configureEach { variant ->
+        // apk 输出文件名配置
+        variant.outputs.configureEach { output ->
+            outputFileName = rootProject.getName() + '.apk'
+        }
+    }
+}
+
+dependencies {
+    // 依赖 libs 目录下所有的 jar 和 aar 包
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+
+    implementation project(':library')
+
+    // 谷歌兼容库：https://developer.android.google.cn/jetpack/androidx/releases/appcompat?hl=zh-cn
+    // noinspection GradleCompatible
+    implementation 'androidx.appcompat:appcompat:1.0.0'
+
+    // 设备兼容框架：https://github.com/getActivity/DeviceCompat
+    implementation 'com.github.getActivity:DeviceCompat:2.3'
+
+    // 吐司框架：https://github.com/getActivity/Toaster
+    implementation 'com.github.getActivity:Toaster:13.8'
+
+    // 标题栏框架：https://github.com/getActivity/TitleBar
+    implementation 'com.github.getActivity:TitleBar:10.8'
+
+    // 内存泄漏检测：https://github.com/square/leakcanary
+    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.12'
+}

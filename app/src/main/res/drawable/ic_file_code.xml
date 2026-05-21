@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    
+    <!-- 代码文件图标 - 带折角的文档样式 -->
+    <!-- 文档主体 -->
+    <path
+        android:pathData="M6,2 L14,2 L20,8 L20,22 C20,22.55 19.55,23 19,23 L5,23 C4.45,23 4,22.55 4,22 L4,4 C4,2.9 4.9,2 6,2 Z"
+        android:fillColor="#E3F2FD"/>
+    
+    <!-- 折角 -->
+    <path
+        android:pathData="M14,2 L14,8 L20,8"
+        android:fillColor="#90CAF9"/>
+    
+    <!-- 代码行 -->
+    <path
+        android:pathData="M8,12 L12,12"
+        android:strokeWidth="1.5"
+        android:strokeColor="#1976D2"
+        android:strokeLineCap="round"/>
+    
+    <path
+        android:pathData="M8,15 L14,15"
+        android:strokeWidth="1.5"
+        android:strokeColor="#1976D2"
+        android:strokeLineCap="round"/>
+    
+    <path
+        android:pathData="M8,18 L11,18"
+        android:strokeWidth="1.5"
+        android:strokeColor="#1976D2"
+        android:strokeLineCap="round"/>
+</vector>

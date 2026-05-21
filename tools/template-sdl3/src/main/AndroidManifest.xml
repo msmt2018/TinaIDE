@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="TINAIDE_APP_NAME_PLACEHOLDER_PADPADPADPADPADPAD"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="true"
+        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+
+        <activity
+            android:name="com.tinaide.template.sdl3.TemplateSDLActivity"
+            android:exported="true"
+            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|smallestScreenSize"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

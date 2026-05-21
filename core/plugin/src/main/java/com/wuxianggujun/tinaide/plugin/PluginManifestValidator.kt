@@ -1,0 +1,178 @@
+package com.wuxianggujun.tinaide.plugin
+
+import android.content.Context
+import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.plugin.script.PluginPermission
+import com.wuxianggujun.tinaide.project.ProjectBuildSystem
+import java.io.File
+
+internal object PluginManifestValidator {
+    private const val SUPPORTED_API_VERSION = 1
+
+    private val pluginIdPattern = Regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+    private val supportedLspToolchainTypes = setOf("system", "download", "pip", "npm")
+
+    fun validate(
+        context: Context,
+        manifest: PluginManifest,
+        pluginDir: File,
+    ) {
+        validatePluginId(context, manifest.id)
+        require(manifest.name.isNotBlank()) { Strings.plugin_error_name_empty.strOr(context) }
+        require(manifest.version.isNotBlank()) { Strings.plugin_error_version_empty.strOr(context) }
+        require(manifest.apiVersion == SUPPORTED_API_VERSION) {
+            Strings.plugin_error_api_version_unsupported.strOr(
+                context,
+                manifest.apiVersion,
+                SUPPORTED_API_VERSION
+            )
+        }
+        validatePermissionIds(context, manifest.permissions)
+        validatePermissionIds(context, manifest.optionalPermissions)
+        validateLspContributions(context, manifest)
+
+        if (manifest.type.equals(PluginTypes.SCRIPT, ignoreCase = true) ||
+            manifest.type.equals(PluginTypes.HYBRID, ignoreCase = true)
+        ) {
+            val mainEntry = manifest.main ?: "main.lua"
+            require(isSafePluginRelativePath(mainEntry)) {
+                Strings.plugin_error_main_path_invalid.strOr(context, mainEntry)
+            }
+            require(File(pluginDir, mainEntry).exists()) {
+                Strings.plugin_error_main_file_not_exist.strOr(context, mainEntry)
+            }
+        }
+
+        manifest.contributions?.themes?.forEach { path ->
+            require(isSafePluginRelativePath(path)) {
+                Strings.plugin_error_themes_path_invalid.strOr(context, path)
+            }
+            require(File(pluginDir, path).exists()) {
+                Strings.plugin_error_theme_file_not_exist.strOr(context, path)
+            }
+        }
+
+        manifest.contributions?.snippets?.forEach { path ->
+            require(isSafePluginRelativePath(path)) {
+                Strings.plugin_error_snippets_path_invalid.strOr(context, path)
+            }
+            require(File(pluginDir, path).exists()) {
+                Strings.plugin_error_snippet_file_not_exist.strOr(context, path)
+            }
+        }
+
+        manifest.contributions?.keybindings?.forEach { path ->
+            require(isSafePluginRelativePath(path)) {
+                Strings.plugin_error_keybindings_path_invalid.strOr(context, path)
+            }
+        }
+
+        manifest.contributions?.projectTemplates?.forEach { template ->
+            require(template.id.isNotBlank()) { Strings.plugin_error_id_empty.strOr(context) }
+            require(template.name.isNotBlank()) { Strings.plugin_error_name_empty.strOr(context) }
+            require(isSafePluginRelativePath(template.templatePath)) {
+                Strings.plugin_error_project_template_path_invalid.strOr(context, template.templatePath)
+            }
+            require(File(pluginDir, template.templatePath).exists()) {
+                Strings.plugin_error_project_template_file_not_exist.strOr(context, template.templatePath)
+            }
+            require(parseProjectBuildSystem(template.buildSystem) != null) {
+                Strings.plugin_error_project_template_build_system_invalid.strOr(
+                    context,
+                    template.buildSystem
+                )
+            }
+        }
+
+        manifest.contributions?.apkExports?.forEach { apkExport ->
+            require(apkExport.id.isNotBlank()) { Strings.plugin_error_id_empty.strOr(context) }
+            require(apkExport.name.isNotBlank()) { Strings.plugin_error_name_empty.strOr(context) }
+            require(isSafePluginRelativePath(apkExport.templatePath)) {
+                Strings.plugin_error_apk_export_template_path_invalid.strOr(
+                    context,
+                    apkExport.templatePath
+                )
+            }
+            require(File(pluginDir, apkExport.templatePath).exists()) {
+                Strings.plugin_error_apk_export_template_file_not_exist.strOr(
+                    context,
+                    apkExport.templatePath
+                )
+            }
+        }
+    }
+
+    private fun validateLspContributions(
+        context: Context,
+        manifest: PluginManifest,
+    ) {
+        if (!manifest.type.equals(PluginTypes.LSP, ignoreCase = true)) return
+        val contributions = manifest.contributions
+        val languageServers = contributions?.languageServers.orEmpty()
+        require(languageServers.isNotEmpty()) {
+            Strings.plugin_error_lsp_language_servers_empty.strOr(context)
+        }
+        languageServers.forEach { server ->
+            require(server.id.isNotBlank()) { Strings.plugin_error_id_empty.strOr(context) }
+            require(server.name.isNotBlank()) { Strings.plugin_error_name_empty.strOr(context) }
+            require(server.languages.any { it.isNotBlank() }) {
+                Strings.plugin_error_lsp_languages_empty.strOr(context, server.id)
+            }
+            require(server.fileExtensions.any { it.isNotBlank() } || !server.filePatterns.isNullOrEmpty()) {
+                Strings.plugin_error_lsp_file_matches_empty.strOr(context, server.id)
+            }
+            require(server.server.type.trim().lowercase() == "stdio") {
+                Strings.plugin_error_lsp_server_type_invalid.strOr(context, server.server.type)
+            }
+            require(!server.server.command.isNullOrBlank()) {
+                Strings.plugin_error_lsp_server_command_empty.strOr(context, server.id)
+            }
+        }
+        contributions?.toolchains.orEmpty().forEach { toolchain ->
+            val type = toolchain.type.trim().lowercase()
+            require(type in supportedLspToolchainTypes) {
+                Strings.plugin_error_lsp_toolchain_type_invalid.strOr(context, toolchain.type)
+            }
+            if (type == "system") {
+                val hasGenericPackages = toolchain.packages.orEmpty().any { it.isNotBlank() }
+                val hasManagerPackages = toolchain.packagesByManager.orEmpty().values.flatten().any { it.isNotBlank() }
+                require(hasGenericPackages || hasManagerPackages) {
+                    Strings.plugin_error_lsp_toolchain_system_packages_empty.strOr(context, toolchain.id)
+                }
+            }
+        }
+    }
+
+    fun parseProjectBuildSystem(value: String): ProjectBuildSystem? {
+        return when (value.trim().lowercase()) {
+            "single_file", "single-file", "singlefile" -> ProjectBuildSystem.SINGLE_FILE
+            "cmake" -> ProjectBuildSystem.CMAKE
+            "make" -> ProjectBuildSystem.MAKE
+            "plugin", "tina_plugin", "tina-plugin", "tinaplugin" -> ProjectBuildSystem.PLUGIN
+            else -> null
+        }
+    }
+
+    private fun validatePermissionIds(
+        context: Context,
+        permissions: List<String>?,
+    ) {
+        val unknownIds = PluginPermission.findUnknownIds(permissions)
+        require(unknownIds.isEmpty()) {
+            Strings.plugin_error_permission_unknown.strOr(context, unknownIds.joinToString(", "))
+        }
+    }
+
+    private fun validatePluginId(
+        context: Context,
+        id: String,
+    ) {
+        require(id.isNotBlank()) { Strings.plugin_error_id_empty.strOr(context) }
+        require(pluginIdPattern.matches(id)) { Strings.plugin_error_id_invalid.strOr(context, id) }
+        require(!id.contains("..")) { Strings.plugin_error_id_contains_dotdot.strOr(context, id) }
+        require(!id.contains(File.separatorChar)) {
+            Strings.plugin_error_id_contains_separator.strOr(context, id)
+        }
+    }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="restricted_settings_title">Permission must be enabled manually</string>
+    <string name="restricted_settings_message">The system does not allow apps to request certain restricted permissions directly. You must enable them manually in the app\'s settings. Tap \"Open settings\" to proceed.</string>
+    <string name="restricted_settings_go">Open settings</string>
+    <string name="restricted_settings_cancel">Later</string>
+</resources>

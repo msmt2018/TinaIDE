@@ -1,0 +1,121 @@
+package com.wuxianggujun.tinaide.plugin
+
+import android.app.Application
+import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.plugin.script.api.PluginCommandRegistry
+import java.io.File
+import java.nio.file.Files
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(
+    sdk = [34],
+    manifest = Config.NONE,
+    application = Application::class
+)
+class PluginMenuResolverTest {
+
+    private lateinit var context: Application
+    private lateinit var pluginDir: File
+
+    @Before
+    fun setUp() {
+        context = RuntimeEnvironment.getApplication()
+        pluginDir = Files.createTempDirectory("plugin-menu-resolver").toFile()
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
+    }
+
+    @After
+    fun tearDown() {
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
+        pluginDir.deleteRecursively()
+    }
+
+    @Test
+    fun `resolveFileTreeContextMenuItems should include registered plugin command`() {
+        PluginCommandRegistry.register(
+            pluginId = "plugin.menu",
+            pluginName = "Plugin Menu",
+            commandId = "plugin.menu.sayHello",
+            callbackName = "handleHello",
+            title = "Runtime title"
+        ).getOrThrow()
+        val plugin = createPlugin(
+            commands = listOf(
+                PluginCommand(
+                    id = "plugin.menu.sayHello",
+                    title = "Manifest title"
+                )
+            ),
+            menuItems = listOf(
+                PluginMenuItem(command = "plugin.menu.sayHello")
+            )
+        )
+
+        val items = PluginMenuResolver.resolveFileTreeContextMenuItems(
+            context = context,
+            installedPlugins = listOf(plugin),
+            file = File(pluginDir, "README.md"),
+            isDirectory = false
+        )
+
+        assertThat(items).hasSize(1)
+        assertThat(items.single().commandId).isEqualTo("plugin.menu.sayHello")
+        assertThat(items.single().title).isEqualTo("Manifest title")
+        assertThat(items.single().pluginId).isEqualTo("plugin.menu")
+    }
+
+    @Test
+    fun `resolveFileTreeContextMenuItems should ignore unregistered plugin command`() {
+        val plugin = createPlugin(
+            commands = listOf(
+                PluginCommand(
+                    id = "plugin.menu.sayHello",
+                    title = "Manifest title"
+                )
+            ),
+            menuItems = listOf(
+                PluginMenuItem(command = "plugin.menu.sayHello")
+            )
+        )
+
+        val items = PluginMenuResolver.resolveFileTreeContextMenuItems(
+            context = context,
+            installedPlugins = listOf(plugin),
+            file = File(pluginDir, "README.md"),
+            isDirectory = false
+        )
+
+        assertThat(items).isEmpty()
+    }
+
+    private fun createPlugin(
+        commands: List<PluginCommand>,
+        menuItems: List<PluginMenuItem>
+    ): InstalledPlugin {
+        return InstalledPlugin(
+            manifest = PluginManifest(
+                id = "plugin.menu",
+                name = "Plugin Menu",
+                version = "1.0.0",
+                type = "script",
+                contributions = PluginContributions(
+                    commands = commands,
+                    menus = PluginMenus(
+                        fileTreeContext = menuItems
+                    )
+                )
+            ),
+            directory = pluginDir,
+            enabled = true
+        )
+    }
+}

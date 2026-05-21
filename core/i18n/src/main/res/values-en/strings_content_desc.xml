@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Content descriptions -->
+  <string name="content_desc_copy">Copy</string>
+  <string name="content_desc_scroll_to_bottom">Scroll to bottom</string>
+  <string name="content_desc_clear_logs">Clear logs</string>
+  <string name="content_desc_navigate_back">Navigate back</string>
+  <string name="content_desc_clear_input">Clear input</string>
+  <string name="content_desc_search">Search</string>
+  <string name="content_desc_more_options">More options</string>
+  <string name="content_desc_close">Close</string>
+</resources>

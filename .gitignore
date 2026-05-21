@@ -1,0 +1,161 @@
+*.iml
+.kotlin/
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+**/.gradle/
+.vscode/
+out/
+
+# Node.js (frontend tools/build outputs)
+**/node_modules/
+**/dist/
+**/.vite/
+**/.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python bytecode/cache
+__pycache__/
+*.pyc
+*.pyo
+*.log
+log.txt
+nul
+# Ignore large offline bootstrap archives by default; keep README
+app/src/main/assets/bootstrap/**/*.zip
+# Sora editor upstream debug keystore
+temp/tina-sora-editor/debug.jks
+# Local signing material (keep local, do not commit)
+/keystore.properties
+/keystore/release.jks
+/keystore/*.jks
+/keystore/*.keystore
+/keystore/*.p12
+# IntelliJ/AS project files (broader)
+/.idea/
+/.kiro/
+/.serena/
+/.claude/
+/.cursor/
+/.trellis/
+CLAUDE.md
+AGENTS.md
+# PRoot rootfs builder outputs (generated artifacts)
+docker/proot-rootfs/output/
+# PRoot build outputs (intermediate build artifacts)
+docker/proot-build/output/
+# Rsync build outputs (intermediate build artifacts)
+docker/rsync-build/output/
+
+# PRoot assets
+# 注意：proot 二进制文件和 libtalloc 需要提交到仓库以支持 CI/CD 构建
+# rootfs.tar.gz 是大文件，仍然忽略（用户需要自行下载或构建）
+#
+# 新架构：使用 productFlavors，资源放在架构特定的 flavor 目录
+# app/src/arm64/assets/proot/arm64-v8a/rootfs.tar.gz (或 .tar_gz)
+# app/src/x86_64/assets/proot/x86_64/rootfs.tar.gz (或 .tar_gz)
+app/src/*/assets/proot/**/*.tar.gz
+app/src/*/assets/proot/**/*.tar_gz
+
+# 旧路径（已废弃，但保留规则以防遗留文件）
+app/src/main/assets/proot/**/*.tar.gz
+app/src/main/assets/proot/**/*.tar_gz
+
+# 以下文件需要提交以支持 CI/CD
+# app/src/main/assets/proot/**/proot
+# app/src/main/assets/proot/**/*.so*
+
+# Local LLVM source trees (do not commit huge upstream repos)
+llvm_projects/
+llvm-project/
+llvm-projects/
+
+# App 集成的 LLVM 库（由同步脚本生成，不提交）
+app/src/main/jniLibs/**/libLLVM*.so
+app/src/main/jniLibs/**/libclang*.so
+app/src/main/jniLibs/**/liblld*.so
+app/src/main/jniLibs/**/libc++_shared.so
+
+# Sysroot（由同步脚本生成，不提交）
+app/src/main/assets/sysroot/
+app/src/main/assets/*.zip
+!app/src/main/assets/xmake-overrides/**
+
+# Generated LLVM build artifacts (headers/libs/sysroot)
+external/llvm-build-libs/
+!external/llvm-build-libs/README.md
+
+# Local scratch / reference clones (do not commit)
+tmp/
+temp/
+%TEMP%/
+.bailucode.md
+
+# Windows compiler intermediate files (MSVC build artifacts)
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.hprof
+
+.ace-tool/
+
+# Prevent committing huge offline bundle
+/tina-server.tar.gz
+
+# Local build logs (workspace noise)
+/build_log*.txt
+
+# Local toolchain archive (moved stale asset packs, not for commit/package)
+app/.local/
+# Legacy wrong path: never archive toolchains under packaged assets
+app/src/*/assets/tina-toolchain/archive/
+
+# Do not commit local production env files
+/server/tina-admin/.env.production
+
+# Do not commit plaintext tina-server secrets (encrypted *.enc is OK)
+/server/tina-server/secrets/*.b64
+/server/tina-server/secrets/*.env
+
+# xCrash local module build artifacts
+/external/xcrash/.cxx/
+/external/xcrash/build/
+/external/tina-exec/runtime/.cmake-smoke-*/
+
+# Temporary files and summaries
+/tmp-*-test-*.txt
+temp/*.md
+temp/*.txt
+!temp/README.md
+
+# 日志目录
+log/
+
+# ProGuard/R8 mapping 文件备份（重要：用于崩溃日志反混淆）
+# 这个目录应该提交到 Git，不要忽略！
+# app/mappings/
+app/mappings/**/*.txt
+.tmp/
+
+# Gradle user home cache (AI mode)
+.gradle-user-home-ai/
+org/

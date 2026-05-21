@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material 3 主题属性声明 -->
+    <attr name="colorOnSurface" format="color" />
+    <attr name="colorOnSurfaceVariant" format="color" />
+</resources>

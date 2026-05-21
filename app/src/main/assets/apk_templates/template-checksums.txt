@@ -1,0 +1,2 @@
+template-native-activity.apk=4eb8c0a8e4d6305e30c346461f224336d6bbbaf6ff5c82cd15d8ce82e84dda89
+template-sdl3.apk=6807ddae6bcddc24196a090910d85fa8a4c2765dc35f3685a1402be6e7ca4b02
