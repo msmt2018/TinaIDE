@@ -117,16 +117,20 @@ jobs:
 
       - name: Build Debug APK
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' }}
+        timeout-minutes: 20
         run: |
           ./gradlew :app:assembleArm64Debug --no-daemon -Ptina.devAbi=arm64 \
+            -Ptina.buildProotFromSource=false \
             -Dorg.gradle.internal.http.connectionTimeout=120000 \
             -Dorg.gradle.internal.http.socketTimeout=120000 \
             -Dorg.gradle.internal.repository.max.retries=4
 
       - name: Build Release APKs
         if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
+        timeout-minutes: 45
         run: |
           ./gradlew :app:assembleReleaseAllAbi --no-daemon -Ptina.allAbi=true \
+            -Ptina.buildProotFromSource=false \
             -Dorg.gradle.internal.http.connectionTimeout=120000 \
             -Dorg.gradle.internal.http.socketTimeout=120000 \
             -Dorg.gradle.internal.repository.max.retries=4
@@ -360,3 +364,10 @@ jobs:
             fi
             echo "| $arch | $filename | $size |" >> "$GITHUB_STEP_SUMMARY"
           done
+
+      - name: Cleanup Gradle processes
+        if: ${{ always() }}
+        run: |
+          set +e
+          ./gradlew --stop || true
+          pgrep -af 'GradleDaemon|org.gradle.launcher.daemon' || true

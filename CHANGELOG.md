@@ -37,13 +37,15 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
-## [0.17.0] - 2026-05-22
+## [0.17.1] - 2026-05-22
 
 ### Changed
 - 市场数据源改为 GitHub 仓库注册表：依赖库、插件列表和包信息不再依赖 TinaIDE 自有服务器，降低服务器资源占用，也更适合公开仓库协作。
 - 包管理与插件市场增加 GitHub 访问兜底配置：在中国网络环境下可继续通过镜像/代理配置访问注册表，减少直接访问 GitHub 失败导致的市场不可用。
 - 项目首页移除公告系统，改为启动时检查 GitHub Release 最新版本，并通过更新对话框提示用户升级。
 - Release workflow 边界进一步收口：公开仓库只负责构建 TinaIDE 自身 APK，发布说明直接从本文件对应版本区块生成。
+- Release 构建显式复用预编译 PRoot 资源，不再在 GitHub Actions 中重新编译 PRoot 源码，减少远端构建耗时和资源占用。
+- Debug/Release 构建步骤增加超时限制，并在 workflow 结束时执行 Gradle 清理，避免构建脚本异常时持续占用后台资源。
 
 ### Removed
 - 完全移除市场页代码片段功能和 `feature:snippet` 模块，避免继续维护未计划上线的代码片段市场。
@@ -54,6 +56,7 @@
 - `.\gradlew.bat :app:compileArm64DebugKotlin :core:network:compileDebugKotlin :feature:projectlist:compileDebugKotlin --no-configuration-cache`
 - `.\gradlew.bat :app:assembleArm64Debug --no-configuration-cache`
 - Debug APK 验证产物：`app/build/outputs/apk/arm64/debug/app-arm64-v8a-debug.apk`
+- `v0.17.0` 远端 Release 构建因未显式关闭 PRoot 源码编译而长时间停留在 `Build Release APKs`，已取消以回收 GitHub Actions 资源；本版本作为实际发布版本重新触发。
 
 ## [0.16.2] - 2026-05-21
 
