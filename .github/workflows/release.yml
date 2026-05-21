@@ -29,6 +29,8 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      signed_release_available: ${{ steps.release-signing.outputs.available }}
     env:
       TS_CLI_BUILD_FROM_SOURCE: 'false'
       # GitHub Actions 标准 runner 只有 7GB RAM；覆盖本地 gradle.properties 的 -Xmx6g 设置
@@ -82,23 +84,30 @@ jobs:
       # - 本地开发可继续使用忽略掉的 keystore.properties / keystore/release.jks
       # - GitHub Actions release 构建优先从仓库 secrets 还原，避免把明文密钥放进仓库
       - name: Prepare release signing assets
+        id: release-signing
         if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
         env:
           TINAIDE_RELEASE_KEYSTORE_B64: ${{ secrets.TINAIDE_RELEASE_KEYSTORE_B64 }}
           TINAIDE_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.TINAIDE_RELEASE_KEYSTORE_PASSWORD }}
           TINAIDE_RELEASE_KEY_ALIAS: ${{ secrets.TINAIDE_RELEASE_KEY_ALIAS }}
           TINAIDE_RELEASE_KEY_PASSWORD: ${{ secrets.TINAIDE_RELEASE_KEY_PASSWORD }}
-          TINAIDE_SERVER_CONFIG_HMAC_SECRET: ${{ secrets.TINAIDE_SERVER_CONFIG_HMAC_SECRET }}
         run: |
           set -euo pipefail
+
+          if [ -z "${TINAIDE_RELEASE_KEYSTORE_B64:-}" ] \
+            || [ -z "${TINAIDE_RELEASE_KEYSTORE_PASSWORD:-}" ] \
+            || [ -z "${TINAIDE_RELEASE_KEY_ALIAS:-}" ] \
+            || [ -z "${TINAIDE_RELEASE_KEY_PASSWORD:-}" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets are incomplete; skipping signed release APK build."
+            exit 0
+          fi
+
+          echo "available=true" >> "$GITHUB_OUTPUT"
 
           mkdir -p keystore
 
           if [ ! -f "keystore/release.jks" ]; then
-            if [ -z "${TINAIDE_RELEASE_KEYSTORE_B64:-}" ]; then
-              echo "ERROR: missing TINAIDE_RELEASE_KEYSTORE_B64 secret."
-              exit 1
-            fi
             printf '%s' "$TINAIDE_RELEASE_KEYSTORE_B64" | base64 -d > keystore/release.jks
             chmod 600 keystore/release.jks
             echo "Reconstructed keystore/release.jks from GitHub Secrets."
@@ -107,20 +116,11 @@ jobs:
           fi
 
           if [ ! -f "keystore.properties" ]; then
-            if [ -z "${TINAIDE_RELEASE_KEYSTORE_PASSWORD:-}" ] \
-              || [ -z "${TINAIDE_RELEASE_KEY_ALIAS:-}" ] \
-              || [ -z "${TINAIDE_RELEASE_KEY_PASSWORD:-}" ] \
-              || [ -z "${TINAIDE_SERVER_CONFIG_HMAC_SECRET:-}" ]; then
-              echo "ERROR: missing one or more release secrets."
-              exit 1
-            fi
-
             {
               printf 'storeFile=keystore/release.jks\n'
               printf 'storePassword=%s\n' "$TINAIDE_RELEASE_KEYSTORE_PASSWORD"
               printf 'keyAlias=%s\n' "$TINAIDE_RELEASE_KEY_ALIAS"
               printf 'keyPassword=%s\n' "$TINAIDE_RELEASE_KEY_PASSWORD"
-              printf 'SERVER_CONFIG_HMAC_SECRET=%s\n' "$TINAIDE_SERVER_CONFIG_HMAC_SECRET"
             } > keystore.properties
 
             echo "Generated keystore.properties from GitHub Secrets."
@@ -149,15 +149,15 @@ jobs:
       # - 手动触发：根据 build_type 输入决定
       # 注意：本地默认仅启用单 ABI 变体；正式 release 需显式使用 AllAbi 任务输出 arm64 + x86_64。
       - name: Build Debug APK
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' || github.ref_type == 'tag' && steps.release-signing.outputs.available != 'true' }}
         run: |
-          ./gradlew assembleDebug --no-daemon \
+          ./gradlew :app:assembleArm64Debug --no-daemon \
             -Dorg.gradle.internal.http.connectionTimeout=120000 \
             -Dorg.gradle.internal.http.socketTimeout=120000 \
             -Dorg.gradle.internal.repository.max.retries=4
 
       - name: Build Release APK
-        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
+        if: ${{ (github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) && steps.release-signing.outputs.available == 'true' }}
         run: |
           ./gradlew :app:assembleReleaseAllAbi --no-daemon \
             -Dorg.gradle.internal.http.connectionTimeout=120000 \
@@ -224,7 +224,7 @@ jobs:
       # 重命名 APK（仅 release 构建）
       # ABI splits 会生成多个 APK：app-arm64-v8a-release.apk, app-x86_64-release.apk
       - name: Rename APKs
-        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
+        if: ${{ (github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) && steps.release-signing.outputs.available == 'true' }}
         run: |
           VERSION="${{ steps.version.outputs.name }}"
           APK_ROOT="app/build/outputs/apk"
@@ -277,7 +277,7 @@ jobs:
       
       # 校验最终发布 APK 内确实包含安装/分享所需 FileProvider 元数据
       - name: Validate release APK manifest
-        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
+        if: ${{ (github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) && steps.release-signing.outputs.available == 'true' }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -328,12 +328,21 @@ jobs:
 
       # 上传所有 APK（供后续 job / 开源仓库下载使用）
       - name: Upload all APK artifacts
-        if: ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release') }}
+        if: ${{ (github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release')) && steps.release-signing.outputs.available == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: app/build/outputs/apk/release/TinaIDE-*.apk
           # 私有仓库 Actions 的 artifacts 有存储配额；保留期越长越容易堆满配额
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload debug APK artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug' || github.ref_type == 'tag' && steps.release-signing.outputs.available != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/arm64/debug/*.apk
           retention-days: 3
           if-no-files-found: error
       
@@ -344,7 +353,11 @@ jobs:
           echo "- **Version**: ${{ steps.version.outputs.name }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version Code**: ${{ steps.version.outputs.code }}" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.ref_type }}" == "tag" ]; then
-            echo "- **Build Type**: release (tag trigger)" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.release-signing.outputs.available }}" == "true" ]; then
+              echo "- **Build Type**: signed release (tag trigger)" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Build Type**: debug validation (tag trigger, release signing secrets unavailable)" >> $GITHUB_STEP_SUMMARY
+            fi
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "- **Build Type**: ${{ github.event.inputs.build_type }} (manual trigger)" >> $GITHUB_STEP_SUMMARY
           fi
@@ -354,7 +367,7 @@ jobs:
           echo "### Generated APKs" >> $GITHUB_STEP_SUMMARY
           echo "| Architecture | File | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|--------------|------|------|" >> $GITHUB_STEP_SUMMARY
-          for apk in app/build/outputs/apk/release/TinaIDE-*.apk; do
+          find app/build/outputs/apk -type f -name "*.apk" | while read -r apk; do
             if [ -f "$apk" ]; then
               filename=$(basename "$apk")
               size=$(du -h "$apk" | cut -f1)
@@ -374,7 +387,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     # 只在 tag 推送时，或手动触发 release 构建且选择触发开源发布时执行
-    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release' && github.event.inputs.trigger_opensource == 'true')
+    if: needs.build.outputs.signed_release_available == 'true' && (github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release' && github.event.inputs.trigger_opensource == 'true'))
     
     steps:
       - name: Checkout code

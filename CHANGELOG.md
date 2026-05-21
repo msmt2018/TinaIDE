@@ -43,6 +43,7 @@
 - 发布干净开源基线：公开仓库历史从当前源码重新开始，移除后端、账号登录、QQ 登录、激活码/许可证和会员入口。
 - 保留反馈、日志、下载历史、插件系统、包管理和本地 IDE 能力。
 - 后端与旧分支/tag 已迁入私有归档仓库，公开仓库仅保留 `main` 与 `dev`。
+- 开源自动构建流程改为无签名密钥时也能完成 arm64 Debug APK 验证；签名密钥完整时再继续生成 Release APK。
 
 ### Verification
 - `.\gradlew.bat :app:assembleArm64Debug --no-daemon`
