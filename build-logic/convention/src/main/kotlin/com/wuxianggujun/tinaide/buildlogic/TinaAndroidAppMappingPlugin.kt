@@ -10,18 +10,22 @@ import org.gradle.api.Project
  *
  * - `backupMappingFiles` copies `build/outputs/mapping/<flavor>Release/mapping.txt`
  *   into `app/mappings/<versionName>-<timestamp>/<flavor>Release/mapping.txt`.
- * - `uploadMappingFiles` gzip-compresses each mapping file and POSTs it to
- *   the configured server endpoint so that crash reports can be
+ * - `uploadMappingFiles` optionally gzip-compresses each mapping file and
+ *   POSTs it to the configured server endpoint so that crash reports can be
  *   de-obfuscated server-side.
  *
- * Both tasks are wired as `finalizedBy` on every `assemble*Release` /
- * `bundle*Release` task so that a successful release build automatically
- * archives and ships its mapping artefact.
+ * Backup is enabled by default for release builds. Upload is opt-in so the
+ * open-source project does not contact private backend services unless a
+ * maintainer explicitly enables it.
  *
  * Configuration properties:
  * - `tina.releaseMapping.enabled` (default `true`): toggle the whole
  *   pipeline; when `false`, both tasks become no-ops and no finalizer
  *   is attached.
+ * - `tina.releaseMapping.backupEnabled` (default `true`): attach
+ *   `backupMappingFiles` to release builds.
+ * - `tina.releaseMapping.uploadEnabled` (default `false`): attach
+ *   `uploadMappingFiles` to release builds.
  * - `tina.releaseMapping.serverUrl` (default
  *   `https://tinaide.wuxianggujun.com`): upload target.
  *
@@ -37,6 +41,14 @@ class TinaAndroidAppMappingPlugin : Plugin<Project> {
                 name = "tina.releaseMapping.enabled",
                 default = true,
             )
+            val backupEnabled = resolveBooleanGradleProperty(
+                name = "tina.releaseMapping.backupEnabled",
+                default = true,
+            )
+            val uploadEnabled = resolveBooleanGradleProperty(
+                name = "tina.releaseMapping.uploadEnabled",
+                default = false,
+            )
             val serverUrl = providers.gradleProperty("tina.releaseMapping.serverUrl")
                 .orNull
                 ?.trim()
@@ -48,7 +60,7 @@ class TinaAndroidAppMappingPlugin : Plugin<Project> {
             tasks.register("backupMappingFiles") {
                 group = "build"
                 description = "Backup R8 mapping files for crash log deobfuscation."
-                onlyIf { enabled }
+                onlyIf { enabled && backupEnabled }
 
                 doLast {
                     val versionName = project.readAppVersionName()
@@ -64,7 +76,7 @@ class TinaAndroidAppMappingPlugin : Plugin<Project> {
             tasks.register("uploadMappingFiles") {
                 group = "build"
                 description = "Upload R8 mapping files to server for crash log deobfuscation."
-                onlyIf { enabled }
+                onlyIf { enabled && uploadEnabled }
 
                 doLast {
                     val versionName = project.readAppVersionName()
@@ -88,11 +100,21 @@ class TinaAndroidAppMappingPlugin : Plugin<Project> {
             }
 
             afterEvaluate {
+                val finalizers = buildList {
+                    if (backupEnabled) add("backupMappingFiles")
+                    if (uploadEnabled) add("uploadMappingFiles")
+                }
+                if (finalizers.isEmpty()) {
+                    logger.lifecycle(
+                        "tina.android.app.mapping: backup/upload finalizers disabled for release tasks.",
+                    )
+                    return@afterEvaluate
+                }
                 tasks.matching { it.name.matches(Regex("assemble.*Release")) }.configureEach {
-                    finalizedBy("backupMappingFiles", "uploadMappingFiles")
+                    finalizers.forEach { finalizedBy(it) }
                 }
                 tasks.matching { it.name.matches(Regex("bundle.*Release")) }.configureEach {
-                    finalizedBy("backupMappingFiles", "uploadMappingFiles")
+                    finalizers.forEach { finalizedBy(it) }
                 }
             }
         }

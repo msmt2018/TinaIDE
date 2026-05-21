@@ -451,6 +451,8 @@ kotlin {
 // `finalizedBy` 挂接逻辑已由 `tina.android.app.mapping` 插件统一注册
 // （见 build-logic/convention）。可通过以下 gradle 属性控制：
 // - `tina.releaseMapping.enabled`（默认 true）
-// - `tina.releaseMapping.serverUrl`（默认 https://tinaide.wuxianggujun.com）
+// - `tina.releaseMapping.backupEnabled`（默认 true）
+// - `tina.releaseMapping.uploadEnabled`（默认 false）
+// - `tina.releaseMapping.serverUrl`（显式启用上传时使用）
 // `checkNoAndroidUtilLog` 守卫任务与 `preBuild` 挂接已由
 // `tina.android.app.guardrails` 插件统一注册（见 build-logic/convention）。
