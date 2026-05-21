@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.network.ApiResult
 import com.wuxianggujun.tinaide.core.network.OkHttpClientProvider
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
+import com.wuxianggujun.tinaide.core.network.registry.RegistryUrl
 import com.wuxianggujun.tinaide.core.packages.model.DownloadInfo
 import com.wuxianggujun.tinaide.core.packages.model.DownloadSource
 import com.wuxianggujun.tinaide.core.packages.model.GUIPackage
@@ -25,12 +26,12 @@ import okhttp3.Request
 import timber.log.Timber
 
 class PackageApiClient private constructor(
-    private val indexUrl: String,
-    private val client: OkHttpClient,
+    private val indexUrls: List<RegistryUrl>,
+    private val indexClient: OkHttpClient,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
-    private var cachedIndex: PackageRegistryIndex? = null
+    private var cachedIndex: LoadedPackageRegistryIndex? = null
 
     companion object {
         private const val TAG = "PackageApiClient"
@@ -46,8 +47,8 @@ class PackageApiClient private constructor(
 
         private fun createInstance(): PackageApiClient {
             return PackageApiClient(
-                indexUrl = GitHubRegistryConfig.PACKAGES_INDEX_URL,
-                client = OkHttpClientProvider.default,
+                indexUrls = GitHubRegistryConfig.packageIndexUrls(),
+                indexClient = OkHttpClientProvider.probe,
             )
         }
 
@@ -104,14 +105,14 @@ class PackageApiClient private constructor(
 
     suspend fun getDownloadInfo(packageId: String, versionId: Int): ApiResult<DownloadInfo> = withIndex { index ->
         index.downloads["$packageId:$versionId"]
-            ?.withResolvedSources()
+            ?.withResolvedSources(index.baseUrl)
             ?: resolveDownloadInfo(packageId, versionId, index)
             ?: throw NoSuchElementException(
                 Strings.pkg_manager_error_download_info_not_found.str(packageId, versionId),
             )
     }
 
-    private suspend fun <T> withIndex(block: (PackageRegistryIndex) -> T): ApiResult<T> {
+    private suspend fun <T> withIndex(block: (LoadedPackageRegistryIndex) -> T): ApiResult<T> {
         return when (val result = loadIndex()) {
             is ApiResult.Success -> runCatching { ApiResult.Success(block(result.data)) }
                 .getOrElse { error -> ApiResult.Error(-1, error.message ?: Strings.error_unknown.str()) }
@@ -120,43 +121,56 @@ class PackageApiClient private constructor(
         }
     }
 
-    private suspend fun loadIndex(): ApiResult<PackageRegistryIndex> = withContext(Dispatchers.IO) {
+    private suspend fun loadIndex(): ApiResult<LoadedPackageRegistryIndex> = withContext(Dispatchers.IO) {
         cachedIndex?.let { return@withContext ApiResult.Success(it) }
         indexMutex.withLock {
             cachedIndex?.let { return@withLock ApiResult.Success(it) }
-            try {
-                val response = client.newCall(
-                    Request.Builder()
-                        .url(indexUrl)
-                        .get()
-                        .build()
-                ).execute()
-                response.use { resp ->
-                    val body = resp.body?.string()
-                    if (!resp.isSuccessful) {
-                        return@use ApiResult.Error(resp.code, "GitHub registry request failed: HTTP ${resp.code}")
+            var lastError: ApiResult<LoadedPackageRegistryIndex>? = null
+            for (registryUrl in indexUrls) {
+                try {
+                    val response = indexClient.newCall(
+                        Request.Builder()
+                            .url(registryUrl.url)
+                            .get()
+                            .build()
+                    ).execute()
+                    response.use { resp ->
+                        val body = resp.body?.string()
+                        if (!resp.isSuccessful) {
+                            lastError = ApiResult.Error(
+                                resp.code,
+                                "Registry request failed via ${registryUrl.endpoint.name}: HTTP ${resp.code}",
+                            )
+                            return@use
+                        }
+                        if (body.isNullOrBlank()) {
+                            lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
+                            return@use
+                        }
+                        val index = LoadedPackageRegistryIndex(
+                            index = json.decodeFromString<PackageRegistryIndex>(body),
+                            baseUrl = registryUrl.endpoint.baseUrl,
+                        )
+                        cachedIndex = index
+                        Timber.tag(TAG).i("Loaded package registry via %s", registryUrl.endpoint.name)
+                        return@withLock ApiResult.Success(index)
                     }
-                    if (body.isNullOrBlank()) {
-                        return@use ApiResult.Error(-1, Strings.error_response_empty.str())
-                    }
-                    val index = json.decodeFromString<PackageRegistryIndex>(body)
-                    cachedIndex = index
-                    ApiResult.Success(index)
+                } catch (e: IOException) {
+                    Timber.tag(TAG).w(e, "Load package registry failed via %s", registryUrl.endpoint.name)
+                    lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "Parse package registry failed via %s", registryUrl.endpoint.name)
+                    lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
                 }
-            } catch (e: IOException) {
-                Timber.tag(TAG).e(e, "Load package registry failed")
-                ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Parse package registry failed")
-                ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
             }
+            lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
         }
     }
 
     private fun resolveDownloadInfo(
         packageId: String,
         versionId: Int,
-        index: PackageRegistryIndex,
+        index: LoadedPackageRegistryIndex,
     ): DownloadInfo? {
         val versions = index.versions[packageId]
             ?: index.packages.firstOrNull { it.id == packageId }?.toVersions(packageId)
@@ -175,7 +189,7 @@ class PackageApiClient private constructor(
                 )
             )
             else -> emptyList()
-        }.map { it.copy(url = GitHubRegistryConfig.resolveRawUrl(it.url)) }
+        }.map { it.copy(url = GitHubRegistryConfig.resolveRawUrl(it.url, index.baseUrl)) }
 
         if (sources.isEmpty()) return null
 
@@ -260,10 +274,10 @@ class PackageApiClient private constructor(
         return linux.orEmpty() + android.orEmpty()
     }
 
-    private fun DownloadInfo.withResolvedSources(): DownloadInfo {
+    private fun DownloadInfo.withResolvedSources(baseUrl: String): DownloadInfo {
         return copy(
             sources = sources.map { source ->
-                source.copy(url = GitHubRegistryConfig.resolveRawUrl(source.url))
+                source.copy(url = GitHubRegistryConfig.resolveRawUrl(source.url, baseUrl))
             }
         )
     }
@@ -276,6 +290,20 @@ data class PackageRegistryIndex(
     val versions: Map<String, PackageVersionsResponse> = emptyMap(),
     val downloads: Map<String, DownloadInfo> = emptyMap(),
 )
+
+data class LoadedPackageRegistryIndex(
+    val index: PackageRegistryIndex,
+    val baseUrl: String,
+) {
+    val packages: List<GUIPackage>
+        get() = index.packages
+    val categories: List<PackageCategory>
+        get() = index.categories
+    val versions: Map<String, PackageVersionsResponse>
+        get() = index.versions
+    val downloads: Map<String, DownloadInfo>
+        get() = index.downloads
+}
 
 @Serializable
 data class PackageListResponse(

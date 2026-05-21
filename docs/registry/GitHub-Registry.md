@@ -1,6 +1,6 @@
 # TinaIDE GitHub Registry
 
-> 更新日期：2026-05-21
+> 更新日期：2026-05-22
 
 TinaIDE 开源版的插件市场与依赖包市场不再从 TinaServer 读取索引。
 客户端默认读取公开仓库：
@@ -9,7 +9,21 @@ TinaIDE 开源版的插件市场与依赖包市场不再从 TinaServer 读取索
 https://github.com/wuxianggujun/TinaIDE-Registry
 ```
 
-对应 raw 地址：
+客户端内置两个索引入口，按顺序自动尝试：
+
+```text
+https://cdn.jsdelivr.net/gh/wuxianggujun/TinaIDE-Registry@main
+https://raw.githubusercontent.com/wuxianggujun/TinaIDE-Registry/main
+```
+
+国内网络优先走 jsDelivr CDN；如果 CDN 不可用，再回退到 GitHub Raw。
+如果用户设备配置了系统代理，OkHttp 会继续按系统代理策略发起请求。
+
+不建议把插件/依赖索引托管在不可信的第三方 GitHub 加速代理上，因为索引会决定
+后续下载地址。需要更稳定的国内下载体验时，优先把具体包文件同步到你信任的
+CDN、对象存储或自建代理，并在索引里填写绝对 URL。
+
+GitHub Raw 兜底地址：
 
 ```text
 https://raw.githubusercontent.com/wuxianggujun/TinaIDE-Registry/main
@@ -27,7 +41,14 @@ packages/<package-id>/<version>/<file>.tar.xz
 `download_url` 和 `download_sources[].url` 支持两种写法：
 
 - 绝对 URL：客户端原样访问。
-- 相对路径：客户端会拼到 GitHub raw base 后面。
+- 相对路径：客户端会拼到本次成功加载索引的 Registry base 后面。
+  默认通常是 jsDelivr CDN，失败后才会是 GitHub Raw。
+
+国内网络建议：
+
+- 小文件、索引、示例插件可以继续使用相对路径，客户端会优先走 CDN。
+- 大文件、依赖包、运行时包建议填写你自己的 CDN/对象存储绝对 URL。
+- 不要把未校验的大文件只放在随机公开代理上；能填写 `sha256:` 时必须填写。
 
 ## 插件索引
 

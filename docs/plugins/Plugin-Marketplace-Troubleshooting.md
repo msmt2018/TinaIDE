@@ -8,7 +8,9 @@
 客户端侧排查时优先确认：
 
 1. 网络请求是否能访问 `wuxianggujun/TinaIDE-Registry` 的 `plugins/index.json`。
-2. 插件包的 `download_url` 是否能通过 GitHub raw 或绝对下载地址访问。
+   客户端会优先尝试 jsDelivr CDN，再回退到 GitHub Raw。
+2. 插件包的 `download_url` 是否能通过当前 Registry 入口或绝对下载地址访问。
+   国内网络建议把大文件放到可信 CDN、对象存储或自建代理，再在索引中填写绝对 URL。
 3. 本地插件缓存、下载历史和安装目录是否可读写。
 4. 开源版账号登录、第三方登录、激活码、会员和官方 AI 额度入口均为移除状态，
    不应再按旧商业版链路排查。
