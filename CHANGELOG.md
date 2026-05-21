@@ -37,6 +37,17 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.16.2] - 2026-05-21
+
+### Changed
+- 修正开源仓库 Release workflow：移除 Pro 仓库时代的跨仓库 dispatch 发布链路，公开仓库现在直接构建并发布自身产物。
+- Release 构建显式启用双 ABI：固定使用 `-Ptina.allAbi=true`，并强制校验 `arm64-v8a` 与 `x86_64` 两个 APK 都存在。
+- APK 与 GitHub Actions artifact 命名统一包含版本号和架构名：`TinaIDE-0.16.2-arm64-v8a.apk`、`TinaIDE-0.16.2-x86_64.apk`。
+
+### Verification
+- GitHub Actions `Build and Release` 手动 release 验证通过：run `26229851905`。
+- 产物确认：`TinaIDE-0.16.2-arm64-v8a-apk`、`TinaIDE-0.16.2-x86_64-apk`。
+
 ## [0.16.0] - 2026-05-21
 
 ### Changed
