@@ -37,6 +37,22 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.17.4] - 2026-05-25
+
+### Changed
+- SDL 图形运行配置继续收敛旧 `gui` 内部命名：运行配置字段改为 `sdlOrientation`，新写出的配置不再暴露旧的 `guiOrientation` 字段。
+- 运行配置弹窗、SDL Activity 启动参数、编译完成提示和多语言资源 key 统一改为 SDL 命名，降低用户误以为仍存在自研 GUI 绘制接口的可能性。
+- 游戏引擎插件文档改名为 `game-engine-plugin-sdl.md`，示例配置同步改为 `sdlOrientation`。
+
+### Fixed
+- 旧版 `run_configs.json` 中的 `guiOrientation` 仍可读取，并会在保存时迁移为 `sdlOrientation`，避免用户升级后丢失屏幕方向设置。
+
+### Verification
+- `git diff --check`
+- `.\gradlew.bat :core:compile:testDebugUnitTest --tests com.wuxianggujun.tinaide.core.compile.RunConfigurationManagerMigrationTest --no-daemon`
+- `.\gradlew.bat :app:compileArm64DebugKotlin --no-daemon`
+- GitHub Actions `Dev APK Build` 已通过：run `26366034612`。
+
 ## [0.17.3] - 2026-05-24
 
 ### Changed
