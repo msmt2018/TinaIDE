@@ -8,8 +8,8 @@ import com.wuxianggujun.tinaide.core.compile.artifact.JsonArtifactStore
 import com.wuxianggujun.tinaide.core.compile.event.BuildEventEmitter
 import com.wuxianggujun.tinaide.core.compile.event.SharedFlowBuildEventEmitter
 import com.wuxianggujun.tinaide.core.compile.launcher.DebugLauncher
-import com.wuxianggujun.tinaide.core.compile.launcher.GuiLauncher
 import com.wuxianggujun.tinaide.core.compile.launcher.NativeLauncher
+import com.wuxianggujun.tinaide.core.compile.launcher.SdlLauncher
 import com.wuxianggujun.tinaide.core.compile.launcher.TerminalLauncher
 import com.wuxianggujun.tinaide.core.compile.pipeline.BuildExecutor
 import com.wuxianggujun.tinaide.core.compile.pipeline.BuildContextFactory
@@ -81,7 +81,7 @@ val compileModule = module {
 
     // ---------- Launcher(P3 stub;P4 接入真实启动逻辑) ----------
     single { NativeLauncher() }
-    single { GuiLauncher() }
+    single { SdlLauncher() }
     single { DebugLauncher() }
     single { TerminalLauncher() }
 
@@ -93,7 +93,7 @@ val compileModule = module {
     factory {
         LaunchDispatcher(
             nativeLauncher = get(),
-            guiLauncher = get(),
+            sdlLauncher = get(),
             debugLauncher = get(),
             terminalLauncher = get(),
         )

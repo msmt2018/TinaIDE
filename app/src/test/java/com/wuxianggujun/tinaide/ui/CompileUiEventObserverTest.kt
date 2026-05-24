@@ -17,12 +17,12 @@ class CompileUiEventObserverTest {
     @Test
     fun `handleUiEvent delegates toast events`() = runTest {
         val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
-        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val sdlLauncher = mockk<CompileUiEventObserver.SdlLauncher>(relaxed = true)
         val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
         val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
         val observer = CompileUiEventObserver(
             toastPresenter = toastPresenter,
-            guiLauncher = guiLauncher,
+            sdlLauncher = sdlLauncher,
             terminalLauncher = terminalLauncher,
             projectTreeRevealer = projectTreeRevealer
         )
@@ -40,20 +40,20 @@ class CompileUiEventObserverTest {
     }
 
     @Test
-    fun `handleUiEvent delegates gui and terminal launch events`() = runTest {
+    fun `handleUiEvent delegates sdl and terminal launch events`() = runTest {
         val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
-        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val sdlLauncher = mockk<CompileUiEventObserver.SdlLauncher>(relaxed = true)
         val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
         val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
         val observer = CompileUiEventObserver(
             toastPresenter = toastPresenter,
-            guiLauncher = guiLauncher,
+            sdlLauncher = sdlLauncher,
             terminalLauncher = terminalLauncher,
             projectTreeRevealer = projectTreeRevealer
         )
 
         observer.handleUiEvent(
-            CompileActionsHelper.UiEvent.OpenGui(
+            CompileActionsHelper.UiEvent.OpenSdl(
                 libraryPath = "/tmp/libdemo.so",
                 environment = emptyMap(),
             )
@@ -66,7 +66,7 @@ class CompileUiEventObserverTest {
             )
         )
 
-        verify(exactly = 1) { guiLauncher.open("/tmp/libdemo.so", emptyMap()) }
+        verify(exactly = 1) { sdlLauncher.open("/tmp/libdemo.so", emptyMap()) }
         verify(exactly = 1) {
             terminalLauncher.open(
                 command = "cmake --build .",
@@ -79,12 +79,12 @@ class CompileUiEventObserverTest {
     @Test
     fun `handleUiEvent delegates reveal requests`() = runTest {
         val toastPresenter = mockk<CompileUiEventObserver.ToastPresenter>(relaxed = true)
-        val guiLauncher = mockk<CompileUiEventObserver.GuiLauncher>(relaxed = true)
+        val sdlLauncher = mockk<CompileUiEventObserver.SdlLauncher>(relaxed = true)
         val terminalLauncher = mockk<CompileUiEventObserver.TerminalLauncher>(relaxed = true)
         val projectTreeRevealer = mockk<CompileUiEventObserver.ProjectTreeRevealer>(relaxed = true)
         val observer = CompileUiEventObserver(
             toastPresenter = toastPresenter,
-            guiLauncher = guiLauncher,
+            sdlLauncher = sdlLauncher,
             terminalLauncher = terminalLauncher,
             projectTreeRevealer = projectTreeRevealer
         )

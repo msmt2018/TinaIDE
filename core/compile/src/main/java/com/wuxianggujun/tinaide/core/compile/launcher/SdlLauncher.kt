@@ -7,16 +7,16 @@ import com.wuxianggujun.tinaide.core.compile.event.BuildEventEmitter
 import com.wuxianggujun.tinaide.core.compile.strategy.BuildContext
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
-import timber.log.Timber
 import java.io.File
+import timber.log.Timber
 
 /**
  * Validates a `.so` artifact before the UI starts the SDL graphical runtime.
  */
-class GuiLauncher : Launcher {
+class SdlLauncher : Launcher {
 
     companion object {
-        private const val TAG = "GuiLauncher"
+        private const val TAG = "SdlLauncher"
     }
 
     override suspend fun launch(
@@ -37,6 +37,6 @@ class GuiLauncher : Launcher {
         }
         Timber.tag(TAG).d("SDL graphical launch prepared: %s", file.absolutePath)
         emitter.emit(BuildEvent.Launch.Completed)
-        return LaunchOutcome.Prepared(LaunchDescriptor.Gui(artifact = artifact, libraryPath = artifact.absolutePath))
+        return LaunchOutcome.Prepared(LaunchDescriptor.Sdl(artifact = artifact, libraryPath = artifact.absolutePath))
     }
 }

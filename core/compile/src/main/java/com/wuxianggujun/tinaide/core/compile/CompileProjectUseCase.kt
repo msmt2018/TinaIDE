@@ -154,7 +154,7 @@ class CompileProjectUseCase(
             val arguments: List<String> = emptyList(),
             val environment: Map<String, String> = emptyMap(),
         ) : LaunchSpec()
-        data class Gui(
+        data class Sdl(
             val libraryPath: String,
             val environment: Map<String, String> = emptyMap(),
         ) : LaunchSpec()
@@ -678,7 +678,7 @@ class CompileProjectUseCase(
             )
             LaunchSpec.Terminal(command, descriptor.outputPath)
         }
-        is LaunchDescriptor.Gui -> LaunchSpec.Gui(
+        is LaunchDescriptor.Sdl -> LaunchSpec.Sdl(
             libraryPath = descriptor.libraryPath,
             environment = launchEnvironment,
         )

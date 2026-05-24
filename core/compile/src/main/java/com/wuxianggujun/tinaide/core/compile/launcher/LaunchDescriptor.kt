@@ -19,7 +19,7 @@ sealed interface LaunchDescriptor {
     ) : LaunchDescriptor
 
     /** SDL 图形运行时加载 .so 运行。 */
-    data class Gui(
+    data class Sdl(
         override val artifact: Artifact,
         val libraryPath: String,
     ) : LaunchDescriptor

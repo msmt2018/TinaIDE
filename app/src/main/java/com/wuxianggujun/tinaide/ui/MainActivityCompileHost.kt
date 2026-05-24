@@ -57,7 +57,7 @@ internal fun createMainActivityCompileHost(
             onError = onToastError,
             onInfo = onToastInfo,
         ),
-        guiLauncher = ContextCompileGuiLauncher(
+        sdlLauncher = ContextCompileSdlLauncher(
             context = activity,
             runConfigurationProvider = { compilerViewModel.getRunConfigurationManager().selectedConfig },
             onError = onToastError,

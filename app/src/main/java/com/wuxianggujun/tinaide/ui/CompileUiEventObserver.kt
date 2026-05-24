@@ -14,7 +14,7 @@ import java.io.File
 
 class CompileUiEventObserver(
     private val toastPresenter: ToastPresenter,
-    private val guiLauncher: GuiLauncher,
+    private val sdlLauncher: SdlLauncher,
     private val terminalLauncher: TerminalLauncher,
     private val projectTreeRevealer: ProjectTreeRevealer,
 ) {
@@ -22,7 +22,7 @@ class CompileUiEventObserver(
         fun show(message: String, type: CompileActionsHelper.ToastType)
     }
 
-    fun interface GuiLauncher {
+    fun interface SdlLauncher {
         fun open(libraryPath: String, environment: Map<String, String>)
     }
 
@@ -40,8 +40,8 @@ class CompileUiEventObserver(
                 toastPresenter.show(event.message, event.type)
             }
 
-            is CompileActionsHelper.UiEvent.OpenGui -> {
-                guiLauncher.open(event.libraryPath, event.environment)
+            is CompileActionsHelper.UiEvent.OpenSdl -> {
+                sdlLauncher.open(event.libraryPath, event.environment)
             }
 
             is CompileActionsHelper.UiEvent.OpenTerminal -> {
@@ -88,12 +88,12 @@ class ContextCompileTerminalLauncher(
     }
 }
 
-class ContextCompileGuiLauncher(
+class ContextCompileSdlLauncher(
     private val context: Context,
     private val runConfigurationProvider: () -> RunConfiguration,
     private val onError: (String) -> Unit,
     private val activityStarter: (Intent) -> Unit = { intent -> context.startActivity(intent) },
-) : CompileUiEventObserver.GuiLauncher {
+) : CompileUiEventObserver.SdlLauncher {
     override fun open(libraryPath: String, environment: Map<String, String>) {
         val normalizedLibraryPath = libraryPath.trim()
         validateSharedLibraryPath(normalizedLibraryPath)?.let { message ->

@@ -64,7 +64,7 @@ class CompileActionsHelper(
     sealed class UiEvent {
         data class ShowToast(val message: String, val type: ToastType) : UiEvent()
         data class OpenTerminal(val command: String, val workDir: String?, val backend: TerminalBackend = TerminalBackend.HOST) : UiEvent()
-        data class OpenGui(
+        data class OpenSdl(
             val libraryPath: String,
             val environment: Map<String, String> = emptyMap(),
         ) : UiEvent()
@@ -315,7 +315,7 @@ class CompileActionsHelper(
 
     private fun handleRunLikeSuccess(report: CompileProjectUseCase.Report) {
         when (val launch = report.launch) {
-            is CompileProjectUseCase.LaunchSpec.Gui -> handleGuiLaunchSuccess(launch)
+            is CompileProjectUseCase.LaunchSpec.Sdl -> handleSdlLaunchSuccess(launch)
             is CompileProjectUseCase.LaunchSpec.PluginInstalled -> handlePluginInstallSuccess(launch)
             is CompileProjectUseCase.LaunchSpec.Terminal -> {
                 handleTerminalLaunchSuccess(launch, report.artifact)
@@ -330,10 +330,10 @@ class CompileActionsHelper(
         }
     }
 
-    private fun handleGuiLaunchSuccess(launch: CompileProjectUseCase.LaunchSpec.Gui) {
+    private fun handleSdlLaunchSuccess(launch: CompileProjectUseCase.LaunchSpec.Sdl) {
         emitToast(Strings.toast_compile_done_opening_gui.strOr(context), ToastType.SUCCESS)
         _uiEvents.tryEmit(
-            UiEvent.OpenGui(
+            UiEvent.OpenSdl(
                 libraryPath = launch.libraryPath,
                 environment = launch.environment,
             )

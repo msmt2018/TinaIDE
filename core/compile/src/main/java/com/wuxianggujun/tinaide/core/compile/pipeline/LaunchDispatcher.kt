@@ -7,9 +7,9 @@ import com.wuxianggujun.tinaide.core.compile.event.BuildEvent
 import com.wuxianggujun.tinaide.core.compile.event.BuildEventEmitter
 import com.wuxianggujun.tinaide.core.compile.event.BuildReport
 import com.wuxianggujun.tinaide.core.compile.launcher.DebugLauncher
-import com.wuxianggujun.tinaide.core.compile.launcher.GuiLauncher
 import com.wuxianggujun.tinaide.core.compile.launcher.LaunchOutcome
 import com.wuxianggujun.tinaide.core.compile.launcher.NativeLauncher
+import com.wuxianggujun.tinaide.core.compile.launcher.SdlLauncher
 import com.wuxianggujun.tinaide.core.compile.launcher.TerminalLauncher
 import com.wuxianggujun.tinaide.core.compile.strategy.BuildContext
 
@@ -23,7 +23,7 @@ import com.wuxianggujun.tinaide.core.compile.strategy.BuildContext
  */
 class LaunchDispatcher(
     private val nativeLauncher: NativeLauncher,
-    private val guiLauncher: GuiLauncher,
+    private val sdlLauncher: SdlLauncher,
     private val debugLauncher: DebugLauncher,
     private val terminalLauncher: TerminalLauncher,
 ) {
@@ -43,8 +43,8 @@ class LaunchDispatcher(
         val outcome: LaunchOutcome = when (intent) {
             is LaunchIntent.Run -> when (intent.outputMode) {
                 OutputMode.TERMINAL -> terminalLauncher.launch(artifact, ctx, emitter)
-                OutputMode.SDL -> guiLauncher.launch(artifact, ctx, emitter)
-                OutputMode.GUI -> guiLauncher.launch(artifact, ctx, emitter)
+                OutputMode.SDL -> sdlLauncher.launch(artifact, ctx, emitter)
+                OutputMode.GUI -> sdlLauncher.launch(artifact, ctx, emitter)
                 OutputMode.LOG -> nativeLauncher.launch(artifact, ctx, emitter)
             }
             LaunchIntent.Debug -> debugLauncher.launch(artifact, ctx, emitter)
