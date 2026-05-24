@@ -34,10 +34,10 @@ import com.wuxianggujun.tinaide.core.compile.BuildSystem
 import com.wuxianggujun.tinaide.core.compile.BuildType
 import com.wuxianggujun.tinaide.core.compile.BuildVariables
 import com.wuxianggujun.tinaide.core.compile.CompilerType
-import com.wuxianggujun.tinaide.core.compile.GuiOrientation
 import com.wuxianggujun.tinaide.core.compile.OutputMode
 import com.wuxianggujun.tinaide.core.compile.RunConfiguration
 import com.wuxianggujun.tinaide.core.compile.RunConfigurationManager
+import com.wuxianggujun.tinaide.core.compile.SdlOrientation
 import com.wuxianggujun.tinaide.core.compile.SourceFileMode
 import com.wuxianggujun.tinaide.core.compile.TargetInfo
 import com.wuxianggujun.tinaide.core.i18n.Strings
@@ -187,7 +187,7 @@ fun RunConfigDialog(
         RunConfiguration.parseSingleFileCppStandard(singleFileCppStandard)
     }
     var singleFileCppStandardDropdownExpanded by remember { mutableStateOf(false) }
-    var guiOrientation by remember { mutableStateOf(config.guiOrientation) }
+    var sdlOrientation by remember { mutableStateOf(config.sdlOrientation) }
     var enableFloatingLog by remember { mutableStateOf(config.enableFloatingLog) }
     var showVariablesHelp by remember { mutableStateOf(false) }
 
@@ -201,7 +201,7 @@ fun RunConfigDialog(
         }
     }
     val defaultTargetDescriptionRes = if (outputMode.isSdlGraphical()) {
-        Strings.run_config_build_target_desc_gui
+        Strings.run_config_build_target_desc_sdl
     } else {
         Strings.run_config_build_target_desc
     }
@@ -278,7 +278,7 @@ fun RunConfigDialog(
                                     sysrootApiLevel = parsedSysrootApiLevel,
                                     singleFileCppStandard = RunConfiguration
                                         .normalizeSingleFileCppStandard(singleFileCppStandard),
-                                    guiOrientation = guiOrientation,
+                                    sdlOrientation = sdlOrientation,
                                     enableFloatingLog = enableFloatingLog
                                 )
                             )
@@ -909,39 +909,39 @@ fun RunConfigDialog(
                 RunConfigOptionRow(
                     selected = outputMode.isSdlGraphical(),
                     onClick = { outputMode = OutputMode.SDL },
-                    title = stringResource(Strings.run_config_output_gui),
-                    description = stringResource(Strings.run_config_output_gui_desc)
+                    title = stringResource(Strings.run_config_output_sdl),
+                    description = stringResource(Strings.run_config_output_sdl_desc)
                 )
             }
 
             // SDL 图形运行选项（仅在 SDL 图形运行下显示）
             if (outputMode.isSdlGraphical()) {
                 RunConfigSectionCard(
-                    title = stringResource(Strings.run_config_gui_options)
+                    title = stringResource(Strings.run_config_sdl_options)
                 ) {
                     Text(
-                        text = stringResource(Strings.run_config_gui_orientation),
+                        text = stringResource(Strings.run_config_sdl_orientation),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
 
                     RunConfigOptionRow(
-                        selected = guiOrientation == GuiOrientation.AUTO,
-                        onClick = { guiOrientation = GuiOrientation.AUTO },
-                        title = stringResource(Strings.run_config_gui_orientation_auto),
-                        description = stringResource(Strings.run_config_gui_orientation_auto_desc)
+                        selected = sdlOrientation == SdlOrientation.AUTO,
+                        onClick = { sdlOrientation = SdlOrientation.AUTO },
+                        title = stringResource(Strings.run_config_sdl_orientation_auto),
+                        description = stringResource(Strings.run_config_sdl_orientation_auto_desc)
                     )
                     RunConfigOptionRow(
-                        selected = guiOrientation == GuiOrientation.LANDSCAPE,
-                        onClick = { guiOrientation = GuiOrientation.LANDSCAPE },
-                        title = stringResource(Strings.run_config_gui_orientation_landscape),
-                        description = stringResource(Strings.run_config_gui_orientation_landscape_desc)
+                        selected = sdlOrientation == SdlOrientation.LANDSCAPE,
+                        onClick = { sdlOrientation = SdlOrientation.LANDSCAPE },
+                        title = stringResource(Strings.run_config_sdl_orientation_landscape),
+                        description = stringResource(Strings.run_config_sdl_orientation_landscape_desc)
                     )
                     RunConfigOptionRow(
-                        selected = guiOrientation == GuiOrientation.PORTRAIT,
-                        onClick = { guiOrientation = GuiOrientation.PORTRAIT },
-                        title = stringResource(Strings.run_config_gui_orientation_portrait),
-                        description = stringResource(Strings.run_config_gui_orientation_portrait_desc)
+                        selected = sdlOrientation == SdlOrientation.PORTRAIT,
+                        onClick = { sdlOrientation = SdlOrientation.PORTRAIT },
+                        title = stringResource(Strings.run_config_sdl_orientation_portrait),
+                        description = stringResource(Strings.run_config_sdl_orientation_portrait_desc)
                     )
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -949,8 +949,8 @@ fun RunConfigDialog(
                     RunConfigSwitchRow(
                         checked = enableFloatingLog,
                         onCheckedChange = { enableFloatingLog = it },
-                        title = stringResource(Strings.run_config_gui_floating_log),
-                        description = stringResource(Strings.run_config_gui_floating_log_desc)
+                        title = stringResource(Strings.run_config_sdl_floating_log),
+                        description = stringResource(Strings.run_config_sdl_floating_log_desc)
                     )
                 }
             }

@@ -156,7 +156,7 @@ class ContextCompileSdlLauncher(
                     mainLibraryPath = staged.runtime.mainLibraryPath,
                     requiredSdlMajor = runtime.spec.requiredSdlMajor,
                     preloadLibraryPaths = staged.runtime.preloadLibraryPaths,
-                    guiOrientation = runConfig.guiOrientation,
+                    sdlOrientation = runConfig.sdlOrientation,
                     enableFloatingLog = runConfig.enableFloatingLog,
                     launchEnvironment = launchEnvironment,
                 )

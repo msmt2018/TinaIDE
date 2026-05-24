@@ -22,7 +22,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.wuxianggujun.tinaide.MainActivity
-import com.wuxianggujun.tinaide.core.compile.GuiOrientation
+import com.wuxianggujun.tinaide.core.compile.SdlOrientation
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.ui.compose.components.FloatingOverlay
@@ -65,8 +65,9 @@ class ExternalSdlActivity :
         const val EXTRA_MAIN_LIBRARY_PATH = "extra_main_library_path"
         const val EXTRA_REQUIRED_SDL_MAJOR = "extra_required_sdl_major"
         const val EXTRA_PRELOAD_LIBRARY_PATHS = "extra_preload_library_paths"
-        const val EXTRA_GUI_ORIENTATION = "extra_gui_orientation"
+        const val EXTRA_SDL_ORIENTATION = "extra_sdl_orientation"
         const val EXTRA_ENABLE_FLOATING_LOG = "extra_enable_floating_log"
+        private const val EXTRA_LEGACY_GUI_ORIENTATION = "extra_gui_orientation"
 
         fun createIntent(
             context: Context,
@@ -74,7 +75,7 @@ class ExternalSdlActivity :
             mainLibraryPath: String,
             requiredSdlMajor: Int,
             preloadLibraryPaths: List<String>,
-            guiOrientation: GuiOrientation = GuiOrientation.AUTO,
+            sdlOrientation: SdlOrientation = SdlOrientation.AUTO,
             enableFloatingLog: Boolean = false,
             launchEnvironment: Map<String, String> = emptyMap(),
         ): Intent = Intent(context, ExternalSdlActivity::class.java).apply {
@@ -85,7 +86,7 @@ class ExternalSdlActivity :
                 EXTRA_PRELOAD_LIBRARY_PATHS,
                 ArrayList(preloadLibraryPaths)
             )
-            putExtra(EXTRA_GUI_ORIENTATION, guiOrientation.name)
+            putExtra(EXTRA_SDL_ORIENTATION, sdlOrientation.name)
             putExtra(EXTRA_ENABLE_FLOATING_LOG, enableFloatingLog)
             NativeLaunchEnvironment.putIntoIntent(
                 this,
@@ -109,7 +110,7 @@ class ExternalSdlActivity :
     private var requiredSdlMajor: Int = 0
     private var preloadLibraryPaths: List<String> = emptyList()
 
-    private var userOrientation: GuiOrientation = GuiOrientation.AUTO
+    private var userOrientation: SdlOrientation = SdlOrientation.AUTO
     private var enableFloatingLog: Boolean = false
     private var launchEnvironmentOwnerId: String? = null
     private var lastBackPressTime: Long = 0L
@@ -144,10 +145,11 @@ class ExternalSdlActivity :
             ?.distinct()
             .orEmpty()
 
-        val orientationName = intent.getStringExtra(EXTRA_GUI_ORIENTATION)
+        val orientationName = intent.getStringExtra(EXTRA_SDL_ORIENTATION)
+            ?: intent.getStringExtra(EXTRA_LEGACY_GUI_ORIENTATION)
         userOrientation = orientationName?.let {
-            runCatching { GuiOrientation.valueOf(it) }.getOrDefault(GuiOrientation.AUTO)
-        } ?: GuiOrientation.AUTO
+            runCatching { SdlOrientation.valueOf(it) }.getOrDefault(SdlOrientation.AUTO)
+        } ?: SdlOrientation.AUTO
         enableFloatingLog = intent.getBooleanExtra(EXTRA_ENABLE_FLOATING_LOG, false)
 
         val validationError = validateLaunchParams()
@@ -164,7 +166,7 @@ class ExternalSdlActivity :
         )
         // 运行时成功启动后，任何正常 finish 都应回到 MainActivity，而不是回到启动器。
         returnToParentOnFinish = true
-        applyGuiOrientation()
+        applySdlOrientation()
 
         super.onCreate(savedInstanceState)
 
@@ -238,7 +240,7 @@ class ExternalSdlActivity :
      * 这里直接忽略 SDL 的请求，保留用户的选择。
      */
     override fun setOrientationBis(w: Int, h: Int, resizable: Boolean, hint: String?) {
-        if (userOrientation != GuiOrientation.AUTO) {
+        if (userOrientation != SdlOrientation.AUTO) {
             Timber.tag(TAG).d(
                 "Ignoring SDL setOrientationBis(w=%d, h=%d) — user forced %s",
                 w,
@@ -378,14 +380,14 @@ class ExternalSdlActivity :
         }
     }
 
-    private fun applyGuiOrientation() {
+    private fun applySdlOrientation() {
         requestedOrientation = when (userOrientation) {
-            GuiOrientation.AUTO -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-            GuiOrientation.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            GuiOrientation.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            SdlOrientation.AUTO -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            SdlOrientation.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            SdlOrientation.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
         Timber.tag(TAG).d(
-            "GUI orientation: %s -> requestedOrientation=%d",
+            "SDL orientation: %s -> requestedOrientation=%d",
             userOrientation,
             requestedOrientation
         )

@@ -1,9 +1,6 @@
 package com.wuxianggujun.tinaide.core.compile
 
-import kotlinx.serialization.Serializable
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
@@ -14,6 +11,11 @@ import java.io.File
 import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonNames
 import timber.log.Timber
 
 private const val RUN_CONFIG_SCHEMA_LEGACY = 1
@@ -116,7 +118,9 @@ data class RunConfiguration(
     /**
      * SDL 图形运行的屏幕方向（仅 outputMode == SDL 时生效）。
      */
-    val guiOrientation: GuiOrientation = GuiOrientation.AUTO,
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonNames("guiOrientation")
+    val sdlOrientation: SdlOrientation = SdlOrientation.AUTO,
 
     /**
      * 是否在 SDL 图形运行下显示悬浮日志窗口（仅 outputMode == SDL 时生效）。
@@ -245,8 +249,8 @@ data class RunConfiguration(
         return when (outputMode) {
             OutputMode.LOG -> Strings.run_config_output_build_log.str()
             OutputMode.TERMINAL -> Strings.run_config_output_terminal.str()
-            OutputMode.SDL -> Strings.run_config_output_gui.str()
-            OutputMode.GUI -> Strings.run_config_output_gui.str()
+            OutputMode.SDL -> Strings.run_config_output_sdl.str()
+            OutputMode.GUI -> Strings.run_config_output_sdl.str()
         }
     }
     
@@ -311,6 +315,7 @@ data class RunConfigurationManager(
         private const val TAG = "RunConfigManager"
         private const val CONFIG_FILE = ".tinaide/run_configs.json"
         private val SCHEMA_VERSION_FIELD_REGEX = Regex("\"schemaVersion\"\\s*:")
+        private val LEGACY_GUI_ORIENTATION_FIELD_REGEX = Regex("\"guiOrientation\"\\s*:")
         private const val MAX_PENDING_MIGRATION_NOTICES_PER_PROJECT = 16
         private val migrationNoticeBuffer =
             ConcurrentHashMap<String, ArrayDeque<MigrationNotice>>()
@@ -335,6 +340,8 @@ data class RunConfigurationManager(
             return try {
                 if (configFile.exists()) {
                     val rawJson = configFile.readText()
+                    val hasLegacyGuiOrientationField =
+                        LEGACY_GUI_ORIENTATION_FIELD_REGEX.containsMatchIn(rawJson)
                     val rawManager = decodeManagerWithSchemaCompatibility(rawJson)
 
                     val validConfigs = rawManager.configurations.filter { config ->
@@ -371,6 +378,7 @@ data class RunConfigurationManager(
                         val changed = filteredInvalidConfigs ||
                             schemaMigrated ||
                             configMigrated ||
+                            hasLegacyGuiOrientationField ||
                             selectedIdAdjusted
                         if (changed) {
                             if (filteredInvalidConfigs) {
@@ -673,7 +681,7 @@ enum class OutputMode {
  * 图形运行时屏幕方向
  */
 @Serializable
-enum class GuiOrientation {
+enum class SdlOrientation {
     /** 跟随系统自动旋转 */
     AUTO,
     /** 强制横屏 */

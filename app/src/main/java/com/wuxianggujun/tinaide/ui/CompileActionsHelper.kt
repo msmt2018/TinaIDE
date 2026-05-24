@@ -331,7 +331,7 @@ class CompileActionsHelper(
     }
 
     private fun handleSdlLaunchSuccess(launch: CompileProjectUseCase.LaunchSpec.Sdl) {
-        emitToast(Strings.toast_compile_done_opening_gui.strOr(context), ToastType.SUCCESS)
+        emitToast(Strings.toast_compile_done_opening_sdl.strOr(context), ToastType.SUCCESS)
         _uiEvents.tryEmit(
             UiEvent.OpenSdl(
                 libraryPath = launch.libraryPath,

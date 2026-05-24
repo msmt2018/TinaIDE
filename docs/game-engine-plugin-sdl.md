@@ -75,7 +75,7 @@ friend-engine-sdl3.zip
 - `SdlRuntimeResolver`
 - `SdlRuntimeLibraryStager`
 - `CompileUiEventObserver`
-- `GuiLauncher`
+- `SdlLauncher`
 
 运行前 TinaIDE 会检查构建产物：
 
@@ -113,7 +113,7 @@ target_link_libraries(friend_engine_game PRIVATE SDL3::SDL3)
       "name": "SDL3 Debug",
       "outputMode": "SDL",
       "targetName": "friend_engine_game",
-      "guiOrientation": "LANDSCAPE",
+      "sdlOrientation": "LANDSCAPE",
       "enableFloatingLog": true
     }
   ]

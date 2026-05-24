@@ -1938,21 +1938,21 @@
   <string name="run_config_output_build_log_desc">输出显示在底部面板的构建日志中</string>
   <string name="run_config_output_terminal">终端</string>
   <string name="run_config_output_terminal_desc">在独立终端中运行，支持交互输入</string>
-  <string name="run_config_output_gui">SDL 图形运行</string>
-  <string name="run_config_output_gui_desc">在 SDL 图形运行时中启动（输出需为 .so）</string>
+  <string name="run_config_output_sdl">SDL 图形运行</string>
+  <string name="run_config_output_sdl_desc">在 SDL 图形运行时中启动（输出需为 .so）</string>
 
   <!-- SDL 图形运行选项 -->
-  <string name="run_config_gui_options">SDL 图形运行选项</string>
-  <string name="run_config_gui_orientation">屏幕方向</string>
-  <string name="run_config_gui_orientation_auto">自动旋转</string>
-  <string name="run_config_gui_orientation_auto_desc">跟随系统自动旋转设置</string>
-  <string name="run_config_gui_orientation_landscape">横屏</string>
-  <string name="run_config_gui_orientation_landscape_desc">强制横屏显示，适合大多数游戏和图形程序</string>
-  <string name="run_config_gui_orientation_portrait">竖屏</string>
-  <string name="run_config_gui_orientation_portrait_desc">强制竖屏显示</string>
-  <string name="run_config_gui_floating_log">悬浮日志窗口</string>
-  <string name="run_config_gui_floating_log_desc">在 SDL 图形全屏运行时显示可拖拽的实时日志窗口，方便查看 stdout/stderr 输出</string>
-  <string name="run_config_gui_floating_log_not_ready">悬浮日志功能开发中，敬请期待</string>
+  <string name="run_config_sdl_options">SDL 图形运行选项</string>
+  <string name="run_config_sdl_orientation">屏幕方向</string>
+  <string name="run_config_sdl_orientation_auto">自动旋转</string>
+  <string name="run_config_sdl_orientation_auto_desc">跟随系统自动旋转设置</string>
+  <string name="run_config_sdl_orientation_landscape">横屏</string>
+  <string name="run_config_sdl_orientation_landscape_desc">强制横屏显示，适合大多数游戏和图形程序</string>
+  <string name="run_config_sdl_orientation_portrait">竖屏</string>
+  <string name="run_config_sdl_orientation_portrait_desc">强制竖屏显示</string>
+  <string name="run_config_sdl_floating_log">悬浮日志窗口</string>
+  <string name="run_config_sdl_floating_log_desc">在 SDL 图形全屏运行时显示可拖拽的实时日志窗口，方便查看 stdout/stderr 输出</string>
+  <string name="run_config_sdl_floating_log_not_ready">悬浮日志功能开发中，敬请期待</string>
 
   <!-- 悬浮覆盖层 -->
   <string name="floating_overlay_exit">退出</string>
@@ -2668,7 +2668,7 @@
   <string name="toast_compile_done_starting_debug">编译完成，正在启动调试...</string>
   <string name="toast_terminal_run_failed">终端运行失败：未获取到运行命令</string>
   <string name="toast_compile_done_opening_terminal">编译完成，正在打开终端...</string>
-  <string name="toast_compile_done_opening_gui">编译完成，正在打开 SDL 图形运行...</string>
+  <string name="toast_compile_done_opening_sdl">编译完成，正在打开 SDL 图形运行...</string>
   <string name="toast_project_config_migrated">检测到旧版配置，已自动迁移（project.json %1$d 项，run_configs.json %2$d 项）</string>
   <string name="toast_compile_done_artifact_exported">编译完成，已导出构建产物</string>
   <string name="toast_compile_done_no_runnable_output">构建完成：当前项目没有可直接运行的产物，已导出到构建产物</string>
@@ -3701,7 +3701,7 @@ kept=%3$d bytes
   <string name="run_config_default_target">默认目标</string>
   <string name="run_config_build_target">构建目标</string>
   <string name="run_config_build_target_desc">使用 CMakeLists.txt 中的第一个可执行目标</string>
-  <string name="run_config_build_target_desc_gui">使用 CMakeLists.txt 中的第一个共享库目标（.so）</string>
+  <string name="run_config_build_target_desc_sdl">使用 CMakeLists.txt 中的第一个共享库目标（.so）</string>
   <string name="run_config_source_files_count">%1$d 个源文件</string>
   <string name="run_config_source_file_selection">源文件选择</string>
   <string name="run_config_auto_detect">自动检测</string>
@@ -4476,9 +4476,9 @@ kept=%3$d bytes
   <string name="compile_plugin_project_diagnostic_info">提示: %1$s</string>
   <string name="compile_plugin_project_diagnostic_fix">修复建议: %1$s</string>
   <string name="compile_terminal_no_executable">echo \'未找到可执行文件\'</string>
-  <string name="compile_gui_error_no_output">SDL 图形运行未找到可运行的共享库产物（.so），请检查目标类型与构建配置。</string>
-  <string name="compile_gui_error_invalid_output">SDL 图形运行要求输出为 .so，当前产物：%1$s</string>
-  <string name="compile_gui_ready">===SDL 图形运行准备完成：%1$s===</string>
+  <string name="compile_sdl_error_no_output">SDL 图形运行未找到可运行的共享库产物（.so），请检查目标类型与构建配置。</string>
+  <string name="compile_sdl_error_invalid_output">SDL 图形运行要求输出为 .so，当前产物：%1$s</string>
+  <string name="compile_sdl_ready">===SDL 图形运行准备完成：%1$s===</string>
   <string name="compile_exception">编译异常: %1$s</string>
   <string name="compile_error_exception">编译异常: %1$s</string>
 

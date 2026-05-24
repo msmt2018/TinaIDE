@@ -202,6 +202,40 @@ class RunConfigurationManagerMigrationTest {
         }
     }
 
+    @Test
+    fun `load migrates legacy gui orientation field to sdl orientation`() {
+        val projectRoot = createTempProjectRoot()
+        try {
+            writeRunConfig(
+                projectRoot,
+                """
+                {
+                  "schemaVersion": 3,
+                  "configurations": [
+                    {
+                      "id": "cfg-sdl",
+                      "name": "SDL Debug",
+                      "outputMode": "SDL",
+                      "guiOrientation": "LANDSCAPE"
+                    }
+                  ],
+                  "selectedId": "cfg-sdl"
+                }
+                """.trimIndent()
+            )
+
+            val manager = RunConfigurationManager.load(projectRoot.absolutePath)
+
+            assertThat(manager.selectedConfig.sdlOrientation).isEqualTo(SdlOrientation.LANDSCAPE)
+
+            val persisted = readRunConfig(projectRoot)
+            assertThat(persisted).contains("\"sdlOrientation\": \"LANDSCAPE\"")
+            assertThat(persisted).doesNotContain("\"guiOrientation\"")
+        } finally {
+            projectRoot.deleteRecursively()
+        }
+    }
+
     private fun createTempProjectRoot(): File {
         return Files.createTempDirectory("run-config-migration-test").toFile()
     }

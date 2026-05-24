@@ -1826,7 +1826,7 @@
   <string name="toast_compile_done_starting_debug">Compilation complete, starting debug...</string>
   <string name="toast_terminal_run_failed">Terminal run failed: command not found</string>
   <string name="toast_compile_done_opening_terminal">Compilation complete, opening terminal...</string>
-  <string name="toast_compile_done_opening_gui">Compilation complete, opening SDL graphical runtime...</string>
+  <string name="toast_compile_done_opening_sdl">Compilation complete, opening SDL graphical runtime...</string>
   <string name="toast_project_config_migrated">Legacy configuration detected and migrated automatically (project.json %1$d item(s), run_configs.json %2$d item(s))</string>
   <string name="toast_compile_done_artifact_exported">Compilation complete, build artifact exported</string>
   <string name="toast_compile_done_no_runnable_output">Build complete: this project has no directly runnable output, and the artifact was exported</string>
@@ -2284,7 +2284,7 @@ kept=%3$d bytes
   <string name="run_config_default_target">Default Target</string>
   <string name="run_config_build_target">Build Target</string>
   <string name="run_config_build_target_desc">Use the first executable target in CMakeLists.txt</string>
-  <string name="run_config_build_target_desc_gui">Use the first shared library target (.so) in CMakeLists.txt</string>
+  <string name="run_config_build_target_desc_sdl">Use the first shared library target (.so) in CMakeLists.txt</string>
   <string name="run_config_source_files_count">%1$d source files</string>
   <string name="run_config_source_file_selection">Source File Selection</string>
   <string name="run_config_auto_detect">Auto Detect</string>
@@ -3041,9 +3041,9 @@ kept=%3$d bytes
   <string name="compile_source_file_mode">Source file mode: %1$s</string>
   <string name="compile_start">=== Compilation started ===</string>
   <string name="compile_terminal_no_executable">echo \'No executable file found\'</string>
-  <string name="compile_gui_error_no_output">SDL graphical runtime could not find a runnable shared library output (.so). Please check your target type and build settings.</string>
-  <string name="compile_gui_error_invalid_output">SDL graphical runtime requires a .so output, current artifact: %1$s</string>
-  <string name="compile_gui_ready">=== SDL graphical runtime ready: %1$s ===</string>
+  <string name="compile_sdl_error_no_output">SDL graphical runtime could not find a runnable shared library output (.so). Please check your target type and build settings.</string>
+  <string name="compile_sdl_error_invalid_output">SDL graphical runtime requires a .so output, current artifact: %1$s</string>
+  <string name="compile_sdl_ready">=== SDL graphical runtime ready: %1$s ===</string>
   <string name="compile_terminal_ready">=== Terminal run ready ===</string>
   <string name="compile_toolchain_install_failed">Toolchain auto-install failed</string>
   <string name="compile_toolchain_install_hint">Hint: please check your network connection, or install the toolchain manually in Settings</string>
@@ -4046,21 +4046,21 @@ kept=%3$d bytes
   <string name="run_config_output_mode">Output mode</string>
   <string name="run_config_output_terminal">Terminal</string>
   <string name="run_config_output_terminal_desc">Run in a separate terminal, supports interactive input</string>
-  <string name="run_config_output_gui">SDL Graphical Runtime</string>
-  <string name="run_config_output_gui_desc">Run in the SDL graphical runtime (output must be .so)</string>
+  <string name="run_config_output_sdl">SDL Graphical Runtime</string>
+  <string name="run_config_output_sdl_desc">Run in the SDL graphical runtime (output must be .so)</string>
 
   <!-- SDL graphical runtime options -->
-  <string name="run_config_gui_options">SDL Graphical Runtime Options</string>
-  <string name="run_config_gui_orientation">Screen Orientation</string>
-  <string name="run_config_gui_orientation_auto">Auto Rotate</string>
-  <string name="run_config_gui_orientation_auto_desc">Follow system auto-rotation setting</string>
-  <string name="run_config_gui_orientation_landscape">Landscape</string>
-  <string name="run_config_gui_orientation_landscape_desc">Force landscape mode, ideal for most games and graphics programs</string>
-  <string name="run_config_gui_orientation_portrait">Portrait</string>
-  <string name="run_config_gui_orientation_portrait_desc">Force portrait mode</string>
-  <string name="run_config_gui_floating_log">Floating Log Window</string>
-  <string name="run_config_gui_floating_log_desc">Show a draggable real-time log window during fullscreen SDL graphical runtime for stdout/stderr output</string>
-  <string name="run_config_gui_floating_log_not_ready">Floating log feature is under development, stay tuned</string>
+  <string name="run_config_sdl_options">SDL Graphical Runtime Options</string>
+  <string name="run_config_sdl_orientation">Screen Orientation</string>
+  <string name="run_config_sdl_orientation_auto">Auto Rotate</string>
+  <string name="run_config_sdl_orientation_auto_desc">Follow system auto-rotation setting</string>
+  <string name="run_config_sdl_orientation_landscape">Landscape</string>
+  <string name="run_config_sdl_orientation_landscape_desc">Force landscape mode, ideal for most games and graphics programs</string>
+  <string name="run_config_sdl_orientation_portrait">Portrait</string>
+  <string name="run_config_sdl_orientation_portrait_desc">Force portrait mode</string>
+  <string name="run_config_sdl_floating_log">Floating Log Window</string>
+  <string name="run_config_sdl_floating_log_desc">Show a draggable real-time log window during fullscreen SDL graphical runtime for stdout/stderr output</string>
+  <string name="run_config_sdl_floating_log_not_ready">Floating log feature is under development, stay tuned</string>
 
   <!-- Floating overlay -->
   <string name="floating_overlay_exit">Exit</string>
