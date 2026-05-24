@@ -3,7 +3,7 @@ package com.wuxianggujun.tinaide.core.util
 /**
  * 用户运行容器与崩溃日志隐私分类器。
  *
- * 规则集中在这里，避免 GUI / SDL / 普通 Native / NDK 的判断散落在上传、导出和进程初始化逻辑中。
+ * 规则集中在这里，避免 SDL / 普通 Native / NDK 的判断散落在上传、导出和进程初始化逻辑中。
  */
 object CrashLogPrivacyClassifier {
     private val userRuntimeProcessSuffixes = setOf(":gui", ":sdl")

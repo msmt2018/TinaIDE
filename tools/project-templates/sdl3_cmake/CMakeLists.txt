@@ -13,7 +13,7 @@ add_library({{PROJECT_NAME}} SHARED
 
 target_link_libraries({{PROJECT_NAME}} PRIVATE SDL3::SDL3)
 
-# GUI / SDL 运行链默认消费共享库，输出名固定为 libmain.so 便于直接运行和后续打包。
+# SDL 图形运行链默认消费共享库，输出名固定为 libmain.so 便于直接运行和后续打包。
 set_target_properties({{PROJECT_NAME}} PROPERTIES
     OUTPUT_NAME "main"
 )

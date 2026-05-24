@@ -1,6 +1,6 @@
 # 游戏引擎插件图形运行方案
 
-本文记录 TinaIDE 当前对游戏引擎插件的图形运行支持。当前仅保留 SDL2/SDL3 运行链路，不再提供非 SDL 图形宿主。
+本文记录 TinaIDE 当前对游戏引擎插件的 SDL 图形运行支持。当前仅保留 SDL2/SDL3 运行链路，不再提供 TinaIDE 自研 GUI 头文件、绘制协议或非 SDL 图形宿主。
 
 ## 目标体验
 
@@ -13,10 +13,10 @@
   ↓
 点击运行
   ↓
-TinaIDE 通过 SDL 运行时打开图形界面
+TinaIDE 通过 SDL 运行时打开运行界面
 ```
 
-Android 依赖库不能像桌面程序一样自行创建窗口。插件应提供项目模板、构建配置和运行配置，实际图形窗口由 TinaIDE 内置的 SDL 运行时承载。
+Android 依赖库不能像桌面程序一样自行创建窗口。插件应提供项目模板、构建配置和运行配置，实际图形窗口由 TinaIDE 内置的 SDL 运行时承载。TinaIDE 不再暴露自研 GUI API 给插件或普通项目调用。
 
 ## 当前支持
 
@@ -65,9 +65,9 @@ friend-engine-sdl3.zip
 └── .tinaide/run_configs.json
 ```
 
-## 图形运行链路
+## SDL 图形运行链路
 
-运行配置仍使用 `OutputMode.GUI` 表示图形运行模式，但它的语义已经收敛为 SDL 图形运行。
+运行配置仍使用 `OutputMode.GUI` 作为历史兼容字段，但它的语义已经收敛为 SDL 图形运行。
 
 关键实现：
 
@@ -84,7 +84,7 @@ friend-engine-sdl3.zip
 3. SDL 运行库必须能在已安装包目录中解析到。
 4. 项目同目录私有 `.so` 依赖会被 staging 到 app 私有目录后启动。
 
-如果 `.so` 未检测到 SDL 依赖，TinaIDE 会拒绝用图形模式启动。普通原生可执行文件应切换到终端模式运行。
+如果 `.so` 未检测到 SDL 依赖，TinaIDE 会拒绝用 SDL 图形运行启动。普通原生可执行文件应切换到终端模式运行。
 
 ## CMake 模板要求
 
@@ -130,12 +130,13 @@ SDL3 项目仍可走现有 APK 导出链路。插件模板可以内置 `.tinaide
 
 - 游戏引擎插件优先发布 SDL3/CMake 模板。
 - 引擎 runtime 以项目源码、预编译 `.so` 或模板内 CMake 配置形式交付。
-- 如果需要独立 Android Activity/View 或 AAR 依赖管理，应先扩展插件系统和 Android Gradle App 构建系统，而不是恢复自定义 GUI 协议。
+- 如果需要独立 Android Activity/View 或 AAR 依赖管理，应先扩展插件系统和 Android Gradle App 构建系统，而不是恢复 TinaIDE 自研 GUI 协议。
 
 ## 不再支持
 
 以下能力已移除：
 
+- TinaIDE 自研 GUI 头文件。
 - 非 SDL 图形头文件。
 - 通用 `.so` 图形宿主。
 - 通过自定义渲染回调输出帧缓冲的运行协议。

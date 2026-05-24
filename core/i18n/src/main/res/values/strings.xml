@@ -1938,7 +1938,7 @@
   <string name="run_config_output_build_log_desc">输出显示在底部面板的构建日志中</string>
   <string name="run_config_output_terminal">终端</string>
   <string name="run_config_output_terminal_desc">在独立终端中运行，支持交互输入</string>
-  <string name="run_config_output_gui">图形界面（GUI）</string>
+  <string name="run_config_output_gui">SDL 图形运行</string>
   <string name="run_config_output_gui_desc">在 SDL 图形运行时中启动（输出需为 .so）</string>
 
   <!-- SDL 图形运行选项 -->
@@ -1977,10 +1977,10 @@
   <string name="sdl_runtime_error_conflicting_versions">检测到目标同时依赖 SDL2 和 SDL3，无法确定运行时版本。</string>
   <string name="sdl_runtime_error_sdl_not_found">检测到 SDL%1$d 依赖，但未在包管理器已安装包运行库目录找到 %2$s。请先安装对应 SDL%1$d 包。</string>
   <string name="sdl_runtime_error_sdl_package_broken">检测到已安装的 SDL%1$d 包（%2$s）缺少 %3$s，请在包管理器中重装该包。</string>
-  <string name="sdl_runtime_error_missing_launch_params">SDL 启动参数缺失，无法启动图形界面。</string>
+  <string name="sdl_runtime_error_missing_launch_params">SDL 启动参数缺失，无法启动 SDL 运行界面。</string>
   <string name="sdl_runtime_error_sdl_library_invalid">SDL 运行库不存在或不可读：%1$s</string>
   <string name="sdl_runtime_error_invalid_required_major">SDL 主版本参数无效：%1$d（仅支持 2 或 3）</string>
-  <string name="sdl_runtime_error_launch_failed">启动 SDL 界面失败：%1$s</string>
+  <string name="sdl_runtime_error_launch_failed">启动 SDL 运行界面失败：%1$s</string>
   <string name="run_config_args_prefix">参数: %1$s</string>
   <string name="run_config_toolchain">工具链</string>
   <string name="run_config_toolchain_default">默认（使用全局激活的工具链）</string>
@@ -2271,7 +2271,7 @@
   <string name="crash_title">应用崩溃了</string>
   <string name="crash_title_user_native">用户程序崩溃了</string>
   <string name="crash_hint">以下是崩溃信息，点击复制按钮可复制完整日志</string>
-  <string name="crash_hint_user_native">用户运行的 Native/GUI 程序已在独立进程中崩溃，TinaIDE 主界面不应受影响。以下是崩溃信息，点击复制按钮可复制完整日志。</string>
+  <string name="crash_hint_user_native">用户运行的 SDL/Native/NDK 程序已在独立进程中崩溃，TinaIDE 主界面不应受影响。以下是崩溃信息，点击复制按钮可复制完整日志。</string>
   <string name="crash_user_native_privacy_note">这是用户项目/运行程序的崩溃日志，不会上传到 TinaIDE 服务器。你可以复制或分享给项目作者自行排查。</string>
   <string name="crash_upload_status_title">崩溃日志上传状态</string>
   <string name="crash_upload_status_none">尚未检测到上传状态。重启应用后会再次检查崩溃日志。</string>
@@ -2668,7 +2668,7 @@
   <string name="toast_compile_done_starting_debug">编译完成，正在启动调试...</string>
   <string name="toast_terminal_run_failed">终端运行失败：未获取到运行命令</string>
   <string name="toast_compile_done_opening_terminal">编译完成，正在打开终端...</string>
-  <string name="toast_compile_done_opening_gui">编译完成，正在打开 GUI...</string>
+  <string name="toast_compile_done_opening_gui">编译完成，正在打开 SDL 图形运行...</string>
   <string name="toast_project_config_migrated">检测到旧版配置，已自动迁移（project.json %1$d 项，run_configs.json %2$d 项）</string>
   <string name="toast_compile_done_artifact_exported">编译完成，已导出构建产物</string>
   <string name="toast_compile_done_no_runnable_output">构建完成：当前项目没有可直接运行的产物，已导出到构建产物</string>
@@ -3426,7 +3426,7 @@ kept=%3$d bytes
   <string name="toast_logs_cleared">日志缓存已清空</string>
   <string name="toast_clear_logs_failed">清空日志失败: %1$s</string>
   <string name="dialog_title_upload_logs">上传日志</string>
-  <string name="dialog_message_upload_logs">将生成 TinaIDE 问题诊断上传包并发送到服务器。请确认你愿意分享以下信息。\n\n会上传：\n• TinaIDE 结构化日志（Timber）\n• 当前 App 进程 logcat（不含全局 logcat）\n• 应用/设备信息、TinaIDE 主进程崩溃与安装诊断\n• 项目构建日志（可能包含项目路径、编译输出或依赖名）\n• PRoot/rootfs/Linux 环境日志（可能包含软件源、已安装包或命令输出）\n• export_manifest.txt（记录收集策略）\n\n不会上传：\n• 源码文件或完整项目文件\n• 全局 logcat\n• 用户 GUI/SDL/Native/NDK 程序崩溃 tombstone\n\n如不想分享这些运行环境日志，请取消并改用“导出日志”本地分享。</string>
+  <string name="dialog_message_upload_logs">将生成 TinaIDE 问题诊断上传包并发送到服务器。请确认你愿意分享以下信息。\n\n会上传：\n• TinaIDE 结构化日志（Timber）\n• 当前 App 进程 logcat（不含全局 logcat）\n• 应用/设备信息、TinaIDE 主进程崩溃与安装诊断\n• 项目构建日志（可能包含项目路径、编译输出或依赖名）\n• PRoot/rootfs/Linux 环境日志（可能包含软件源、已安装包或命令输出）\n• export_manifest.txt（记录收集策略）\n\n不会上传：\n• 源码文件或完整项目文件\n• 全局 logcat\n• 用户 SDL/Native/NDK 程序崩溃 tombstone\n\n如不想分享这些运行环境日志，请取消并改用“导出日志”本地分享。</string>
   <string name="dialog_title_clear_logs">清空日志缓存</string>
   <string name="dialog_message_clear_logs">确定要清空所有日志缓存吗？此操作不可撤销。</string>
   <string name="log_export_filename">TinaIDE_logs_%1$s.zip</string>
@@ -4476,8 +4476,8 @@ kept=%3$d bytes
   <string name="compile_plugin_project_diagnostic_info">提示: %1$s</string>
   <string name="compile_plugin_project_diagnostic_fix">修复建议: %1$s</string>
   <string name="compile_terminal_no_executable">echo \'未找到可执行文件\'</string>
-  <string name="compile_gui_error_no_output">图形模式未找到可运行的共享库产物（.so），请检查目标类型与构建配置。</string>
-  <string name="compile_gui_error_invalid_output">图形模式要求输出为 .so，当前产物：%1$s</string>
+  <string name="compile_gui_error_no_output">SDL 图形运行未找到可运行的共享库产物（.so），请检查目标类型与构建配置。</string>
+  <string name="compile_gui_error_invalid_output">SDL 图形运行要求输出为 .so，当前产物：%1$s</string>
   <string name="compile_gui_ready">===SDL 图形运行准备完成：%1$s===</string>
   <string name="compile_exception">编译异常: %1$s</string>
   <string name="compile_error_exception">编译异常: %1$s</string>
@@ -5537,7 +5537,7 @@ kept=%3$d bytes
   <string name="apk_builder_app_name">应用名称</string>
   <string name="apk_builder_package_name">包名</string>
   <string name="apk_builder_template_type">模板类型</string>
-  <string name="apk_builder_template_native">NativeActivity（TinaIDE GUI）</string>
+  <string name="apk_builder_template_native">NativeActivity（原生 Android）</string>
   <string name="apk_builder_template_sdl3">SDL3 应用</string>
   <string name="apk_builder_template_terminal">终端应用</string>
   <string name="apk_builder_version_name">版本号</string>

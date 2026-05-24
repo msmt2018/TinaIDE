@@ -29,7 +29,7 @@ object CrashLogUploader {
     /**
      * 是否存在真正允许上传的 tombstone。
      *
-     * 这里会复用上传器的隐私过滤逻辑：用户 GUI/SDL/NDK 运行容器崩溃会被标记为 skipped，
+     * 这里会复用上传器的隐私过滤逻辑：用户 SDL/Native/NDK 运行容器崩溃会被标记为 skipped，
      * 因而不会因为“本地有 tombstone 文件”而反复调度服务器上传任务。
      */
     fun hasPendingUploadableTombstone(context: Context): Boolean {
