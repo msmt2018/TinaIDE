@@ -5839,4 +5839,6 @@ kept=%3$d bytes
   <string name="ai_tool_doc_property_description">%1$s 参数</string>
   <string name="ai_tool_doc_param_description">%1$s 的说明</string>
   <string name="ai_tool_doc_return_description">返回值说明</string>
+  <string name="clangd_test_real_lsp_request_finished">真实 LSP 请求已完成</string>
+  <string name="clangd_test_real_lsp_request_failed">真实 LSP 请求失败：%1$s</string>
 </resources>

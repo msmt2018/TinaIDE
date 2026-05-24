@@ -123,7 +123,7 @@ fun TreeSitterTestScreen(onNavigateBack: (() -> Unit)? = null) {
                 onReanalyze = { reloadToken += 1 }
             )
         },
-        headerContent = { _ ->
+        headerContent = { _, _ ->
             DevEditorInfoCard(text = previewHint)
         }
     )

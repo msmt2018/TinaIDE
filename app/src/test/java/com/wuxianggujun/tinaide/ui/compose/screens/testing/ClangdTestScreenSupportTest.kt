@@ -396,23 +396,20 @@ class ClangdTestScreenSupportTest {
     }
 
     @Test
-    fun buildRealLspPlaceholderOutcome_shouldReturnParsableGuidanceJson() {
-        val outcome = ClangdTestScreenSupport.buildRealLspPlaceholderOutcome()
+    fun buildRealLspUnavailableOutcome_shouldReturnParsableErrorJson() {
+        val reason = "No matching editor tab is open for the requested file URI."
+        val outcome = ClangdTestScreenSupport.buildRealLspUnavailableOutcome(reason)
         val json = Json.parseToJsonElement(outcome.responseJson).jsonObject
 
-        assertThat(outcome.testStatus).isEqualTo(TestStatus.SUCCESS)
-        assertThat(outcome.errorMessage).isNull()
-        assertThat(outcome.success).isTrue()
+        assertThat(outcome.testStatus).isEqualTo(TestStatus.ERROR)
+        assertThat(outcome.errorMessage).isEqualTo(reason)
+        assertThat(outcome.success).isFalse()
+        assertThat(json.getValue("mode").jsonPrimitive.content).isEqualTo("REAL_LSP")
+        assertThat(json.getValue("result").jsonPrimitive.content).isEqualTo("UNAVAILABLE")
         assertThat(json.getValue("error").jsonPrimitive.content)
-            .isEqualTo("Real LSP testing is not implemented yet")
-        assertThat(json.getValue("note").jsonPrimitive.content)
-            .isEqualTo("To test a real LSP response:")
-        assertThat(json.getValue("step1").jsonPrimitive.content)
-            .isEqualTo("Open a C/C++ file in the editor")
-        assertThat(json.getValue("step2").jsonPrimitive.content).contains("LSP is connected")
-        assertThat(json.getValue("step3").jsonPrimitive.content).contains("completion/hover/definition")
+            .isEqualTo(reason)
         assertThat(json.getValue("hint").jsonPrimitive.content)
-            .isEqualTo("This screen mainly validates JSON format")
+            .contains("editor LSP status")
     }
 
     @Test

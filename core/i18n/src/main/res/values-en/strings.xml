@@ -5683,4 +5683,6 @@ kept=%3$d bytes
   <string name="ai_tool_doc_property_description">The %1$s parameter</string>
   <string name="ai_tool_doc_param_description">Description of %1$s</string>
   <string name="ai_tool_doc_return_description">Description of return value</string>
+  <string name="clangd_test_real_lsp_request_finished">Real LSP request finished</string>
+  <string name="clangd_test_real_lsp_request_failed">Real LSP request failed: %1$s</string>
 </resources>

@@ -28,19 +28,29 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wuxianggujun.tinaide.core.editorlsp.CompletionFetchResult
+import com.wuxianggujun.tinaide.core.editorlsp.CompletionItem
+import com.wuxianggujun.tinaide.core.editorlsp.CompletionTextEdit
+import com.wuxianggujun.tinaide.core.editorlsp.SemanticToken
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.core.lsp.LocationItem
+import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.testing.lsp.*
+import com.wuxianggujun.tinaide.ui.compose.components.EditorStatus
 import com.wuxianggujun.tinaide.ui.compose.components.TinaAlertDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogContentColumn
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogTitleText
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTextButton
+import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import timber.log.Timber
@@ -249,23 +259,255 @@ internal object ClangdTestScreenSupport {
         )
     }
 
-    fun buildRealLspPlaceholderOutcome(): ClangdTestExecutionOutcome {
+    fun buildRealLspUnavailableOutcome(reason: String): ClangdTestExecutionOutcome {
         val responseJson = prettyJson.encodeToString(
             JsonObject.serializer(),
             buildJsonObject {
-                put("error", "Real LSP testing is not implemented yet")
-                put("note", "To test a real LSP response:")
-                put("step1", "Open a C/C++ file in the editor")
-                put("step2", "Wait until LSP is connected (status bar turns green)")
-                put("step3", "Use completion/hover/definition features to verify")
-                put("hint", "This screen mainly validates JSON format")
+                put("mode", "REAL_LSP")
+                put("result", "UNAVAILABLE")
+                put("error", reason)
+                put("hint", "Open a C/C++ fixture and wait until the editor LSP status is Ready.")
             }
         )
 
         return ClangdTestExecutionOutcome(
             responseJson = responseJson,
-            testStatus = TestStatus.SUCCESS
+            testStatus = TestStatus.ERROR,
+            errorMessage = reason
         )
+    }
+
+    fun buildRealLspCompletionOutcome(
+        scenario: LspTestScenario,
+        result: CompletionFetchResult
+    ): ClangdTestExecutionOutcome = when (result) {
+        is CompletionFetchResult.Success -> {
+            val responseJson = prettyJson.encodeToString(
+                JsonObject.serializer(),
+                buildJsonObject {
+                    put("mode", "REAL_LSP")
+                    put("method", scenario.method)
+                    put("result", "PASS")
+                    put("itemCount", result.items.size)
+                    put(
+                        "items",
+                        buildJsonArray {
+                            result.items.take(50).forEach { item ->
+                                addCompletionItem(item)
+                            }
+                        }
+                    )
+                    if (result.items.size > 50) {
+                        put("truncated", true)
+                    }
+                }
+            )
+            ClangdTestExecutionOutcome(responseJson = responseJson, testStatus = TestStatus.SUCCESS)
+        }
+
+        is CompletionFetchResult.TransientFailure -> buildRealLspUnavailableOutcome(
+            reason = result.reason ?: "Completion request failed before receiving an LSP response."
+        )
+    }
+
+    fun buildRealLspHoverOutcome(markdown: String?): ClangdTestExecutionOutcome {
+        val hasHover = markdown?.isNotBlank() == true
+        val responseJson = prettyJson.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("mode", "REAL_LSP")
+                put("method", LspTestScenario.HOVER.method)
+                put("result", if (hasHover) "PASS" else "EMPTY")
+                put("markdown", markdown.orEmpty())
+            }
+        )
+        return ClangdTestExecutionOutcome(
+            responseJson = responseJson,
+            testStatus = if (hasHover) TestStatus.SUCCESS else TestStatus.ERROR,
+            errorMessage = if (hasHover) null else "Hover response was empty."
+        )
+    }
+
+    fun buildRealLspLocationsOutcome(
+        scenario: LspTestScenario,
+        locations: List<LocationItem>
+    ): ClangdTestExecutionOutcome {
+        val hasLocations = locations.isNotEmpty()
+        val responseJson = prettyJson.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("mode", "REAL_LSP")
+                put("method", scenario.method)
+                put("result", if (hasLocations) "PASS" else "EMPTY")
+                put("locationCount", locations.size)
+                put(
+                    "locations",
+                    buildJsonArray {
+                        locations.take(50).forEach { location ->
+                            add(
+                                buildJsonObject {
+                                    put("uri", location.uri)
+                                    put("filePath", location.filePath)
+                                    put("fileName", location.fileName)
+                                    put("line", location.line)
+                                    put("column", location.column)
+                                    put("endLine", location.endLine)
+                                    put("endColumn", location.endColumn)
+                                    location.previewText?.let { put("previewText", it) }
+                                }
+                            )
+                        }
+                    }
+                )
+                if (locations.size > 50) {
+                    put("truncated", true)
+                }
+            }
+        )
+        return ClangdTestExecutionOutcome(
+            responseJson = responseJson,
+            testStatus = if (hasLocations) TestStatus.SUCCESS else TestStatus.ERROR,
+            errorMessage = if (hasLocations) null else "LSP returned no locations."
+        )
+    }
+
+    fun buildRealLspSemanticTokensOutcome(
+        scenario: LspTestScenario,
+        tokens: List<SemanticToken>
+    ): ClangdTestExecutionOutcome {
+        val hasTokens = tokens.isNotEmpty()
+        val responseJson = prettyJson.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("mode", "REAL_LSP")
+                put("method", scenario.method)
+                put("result", if (hasTokens) "PASS" else "EMPTY")
+                put("tokenCount", tokens.size)
+                put(
+                    "tokens",
+                    buildJsonArray {
+                        tokens.take(80).forEach { token ->
+                            add(
+                                buildJsonObject {
+                                    put("line", token.line)
+                                    put("startColumn", token.startColumn)
+                                    put("length", token.length)
+                                    put("tokenType", token.tokenType)
+                                    put("tokenModifiers", token.tokenModifiers.joinToString())
+                                }
+                            )
+                        }
+                    }
+                )
+                if (tokens.size > 80) {
+                    put("truncated", true)
+                }
+            }
+        )
+        return ClangdTestExecutionOutcome(
+            responseJson = responseJson,
+            testStatus = if (hasTokens) TestStatus.SUCCESS else TestStatus.ERROR,
+            errorMessage = if (hasTokens) null else "LSP returned no semantic tokens."
+        )
+    }
+
+    fun buildRealLspCustomOutcome(requestJson: String): ClangdTestExecutionOutcome = buildRealLspUnavailableOutcome(
+        reason = "Custom JSON requests cannot be sent through the editor-state LSP facade yet. Generated request was ${requestJson.length} characters."
+    )
+
+    suspend fun runRealLspScenario(
+        editorState: EditorContainerState,
+        scenario: LspTestScenario,
+        params: LspTestParams,
+        requestJson: String
+    ): ClangdTestExecutionOutcome {
+        return try {
+            val tab = resolveTargetTab(editorState, params.fileUri)
+                ?: return buildRealLspUnavailableOutcome("No matching editor tab is open for the requested file URI.")
+            val status = editorState.getLspStatus(tab.id)
+            if (!status.isInteractiveLspStatus()) {
+                return buildRealLspUnavailableOutcome("Active editor LSP status is $status, expected Ready or Busy.")
+            }
+
+            val text = editorState.readActiveTabText().orEmpty()
+            val lineCount = text.lineSequence().count().coerceAtLeast(1)
+            val fullDocumentLines = 0 until lineCount
+            val requestedLine = params.line.coerceIn(0, lineCount - 1)
+            val requestedColumn = params.column.coerceAtLeast(0)
+            val position = Position(requestedLine, requestedColumn)
+
+            when (scenario) {
+                LspTestScenario.COMPLETION,
+                LspTestScenario.BENCHMARK_COMPLETION -> buildRealLspCompletionOutcome(
+                    scenario = scenario,
+                    result = editorState.requestLspCompletion(
+                        tabId = tab.id,
+                        position = position,
+                        triggerChar = params.triggerChar.firstOrNull()
+                    )
+                )
+
+                LspTestScenario.HOVER,
+                LspTestScenario.BENCHMARK_HOVER -> buildRealLspHoverOutcome(
+                    markdown = editorState.requestLspHoverMarkdown(
+                        tabId = tab.id,
+                        line = requestedLine,
+                        column = requestedColumn
+                    )
+                )
+
+                LspTestScenario.DEFINITION -> buildRealLspLocationsOutcome(
+                    scenario = scenario,
+                    locations = editorState.gotoDefinition(tab.id, requestedLine, requestedColumn)
+                )
+
+                LspTestScenario.TYPE_DEFINITION -> buildRealLspLocationsOutcome(
+                    scenario = scenario,
+                    locations = editorState.gotoTypeDefinition(tab.id, requestedLine, requestedColumn)
+                )
+
+                LspTestScenario.IMPLEMENTATION -> buildRealLspLocationsOutcome(
+                    scenario = scenario,
+                    locations = editorState.gotoImplementation(tab.id, requestedLine, requestedColumn)
+                )
+
+                LspTestScenario.SEMANTIC_TOKENS_FULL -> buildRealLspSemanticTokensOutcome(
+                    scenario = scenario,
+                    tokens = editorState.requestLspSemanticTokens(
+                        tabId = tab.id,
+                        visibleLines = fullDocumentLines,
+                        documentVersion = System.nanoTime()
+                    )
+                )
+
+                LspTestScenario.SEMANTIC_TOKENS_RANGE -> buildRealLspSemanticTokensOutcome(
+                    scenario = scenario,
+                    tokens = editorState.requestLspSemanticTokens(
+                        tabId = tab.id,
+                        visibleLines = requestedLine..requestedLine,
+                        documentVersion = System.nanoTime()
+                    )
+                )
+
+                LspTestScenario.CUSTOM -> buildRealLspCustomOutcome(requestJson)
+
+                LspTestScenario.INITIALIZE,
+                LspTestScenario.DECLARATION,
+                LspTestScenario.INLAY_HINT,
+                LspTestScenario.SELECTION_RANGE,
+                LspTestScenario.DID_OPEN,
+                LspTestScenario.DID_CHANGE,
+                LspTestScenario.DID_CLOSE -> buildRealLspUnavailableOutcome(
+                    reason = "${scenario.method} is not supported by the editor-state LSP facade yet."
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            buildRealLspUnavailableOutcome(
+                reason = e.message ?: e::class.java.simpleName
+            )
+        }
     }
 
     fun buildHistoryResult(
@@ -338,6 +580,73 @@ internal object ClangdTestScreenSupport {
             "file:///$normalizedPath"
         }
     }
+
+    private fun resolveTargetTab(
+        editorState: EditorContainerState,
+        requestedFileUri: String
+    ): com.wuxianggujun.tinaide.ui.compose.components.editor.EditorTabState? {
+        val activeIndex = editorState.activeTabIndex
+            .takeIf { it in editorState.tabs.indices }
+            ?: return null
+        val requestedUri = requestedFileUri.trim()
+        val targetIndex = if (requestedUri.isBlank()) {
+            activeIndex
+        } else {
+            editorState.tabs.indexOfFirst { tab -> buildFileUri(tab.file) == requestedUri }
+                .takeIf { it >= 0 }
+                ?: return null
+        }
+        if (targetIndex != activeIndex) {
+            editorState.selectTab(targetIndex)
+        }
+        return editorState.tabs.getOrNull(targetIndex)
+    }
+
+    private fun buildFileUri(file: File): String {
+        val normalizedPath = file.absolutePath.replace(File.separatorChar, '/')
+        return if (normalizedPath.startsWith("/")) {
+            "file://$normalizedPath"
+        } else {
+            "file:///$normalizedPath"
+        }
+    }
+
+    private fun EditorStatus.isInteractiveLspStatus(): Boolean = this == EditorStatus.Ready || this == EditorStatus.Busy
+
+    private fun kotlinx.serialization.json.JsonArrayBuilder.addCompletionItem(item: CompletionItem) {
+        add(
+            buildJsonObject {
+                put("label", item.label)
+                put("kind", item.kind.name)
+                put("source", item.source.name)
+                item.detail?.let { put("detail", it) }
+                item.documentation?.let { put("documentation", it) }
+                item.insertText?.let { put("insertText", it) }
+                item.snippetText?.let { put("snippetText", it) }
+                item.sortText?.let { put("sortText", it) }
+                item.filterText?.let { put("filterText", it) }
+                item.textEdit?.let { edit ->
+                    put("textEdit", edit.toJsonObject())
+                }
+                if (item.additionalTextEdits.isNotEmpty()) {
+                    put(
+                        "additionalTextEdits",
+                        buildJsonArray {
+                            item.additionalTextEdits.forEach { edit -> add(edit.toJsonObject()) }
+                        }
+                    )
+                }
+            }
+        )
+    }
+
+    private fun CompletionTextEdit.toJsonObject(): JsonObject = buildJsonObject {
+        put("startLine", startLine)
+        put("startColumn", startColumn)
+        put("endLine", endLine)
+        put("endColumn", endColumn)
+        put("newText", newText)
+    }
 }
 
 /**
@@ -377,13 +686,14 @@ fun ClangdTestScreen(
     var currentResponseJson by remember { mutableStateOf("") }
     var currentError by remember { mutableStateOf("") }
 
-    val runSelectedTest = {
+    val runSelectedTest: (EditorContainerState) -> Unit = { editorState ->
         Timber.tag("ClangdTestScreen").d("========== Test button clicked ==========")
         Timber.tag("ClangdTestScreen").d("Mode: ${if (generateOnlyMode) "GENERATE_ONLY" else "SEND_TO_LSP"}")
         Timber.tag("ClangdTestScreen").d("Scenario: ${selectedScenario.getDisplayName(context)}")
         Timber.tag("ClangdTestScreen").d("File URI: $fileUri")
         Timber.tag("ClangdTestScreen").d("Position: line=$line, column=$column")
 
+        val scenarioUnderTest = selectedScenario
         testStatus = TestStatus.SENDING
         val params = ClangdTestScreenSupport.buildTestParams(
             fileUri = fileUri,
@@ -392,11 +702,12 @@ fun ClangdTestScreen(
             triggerChar = triggerChar,
             customJson = customJson
         )
-        currentRequestJson = testManager.generateTestRequest(selectedScenario, params)
+        val requestJson = testManager.generateTestRequest(scenarioUnderTest, params)
+        currentRequestJson = requestJson
         currentError = ""
 
         Timber.tag("ClangdTestScreen").d("Generated request JSON:")
-        Timber.tag("ClangdTestScreen").d(currentRequestJson)
+        Timber.tag("ClangdTestScreen").d(requestJson)
 
         coroutineScope.launch {
             val startTime = System.currentTimeMillis()
@@ -404,15 +715,20 @@ fun ClangdTestScreen(
                 Timber.tag("ClangdTestScreen").d("Generate-only mode: validating JSON format")
                 delay(100)
                 ClangdTestScreenSupport.buildValidationOutcome(
-                    scenario = selectedScenario,
+                    scenario = scenarioUnderTest,
                     validationResult = testManager.validateLspJson(
-                        currentRequestJson,
-                        selectedScenario
+                        requestJson,
+                        scenarioUnderTest
                     )
                 )
             } else {
-                Timber.tag("ClangdTestScreen").d("Real LSP mode requires an active LSP connection")
-                ClangdTestScreenSupport.buildRealLspPlaceholderOutcome()
+                Timber.tag("ClangdTestScreen").d("Real LSP mode: dispatching request through editor state")
+                ClangdTestScreenSupport.runRealLspScenario(
+                    editorState = editorState,
+                    scenario = scenarioUnderTest,
+                    params = params,
+                    requestJson = requestJson
+                )
             }
 
             currentResponseJson = outcome.responseJson
@@ -435,8 +751,15 @@ fun ClangdTestScreen(
             } else {
                 Toast.makeText(
                     context,
-                    Strings.clangd_test_real_lsp_requires_connection.strOr(context),
-                    Toast.LENGTH_LONG
+                    if (outcome.success) {
+                        Strings.clangd_test_real_lsp_request_finished.strOr(context)
+                    } else {
+                        Strings.clangd_test_real_lsp_request_failed.strOr(
+                            context,
+                            outcome.errorMessage.orEmpty()
+                        )
+                    },
+                    if (outcome.success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
                 ).show()
             }
 
@@ -444,8 +767,8 @@ fun ClangdTestScreen(
             testManager.recordTestResult(
                 ClangdTestScreenSupport.buildHistoryResult(
                     timestamp = System.currentTimeMillis(),
-                    scenario = selectedScenario,
-                    requestJson = currentRequestJson,
+                    scenario = scenarioUnderTest,
+                    requestJson = requestJson,
                     outcome = outcome,
                     durationMs = duration
                 )
@@ -469,7 +792,7 @@ fun ClangdTestScreen(
         fixtures = fixtures,
         onNavigateBack = onNavigateBack,
         activeFixtureIndex = scenario.activeFixtureIndex,
-        headerContent = { workspaceDir ->
+        headerContent = { workspaceDir, editorState ->
             LaunchedEffect(workspaceDir, fixtures, scenario.activeFixtureIndex) {
                 fileUri = ClangdTestScreenSupport.buildEditorFixtureFileUri(
                     workspaceDir = workspaceDir,
@@ -721,7 +1044,7 @@ fun ClangdTestScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = runSelectedTest,
+                            onClick = { runSelectedTest(editorState) },
                             modifier = Modifier.weight(1f),
                             enabled = testStatus != TestStatus.SENDING
                         ) {
@@ -752,7 +1075,7 @@ fun ClangdTestScreen(
                 }
             }
         },
-        footerContent = {
+        footerContent = { _, _ ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

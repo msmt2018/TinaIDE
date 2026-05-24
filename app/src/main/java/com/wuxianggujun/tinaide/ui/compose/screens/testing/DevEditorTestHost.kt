@@ -33,6 +33,7 @@ import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.plugin.PluginSnippetManager
 import com.wuxianggujun.tinaide.ui.compose.components.EditorContainer
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
+import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState
 import com.wuxianggujun.tinaide.ui.compose.state.editor.rememberEditorContainerState
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -133,8 +134,8 @@ internal fun DevEditorTestHost(
     activeFixtureIndex: Int = fixtures.lastIndex.coerceAtLeast(0),
     reloadToken: Any? = null,
     topBarActions: @Composable RowScope.() -> Unit = {},
-    headerContent: @Composable ColumnScope.(workspaceDir: File) -> Unit = {},
-    footerContent: @Composable ColumnScope.(workspaceDir: File) -> Unit = {}
+    headerContent: @Composable ColumnScope.(workspaceDir: File, editorState: EditorContainerState) -> Unit = { _, _ -> },
+    footerContent: @Composable ColumnScope.(workspaceDir: File, editorState: EditorContainerState) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -208,7 +209,7 @@ internal fun DevEditorTestHost(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            headerContent(workspaceDir)
+            headerContent(workspaceDir, editorState)
             EditorContainer(
                 state = editorState,
                 editorManager = editorManager,
@@ -224,7 +225,7 @@ internal fun DevEditorTestHost(
                 },
                 modifier = Modifier.weight(1f)
             )
-            footerContent(workspaceDir)
+            footerContent(workspaceDir, editorState)
         }
     }
 }

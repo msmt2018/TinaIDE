@@ -77,7 +77,7 @@ fun ThemePreviewTestScreen(onNavigateBack: (() -> Unit)? = null) {
                 }
             }
         }
-    ) { _ ->
+    ) { _, _ ->
         // 保持空 footer，避免把额外操作块放到页面底部。
     }
 }
