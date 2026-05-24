@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +53,7 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionHea
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionTitle
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPanelSegmentButton
 import com.wuxianggujun.tinaide.ui.compose.icons.rememberTinaPainter
+import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState.SplitEditorLayout
 
 /**
  * TopAppBar 回调接口，减少参数传递。
@@ -79,6 +81,7 @@ internal class TopBarCallbacks(
     val onRenameSymbol: () -> Unit = {},
     val onSwitchHeaderSource: () -> Unit = {},
     val onToggleSplitEditor: () -> Unit = {},
+    val onSetSplitEditorLayout: (SplitEditorLayout) -> Unit = {},
     val onMoveTabToSecondaryPane: () -> Unit = {},
     val onOpenExplorer: () -> Unit,
     val onOpenGlobalSearch: () -> Unit,
@@ -113,6 +116,7 @@ internal fun MainActivityTopBar(
     canNavigateBack: Boolean,
     canNavigateForward: Boolean,
     isSplitEditorEnabled: Boolean,
+    splitEditorLayout: SplitEditorLayout,
     canMoveTabToSecondaryPane: Boolean,
     currentBuildSystem: BuildSystem,
     availableTargets: List<TargetInfo>,
@@ -409,8 +413,46 @@ internal fun MainActivityTopBar(
                     }
                 )
 
+                if (isSplitEditorEnabled) {
+                    TinaDropdownMenuItem(
+                        text = { Text(stringResource(Strings.menu_split_editor_horizontal)) },
+                        onClick = {
+                            showMenu = false
+                            callbacks.onSetSplitEditorLayout(SplitEditorLayout.HORIZONTAL)
+                        },
+                        leadingIcon = {
+                            if (splitEditorLayout == SplitEditorLayout.HORIZONTAL) {
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    )
+
+                    TinaDropdownMenuItem(
+                        text = { Text(stringResource(Strings.menu_split_editor_vertical)) },
+                        onClick = {
+                            showMenu = false
+                            callbacks.onSetSplitEditorLayout(SplitEditorLayout.VERTICAL)
+                        },
+                        leadingIcon = {
+                            if (splitEditorLayout == SplitEditorLayout.VERTICAL) {
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    )
+                }
+
                 TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_move_tab_to_secondary_pane)) },
+                    text = {
+                        Text(
+                            stringResource(
+                                if (splitEditorLayout == SplitEditorLayout.VERTICAL) {
+                                    Strings.menu_move_tab_to_lower_pane
+                                } else {
+                                    Strings.menu_move_tab_to_secondary_pane
+                                }
+                            )
+                        )
+                    },
                     enabled = canMoveTabToSecondaryPane,
                     onClick = {
                         showMenu = false

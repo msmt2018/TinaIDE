@@ -167,6 +167,11 @@ class EditorContainerState(
         SECONDARY
     }
 
+    enum class SplitEditorLayout {
+        HORIZONTAL,
+        VERTICAL
+    }
+
     sealed interface ActiveEditableEditorSnapshotResult {
         object NoOpenFile : ActiveEditableEditorSnapshotResult
         object UnsupportedEditor : ActiveEditableEditorSnapshotResult
@@ -336,6 +341,9 @@ class EditorContainerState(
         private set
 
     var splitEditorPrimaryRatio by mutableStateOf(DEFAULT_SPLIT_EDITOR_PRIMARY_RATIO)
+        private set
+
+    var splitEditorLayout by mutableStateOf(SplitEditorLayout.HORIZONTAL)
         private set
 
     internal var peekDefinitionPanelState by mutableStateOf<PeekDefinitionPanelState?>(null)
@@ -1318,6 +1326,10 @@ class EditorContainerState(
     fun resizeSplitEditorBy(deltaPx: Float, containerWidthPx: Float) {
         if (!deltaPx.isFinite() || !containerWidthPx.isFinite() || containerWidthPx <= 0f) return
         updateSplitEditorPrimaryRatio(splitEditorPrimaryRatio + deltaPx / containerWidthPx)
+    }
+
+    fun updateSplitEditorLayout(layout: SplitEditorLayout) {
+        splitEditorLayout = layout
     }
 
     fun toggleSplitEditor() {

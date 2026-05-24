@@ -2668,7 +2668,10 @@
   <string name="menu_section_view">视图</string>
   <string name="menu_enable_split_editor">开启分屏编辑</string>
   <string name="menu_disable_split_editor">关闭分屏编辑</string>
+  <string name="menu_split_editor_horizontal">左右分屏</string>
+  <string name="menu_split_editor_vertical">上下分屏</string>
   <string name="menu_move_tab_to_secondary_pane">移动到右侧编辑区</string>
+  <string name="menu_move_tab_to_lower_pane">移动到下方编辑区</string>
   <string name="menu_explorer">资源管理器</string>
   <string name="menu_global_search">全局搜索</string>
   <string name="menu_bookmarks">书签</string>

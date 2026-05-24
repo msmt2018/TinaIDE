@@ -1158,6 +1158,29 @@ class EditorContainerStateTest {
     }
 
     @Test
+    fun splitEditorLayout_shouldDefaultToHorizontal() {
+        assertThat(state.splitEditorLayout).isEqualTo(EditorContainerState.SplitEditorLayout.HORIZONTAL)
+    }
+
+    @Test
+    fun updateSplitEditorLayout_shouldUpdateLayout() {
+        state.updateSplitEditorLayout(EditorContainerState.SplitEditorLayout.VERTICAL)
+
+        assertThat(state.splitEditorLayout).isEqualTo(EditorContainerState.SplitEditorLayout.VERTICAL)
+    }
+
+    @Test
+    fun toggleSplitEditor_shouldKeepSelectedLayoutForNextOpen() {
+        state.updateSplitEditorLayout(EditorContainerState.SplitEditorLayout.VERTICAL)
+        state.toggleSplitEditor()
+        state.toggleSplitEditor()
+        state.toggleSplitEditor()
+
+        assertThat(state.isSplitEditorEnabled).isTrue()
+        assertThat(state.splitEditorLayout).isEqualTo(EditorContainerState.SplitEditorLayout.VERTICAL)
+    }
+
+    @Test
     fun resizeSplitEditorBy_shouldUpdateRatioFromContainerWidth() {
         state.resizeSplitEditorBy(deltaPx = 120f, containerWidthPx = 1000f)
 

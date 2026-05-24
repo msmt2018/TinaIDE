@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.ui.compose.components
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.pager.HorizontalPager
@@ -50,6 +50,7 @@ import com.wuxianggujun.tinaide.ui.compose.components.editor.EmptyEditorView
 import com.wuxianggujun.tinaide.ui.compose.components.editor.TinaCodeEditorPage
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState.EditorPaneId
+import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState.SplitEditorLayout
 import com.wuxianggujun.tinaide.ui.compose.viewer.HexViewerScreen
 import com.wuxianggujun.tinaide.ui.compose.viewer.ImagePreviewScreen
 import com.wuxianggujun.tinaide.ui.compose.viewer.LargeTextViewerScreen
@@ -208,46 +209,67 @@ fun EditorContainer(
             }
         }
 
-        var splitContainerWidthPx by remember { mutableIntStateOf(0) }
+        var splitContainerMainAxisPx by remember { mutableIntStateOf(0) }
         val primaryRatio = state.splitEditorPrimaryRatio
         val secondaryRatio = 1f - primaryRatio
 
         Box(modifier = modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onSizeChanged { splitContainerWidthPx = it.width }
-            ) {
-                EditorPane(
-                    pane = EditorPaneId.PRIMARY,
-                    state = state,
-                    pluginManager = pluginManager,
-                    hostCommandExecutor = hostCommandExecutor,
-                    tabLoadingMap = tabLoadingMap,
-                    onOpenFileTree = onOpenFileTree,
-                    onShowFilePath = showFilePath,
-                    onCursorPositionChanged = onCursorPositionChanged,
-                    onFileEncodingChanged = onFileEncodingChanged,
-                    modifier = Modifier.weight(primaryRatio)
-                )
+            when (state.splitEditorLayout) {
+                SplitEditorLayout.HORIZONTAL -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onSizeChanged { splitContainerMainAxisPx = it.width }
+                    ) {
+                        SplitEditorPanePair(
+                            state = state,
+                            pluginManager = pluginManager,
+                            hostCommandExecutor = hostCommandExecutor,
+                            tabLoadingMap = tabLoadingMap,
+                            onOpenFileTree = onOpenFileTree,
+                            onShowFilePath = showFilePath,
+                            onCursorPositionChanged = onCursorPositionChanged,
+                            onFileEncodingChanged = onFileEncodingChanged,
+                            primaryModifier = Modifier.weight(primaryRatio),
+                            secondaryModifier = Modifier.weight(secondaryRatio),
+                            handle = {
+                                SplitEditorResizeHandle(
+                                    layout = SplitEditorLayout.HORIZONTAL,
+                                    state = state,
+                                    containerMainAxisPx = splitContainerMainAxisPx
+                                )
+                            }
+                        )
+                    }
+                }
 
-                SplitEditorResizeHandle(
-                    state = state,
-                    containerWidthPx = splitContainerWidthPx
-                )
-
-                EditorPane(
-                    pane = EditorPaneId.SECONDARY,
-                    state = state,
-                    pluginManager = pluginManager,
-                    hostCommandExecutor = hostCommandExecutor,
-                    tabLoadingMap = tabLoadingMap,
-                    onOpenFileTree = onOpenFileTree,
-                    onShowFilePath = showFilePath,
-                    onCursorPositionChanged = onCursorPositionChanged,
-                    onFileEncodingChanged = onFileEncodingChanged,
-                    modifier = Modifier.weight(secondaryRatio)
-                )
+                SplitEditorLayout.VERTICAL -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onSizeChanged { splitContainerMainAxisPx = it.height }
+                    ) {
+                        SplitEditorPanePair(
+                            state = state,
+                            pluginManager = pluginManager,
+                            hostCommandExecutor = hostCommandExecutor,
+                            tabLoadingMap = tabLoadingMap,
+                            onOpenFileTree = onOpenFileTree,
+                            onShowFilePath = showFilePath,
+                            onCursorPositionChanged = onCursorPositionChanged,
+                            onFileEncodingChanged = onFileEncodingChanged,
+                            primaryModifier = Modifier.weight(primaryRatio),
+                            secondaryModifier = Modifier.weight(secondaryRatio),
+                            handle = {
+                                SplitEditorResizeHandle(
+                                    layout = SplitEditorLayout.VERTICAL,
+                                    state = state,
+                                    containerMainAxisPx = splitContainerMainAxisPx
+                                )
+                            }
+                        )
+                    }
+                }
             }
 
             SnackbarHost(
@@ -559,39 +581,109 @@ private fun EditorPane(
 }
 
 @Composable
-private fun SplitEditorResizeHandle(
+private fun SplitEditorPanePair(
     state: EditorContainerState,
-    containerWidthPx: Int,
+    pluginManager: com.wuxianggujun.tinaide.plugin.PluginManager,
+    hostCommandExecutor: com.wuxianggujun.tinaide.core.commands.HostCommandExecutor?,
+    tabLoadingMap: MutableMap<String, Boolean>,
+    onOpenFileTree: () -> Unit,
+    onShowFilePath: (String) -> Unit,
+    onCursorPositionChanged: (line: Int, column: Int) -> Unit,
+    onFileEncodingChanged: (encoding: String) -> Unit,
+    primaryModifier: Modifier,
+    secondaryModifier: Modifier,
+    handle: @Composable () -> Unit
+) {
+    EditorPane(
+        pane = EditorPaneId.PRIMARY,
+        state = state,
+        pluginManager = pluginManager,
+        hostCommandExecutor = hostCommandExecutor,
+        tabLoadingMap = tabLoadingMap,
+        onOpenFileTree = onOpenFileTree,
+        onShowFilePath = onShowFilePath,
+        onCursorPositionChanged = onCursorPositionChanged,
+        onFileEncodingChanged = onFileEncodingChanged,
+        modifier = primaryModifier
+    )
+
+    handle()
+
+    EditorPane(
+        pane = EditorPaneId.SECONDARY,
+        state = state,
+        pluginManager = pluginManager,
+        hostCommandExecutor = hostCommandExecutor,
+        tabLoadingMap = tabLoadingMap,
+        onOpenFileTree = onOpenFileTree,
+        onShowFilePath = onShowFilePath,
+        onCursorPositionChanged = onCursorPositionChanged,
+        onFileEncodingChanged = onFileEncodingChanged,
+        modifier = secondaryModifier
+    )
+}
+
+@Composable
+private fun SplitEditorResizeHandle(
+    layout: SplitEditorLayout,
+    state: EditorContainerState,
+    containerMainAxisPx: Int,
     modifier: Modifier = Modifier
 ) {
     val handleColor = MaterialTheme.colorScheme.outlineVariant
     val gripColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-
-    Box(
-        modifier = modifier
+    val handleModifier = when (layout) {
+        SplitEditorLayout.HORIZONTAL -> modifier
             .width(16.dp)
             .fillMaxHeight()
-            .pointerInput(state, containerWidthPx) {
-                detectHorizontalDragGestures { change, dragAmount ->
-                    change.consume()
-                    state.resizeSplitEditorBy(
-                        deltaPx = dragAmount,
-                        containerWidthPx = containerWidthPx.toFloat()
-                    )
-                }
-            },
+        SplitEditorLayout.VERTICAL -> modifier
+            .height(16.dp)
+            .fillMaxWidth()
+    }
+    val dragModifier = when (layout) {
+        SplitEditorLayout.HORIZONTAL -> Modifier.pointerInput(state, containerMainAxisPx) {
+            detectHorizontalDragGestures { change, dragAmount ->
+                change.consume()
+                state.resizeSplitEditorBy(
+                    deltaPx = dragAmount,
+                    containerWidthPx = containerMainAxisPx.toFloat()
+                )
+            }
+        }
+        SplitEditorLayout.VERTICAL -> Modifier.pointerInput(state, containerMainAxisPx) {
+            detectVerticalDragGestures { change, dragAmount ->
+                change.consume()
+                state.resizeSplitEditorBy(
+                    deltaPx = dragAmount,
+                    containerWidthPx = containerMainAxisPx.toFloat()
+                )
+            }
+        }
+    }
+
+    Box(
+        modifier = handleModifier.then(dragModifier),
         contentAlignment = Alignment.Center
     ) {
         Box(
-            modifier = Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(handleColor)
+            modifier = when (layout) {
+                SplitEditorLayout.HORIZONTAL -> Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                SplitEditorLayout.VERTICAL -> Modifier
+                    .height(1.dp)
+                    .fillMaxWidth()
+            }.background(handleColor)
         )
         Box(
-            modifier = Modifier
-                .width(3.dp)
-                .height(32.dp)
+            modifier = when (layout) {
+                SplitEditorLayout.HORIZONTAL -> Modifier
+                    .width(3.dp)
+                    .height(32.dp)
+                SplitEditorLayout.VERTICAL -> Modifier
+                    .width(32.dp)
+                    .height(3.dp)
+            }
                 .clip(RoundedCornerShape(2.dp))
                 .background(gripColor)
         )

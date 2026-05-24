@@ -72,6 +72,7 @@ internal fun MainActivityTopBarHost(
         canNavigateBack = canNavigateBack,
         canNavigateForward = canNavigateForward,
         isSplitEditorEnabled = editorContainerState.isSplitEditorEnabled,
+        splitEditorLayout = editorContainerState.splitEditorLayout,
         canMoveTabToSecondaryPane = canMoveTabToSecondaryPane,
         currentBuildSystem = buildUiState.currentBuildSystem,
         availableTargets = buildUiState.availableTargets,
@@ -129,6 +130,7 @@ private fun rememberMainActivityTopBarCallbacks(
         onRenameSymbol = { editorContainerState.requestActiveLspRename() },
         onSwitchHeaderSource = { editorContainerState.requestActiveLspNavigation("switchHeaderSource") },
         onToggleSplitEditor = { editorContainerState.toggleSplitEditor() },
+        onSetSplitEditorLayout = { layout -> editorContainerState.updateSplitEditorLayout(layout) },
         onMoveTabToSecondaryPane = { editorContainerState.moveActiveTabToSecondaryPane() },
         onGotoLine = {
             when (editorContainerState.getActiveEditableEditorCommandAvailability()) {
