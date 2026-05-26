@@ -1684,6 +1684,9 @@
   <string name="workspace_linux_health_missing_required">缺少必需项：%1$s</string>
   <string name="workspace_linux_health_missing_optional">可选项缺失：%1$s</string>
   <string name="workspace_linux_health_check_failed">自检失败：%1$s</string>
+  <string name="workspace_linux_health_log_started">开始 Linux 环境自检</string>
+  <string name="workspace_linux_health_log_result">Linux 自检结果：%1$s</string>
+  <string name="workspace_linux_health_log_result_with_detail">Linux 自检结果：%1$s（%2$s）</string>
   <string name="btn_refresh_linux_health">重新自检 Linux 环境</string>
   <string name="btn_checking_linux_health">正在自检 Linux 环境</string>
   <string name="btn_enter_workspace">进入工作台</string>

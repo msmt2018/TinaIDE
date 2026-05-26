@@ -9,6 +9,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.ndk.AndroidNativeToolchainManager
 import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
+import com.wuxianggujun.tinaide.core.proot.InstallLogManager
 import com.wuxianggujun.tinaide.core.proot.LinuxDistroRootfsHealthLevel
 import com.wuxianggujun.tinaide.core.proot.LinuxDistroRootfsHealthProbe
 import com.wuxianggujun.tinaide.core.proot.LinuxDistroRootfsHealthReport
@@ -34,6 +35,7 @@ import kotlinx.coroutines.withContext
 class DependencyInstallViewModel(
     private val applicationContext: Context,
     private val configManager: IConfigManager,
+    private val installLogManager: InstallLogManager,
     private val toolchainConfig: ToolchainConfig,
     private val preferredLlvmMajorVersion: Int?,
     private val isRepairMode: Boolean,
@@ -519,6 +521,7 @@ class DependencyInstallViewModel(
 
         rootfsHealthJob?.cancel()
         rootfsHealthJob = viewModelScope.launch {
+            installLogManager.info(Strings.workspace_linux_health_log_started.strOr(applicationContext))
             _uiState.update { state ->
                 state.copy(
                     rootfsHealth = DependencyRootfsHealthUiState(
@@ -531,24 +534,49 @@ class DependencyInstallViewModel(
             RootfsDistroRuntime(applicationContext, configManager)
                 .checkActiveDistroHealth()
                 .onSuccess { report ->
+                    val healthState = report.toDependencyRootfsHealthUiState()
                     _uiState.update { state ->
-                        state.copy(rootfsHealth = report.toDependencyRootfsHealthUiState())
+                        state.copy(rootfsHealth = healthState)
                     }
+                    logRootfsHealthResult(healthState)
                 }
                 .onFailure { error ->
+                    val healthState = DependencyRootfsHealthUiState(
+                        status = DependencyRootfsHealthStatus.UNAVAILABLE,
+                        statusText = Strings.workspace_linux_health_unavailable.strOr(applicationContext),
+                        detailText = Strings.workspace_linux_health_check_failed.strOr(
+                            applicationContext,
+                            error.message ?: Strings.error_unknown.strOr(applicationContext),
+                        ),
+                    )
                     _uiState.update { state ->
-                        state.copy(
-                            rootfsHealth = DependencyRootfsHealthUiState(
-                                status = DependencyRootfsHealthStatus.UNAVAILABLE,
-                                statusText = Strings.workspace_linux_health_unavailable.strOr(applicationContext),
-                                detailText = Strings.workspace_linux_health_check_failed.strOr(
-                                    applicationContext,
-                                    error.message ?: Strings.error_unknown.strOr(applicationContext),
-                                ),
-                            )
-                        )
+                        state.copy(rootfsHealth = healthState)
                     }
+                    logRootfsHealthResult(healthState)
                 }
+        }
+    }
+
+    private fun logRootfsHealthResult(healthState: DependencyRootfsHealthUiState) {
+        val statusText = healthState.statusText.ifBlank {
+            Strings.workspace_linux_health_unknown.strOr(applicationContext)
+        }
+        val message = if (healthState.detailText.isBlank()) {
+            Strings.workspace_linux_health_log_result.strOr(applicationContext, statusText)
+        } else {
+            Strings.workspace_linux_health_log_result_with_detail.strOr(
+                applicationContext,
+                statusText,
+                healthState.detailText,
+            )
+        }
+
+        when (healthState.status) {
+            DependencyRootfsHealthStatus.READY -> installLogManager.success(message)
+            DependencyRootfsHealthStatus.ATTENTION -> installLogManager.warning(message)
+            DependencyRootfsHealthStatus.UNAVAILABLE -> installLogManager.error(message)
+            DependencyRootfsHealthStatus.CHECKING,
+            DependencyRootfsHealthStatus.UNKNOWN -> installLogManager.info(message)
         }
     }
 
