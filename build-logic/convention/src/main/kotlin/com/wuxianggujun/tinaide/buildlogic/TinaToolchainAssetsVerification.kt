@@ -23,16 +23,47 @@ internal object TinaToolchainAssetsVerification {
     val supportedDevAbis: Set<String> = setOf("arm64", "x86_64")
 
     /**
-     * Resolve the configured dev ABI from Gradle properties. Defaults to
-     * `arm64` to match the historic behaviour of `app/build.gradle.kts`.
+     * Resolve the dev ABI flavor that should stay enabled.
+     *
+     * Precedence:
+     *  1. `android.injected.build.abi` — AGP injects this when you Run/Install
+     *     from Android Studio to a connected device, so the active flavor
+     *     follows the device automatically.
+     *  2. `-Ptina.devAbi=` / `tina.devAbi` in gradle.properties — explicit
+     *     CLI / IDE override.
+     *  3. Fallback `arm64` to match historic behaviour.
      */
     fun resolveLocalDevAbi(project: Project): String {
+        injectedAbiFlavor(project)?.let { return it }
         val raw = project.providers.gradleProperty("tina.devAbi").orNull?.trim().orEmpty()
         val abi = if (raw.isBlank()) "arm64" else raw
         require(abi in supportedDevAbis) {
             "Unsupported -Ptina.devAbi=$abi. Expected one of $supportedDevAbis."
         }
         return abi
+    }
+
+    /**
+     * Map the AGP-injected device ABI list to one of our flavor names.
+     * AGP passes a comma separated list ordered by device preference, e.g.
+     * `arm64-v8a,armeabi-v7a` or `x86_64,x86`. We pick the first entry that
+     * matches a supported flavor.
+     */
+    private fun injectedAbiFlavor(project: Project): String? {
+        val injected = project.providers.gradleProperty("android.injected.build.abi").orNull
+            ?: return null
+        return injected.split(',')
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .mapNotNull { abi ->
+                when {
+                    abi.startsWith("arm64") || abi.startsWith("aarch64") -> "arm64"
+                    abi.startsWith("x86_64") -> "x86_64"
+                    else -> null
+                }
+            }
+            .firstOrNull()
     }
 
     /**
