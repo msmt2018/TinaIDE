@@ -112,6 +112,7 @@ TinaIDE is an integrated development environment designed specifically for Andro
 | Theme Plugins | Provide editor themes via plugins |
 | Snippet Plugins | Show snippets in completion list and insert placeholders |
 | Bundled Plugins | `assets/bundled_plugins/*` auto install/update on app start |
+| Public Registry | Plugins and packages are published from `https://github.com/wuxianggujun/TinaIDE-Registry` |
 
 ### File Preview
 

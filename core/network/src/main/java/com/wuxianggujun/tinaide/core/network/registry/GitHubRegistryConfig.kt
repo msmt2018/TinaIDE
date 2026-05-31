@@ -9,7 +9,7 @@ object GitHubRegistryConfig {
     const val JSDELIVR_BASE_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPOSITORY@$BRANCH"
 
     const val RAW_BASE_URL = GITHUB_RAW_BASE_URL
-    const val PRIMARY_BASE_URL = JSDELIVR_BASE_URL
+    const val PRIMARY_BASE_URL = GITHUB_RAW_BASE_URL
 
     const val PLUGINS_INDEX_PATH = "plugins/index.json"
     const val PACKAGES_INDEX_PATH = "packages/index.json"
@@ -17,8 +17,8 @@ object GitHubRegistryConfig {
     const val PACKAGES_INDEX_URL = "$PRIMARY_BASE_URL/$PACKAGES_INDEX_PATH"
 
     val REGISTRY_ENDPOINTS: List<RegistryEndpoint> = listOf(
-        RegistryEndpoint(name = "jsDelivr CDN", baseUrl = JSDELIVR_BASE_URL),
         RegistryEndpoint(name = "GitHub Raw", baseUrl = GITHUB_RAW_BASE_URL),
+        RegistryEndpoint(name = "jsDelivr CDN", baseUrl = JSDELIVR_BASE_URL),
     )
 
     fun pluginIndexUrls(): List<RegistryUrl> = indexUrls(PLUGINS_INDEX_PATH)

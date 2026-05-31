@@ -675,7 +675,15 @@ my-plugin.tinaplug
 
 ## 当前内置插件（assets）
 
-仓库当前随 APK 分发的内置插件位于 `app/src/main/assets/bundled_plugins/`：
+公开发布事实源已经迁移到 TinaIDE Registry：
+
+```text
+https://github.com/wuxianggujun/TinaIDE-Registry
+```
+
+Registry 中的 `sources/plugins/**`、`plugins/index.json` 和 `packages/index.json`
+负责市场分发。主仓库当前随 APK 分发的内置插件位于
+`app/src/main/assets/bundled_plugins/`，用于首次启动的兜底自动安装：
 
 - `tinaide.plugin.starters`：插件 starter 模板入口
 - `tinaide.lsp.python`：Python LSP 示例插件
@@ -685,6 +693,8 @@ my-plugin.tinaplug
 
 更新内置插件的方式：
 
+- 市场发布：在 `TinaIDE-Registry` 更新 `sources/plugins/**` 或包文件，运行
+  `scripts/build-registry.ps1`，提交生成的 `plugins/index.json` / `packages/index.json`。
 - 修改 `app/src/main/assets/bundled_plugins/<pluginId>/manifest.json` 的 `version`（例如 `1.0.1`）
 - 下次启动会自动覆盖安装到 `filesDir/plugins/<pluginId>/`
 

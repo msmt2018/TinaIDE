@@ -1,6 +1,6 @@
 # TinaIDE GitHub Registry
 
-> 更新日期：2026-05-22
+> 更新日期：2026-06-01
 
 TinaIDE 开源版的插件市场与依赖包市场不再从 TinaServer 读取索引。
 客户端默认读取公开仓库：
@@ -9,14 +9,29 @@ TinaIDE 开源版的插件市场与依赖包市场不再从 TinaServer 读取索
 https://github.com/wuxianggujun/TinaIDE-Registry
 ```
 
+这个仓库是插件与依赖包的公开 Registry，不是 Android 主项目的源码目录。
+它现在同时承载：
+
+- `plugins/index.json` 与 `packages/index.json`
+- `plugins/<plugin-id>/<version>/*.tinaplug`
+- `packages/<package-id>/<version>/*`
+- `sources/plugins/**`
+- `sources/plugin-starters/**`
+- `metadata/*.json`
+- `scripts/*.ps1`
+
+发布插件或依赖包时，需要把 `.tinaplug` / 包文件放入该仓库约定目录，或在索引里填写
+可信 CDN、对象存储、自建代理的绝对下载地址，并同步更新对应索引。
+
 客户端内置两个索引入口，按顺序自动尝试：
 
 ```text
-https://cdn.jsdelivr.net/gh/wuxianggujun/TinaIDE-Registry@main
 https://raw.githubusercontent.com/wuxianggujun/TinaIDE-Registry/main
+https://cdn.jsdelivr.net/gh/wuxianggujun/TinaIDE-Registry@main
 ```
 
-国内网络优先走 jsDelivr CDN；如果 CDN 不可用，再回退到 GitHub Raw。
+默认优先走 GitHub Raw，避免 jsDelivr 缓存旧索引导致市场列表为空；
+Raw 不可用时再回退到 jsDelivr CDN。
 如果用户设备配置了系统代理，OkHttp 会继续按系统代理策略发起请求。
 
 不建议把插件/依赖索引托管在不可信的第三方 GitHub 加速代理上，因为索引会决定
@@ -36,19 +51,35 @@ plugins/index.json
 plugins/<plugin-id>/<version>/<plugin-id>.tinaplug
 packages/index.json
 packages/<package-id>/<version>/<file>.tar.xz
+sources/plugins/<plugin-id>/manifest.json
+sources/plugin-starters/<template>/
+metadata/plugins.json
+metadata/packages.json
+scripts/build-registry.ps1
 ```
 
 `download_url` 和 `download_sources[].url` 支持两种写法：
 
 - 绝对 URL：客户端原样访问。
 - 相对路径：客户端会拼到本次成功加载索引的 Registry base 后面。
-  默认通常是 jsDelivr CDN，失败后才会是 GitHub Raw。
+  默认通常是 GitHub Raw，失败后才会是 jsDelivr CDN。
 
 国内网络建议：
 
-- 小文件、索引、示例插件可以继续使用相对路径，客户端会优先走 CDN。
+- 小文件、索引、示例插件可以继续使用相对路径，客户端会优先走 GitHub Raw。
 - 大文件、依赖包、运行时包建议填写你自己的 CDN/对象存储绝对 URL。
 - 不要把未校验的大文件只放在随机公开代理上；能填写 `sha256:` 时必须填写。
+
+## 构建索引
+
+Registry 仓库内执行：
+
+```powershell
+pwsh ./scripts/build-registry.ps1
+```
+
+脚本会重新打包 `sources/plugins/**`，计算插件包和依赖包的 SHA-256，
+并重写 `plugins/index.json` 与 `packages/index.json`。
 
 ## 插件索引
 

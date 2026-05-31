@@ -646,7 +646,7 @@ data class LspToolchainConfig(
 | [LspPluginManager.kt](../../core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspPluginManager.kt) | LSP 插件管理器 |
 | [LspToolchainInstaller.kt](../../core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspToolchainInstaller.kt) | 工具链安装器 |
 | [PluginLspConnectionProvider.kt](../../core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/PluginLspConnectionProvider.kt) | LSP 连接提供者 |
-| [tinaide.lsp.python/manifest.json](../../app/src/main/assets/bundled_plugins/tinaide.lsp.python/manifest.json) | Python LSP 示例插件 |
+| [tinaide.lsp.python/manifest.json](https://github.com/wuxianggujun/TinaIDE-Registry/tree/main/sources/plugins/tinaide.lsp.python) | Python LSP 示例插件发布源 |
 
 ---
 
