@@ -37,6 +37,15 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.17.7] - 2026-06-01
+
+### Fixed
+- 发布 0.17.6 SmartDns 启动崩溃修复的确认版，便于用户通过最新 Release 下载到包含 `StackOverflowError` 修复的 APK。
+
+### Verification
+- 新增 `SmartDnsCircularDependencyTest` 回归测试，覆盖 `DohDnsResolver`、`SmartDns`、`OkHttpClientProvider.probe` 初始化不再形成循环依赖，并验证 `SmartDnsResolver` 能正常解析 `localhost`。
+- `.\gradlew.bat :core:network:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.network.SmartDnsCircularDependencyTest" --console=plain`
+
 ## [0.17.6] - 2026-05-31
 
 ### Fixed
