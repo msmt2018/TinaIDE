@@ -65,7 +65,6 @@ import com.wuxianggujun.tinaide.storage.StorageManager
 import com.wuxianggujun.tinaide.storage.compose.rememberStoragePermissionRequester
 import com.wuxianggujun.tinaide.tutorial.SpotlightUiState
 import com.wuxianggujun.tinaide.tutorial.spotlight.SpotlightTargets
-import com.wuxianggujun.tinaide.update.AppUpdateInfo
 import com.wuxianggujun.tinaide.ui.ProjectManagerViewModel
 import com.wuxianggujun.tinaide.ui.UiMessageException
 import com.wuxianggujun.tinaide.ui.compose.components.ProjectCardSkeleton
@@ -84,6 +83,7 @@ import com.wuxianggujun.tinaide.ui.projectlist.RenameProjectDialog
 import com.wuxianggujun.tinaide.ui.projectlist.SearchBox
 import com.wuxianggujun.tinaide.ui.projectlist.SectionHeader
 import com.wuxianggujun.tinaide.ui.wizard.NewProjectWizardActivity
+import com.wuxianggujun.tinaide.update.AppUpdateInfo
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

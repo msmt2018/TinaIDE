@@ -1,9 +1,9 @@
 package com.wuxianggujun.tinaide.ai.integration
 
 import com.google.common.truth.Truth.assertThat
-import org.junit.Test
 import java.io.File
 import kotlin.io.path.createTempDirectory
+import org.junit.Test
 
 class PathUtilsTest {
 

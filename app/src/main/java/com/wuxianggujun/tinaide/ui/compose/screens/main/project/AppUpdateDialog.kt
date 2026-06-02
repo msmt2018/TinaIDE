@@ -17,13 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.i18n.Strings
-import com.wuxianggujun.tinaide.update.AppUpdateInfo
 import com.wuxianggujun.tinaide.ui.compose.components.MarkdownViewer
 import com.wuxianggujun.tinaide.ui.compose.components.TinaCustomDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaCustomDialogHeader
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogActionRow
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPrimaryButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTextButton
+import com.wuxianggujun.tinaide.update.AppUpdateInfo
 
 @Composable
 fun AppUpdateDialog(

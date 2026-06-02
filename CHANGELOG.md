@@ -37,6 +37,31 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.17.9] - 2026-06-02
+
+### Changed
+- Git 提交面板接通提交信息历史记录：历史按钮现在会读取最近 Git 提交消息，用户可以快速复用已有提交说明。
+- Git 提交表情插入逻辑收口，避免在已有提交信息前产生重复空格。
+- `version.properties` 升级到 `0.17.9 / 1710`，为下一轮测试包与 `v0.17.8` 发布包做版本区分。
+
+### Documentation
+- 校正 Feature Roadmap 中已接入的小 TODO 状态，避免路线图继续把安装引导、底部面板、调试变量和 Git 入口误标为未实现。
+
+### Verification
+- `py tools/i18n/check_all.py`
+- `.\gradlew.bat :app:ktlintCheck --console=plain --no-daemon`
+- `.\gradlew.bat :app:compileArm64DebugKotlin --console=plain --no-daemon`
+
+## [0.17.8] - 2026-06-02
+
+### Changed
+- 完善分屏编辑器与状态管理体验，补齐分栏焦点、布局切换、标签移动/复制和状态持久化闭环。
+- 增强自定义项目模板与内置模板管理链路，项目模板 ZIP 扫描、元数据展示和设置页管理进一步收口。
+
+### Verification
+- `.\gradlew.bat :app:compileArm64DebugKotlin --console=plain`
+- GitHub Actions `Build and Release` 已通过：run `26824061799`，并生成 `arm64-v8a` / `x86_64` Release APK。
+
 ## [0.17.7] - 2026-06-01
 
 ### Fixed

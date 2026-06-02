@@ -1536,15 +1536,14 @@ class EditorContainerStateTest {
         )
     }
 
-    private fun newEditorContainerState(manager: IEditorManager = editorManager): EditorContainerState =
-        EditorContainerState(
-            context = context,
-            editorManager = manager,
-            snippetManager = mockk<PluginSnippetManager>(relaxed = true),
-            pluginThemeRegistry = mockk<PluginEditorThemeRegistry>(relaxed = true),
-            projectSymbolIndexServiceProvider = { null },
-            projectRootPathProvider = { context.cacheDir.absolutePath }
-        )
+    private fun newEditorContainerState(manager: IEditorManager = editorManager): EditorContainerState = EditorContainerState(
+        context = context,
+        editorManager = manager,
+        snippetManager = mockk<PluginSnippetManager>(relaxed = true),
+        pluginThemeRegistry = mockk<PluginEditorThemeRegistry>(relaxed = true),
+        projectSymbolIndexServiceProvider = { null },
+        projectRootPathProvider = { context.cacheDir.absolutePath }
+    )
 
     @Suppress("UNCHECKED_CAST")
     private fun setLspStatus(tabId: String, status: EditorStatus) {

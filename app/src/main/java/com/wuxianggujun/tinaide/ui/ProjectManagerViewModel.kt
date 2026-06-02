@@ -255,9 +255,8 @@ class ProjectManagerViewModel(
         throw UiMessageException(access.failureMessageResId ?: Strings.toast_open_failed)
     }
 
-    private fun isManagedProject(appContext: Application, dir: File): Boolean =
-        ProjectPaths.isUnderPublicProjectsRoot(appContext, dir) ||
-            ProjectPaths.isUnderPrivateProjectsRoot(appContext, dir)
+    private fun isManagedProject(appContext: Application, dir: File): Boolean = ProjectPaths.isUnderPublicProjectsRoot(appContext, dir) ||
+        ProjectPaths.isUnderPrivateProjectsRoot(appContext, dir)
 
     private fun isEmptyProjectShell(dir: File): Boolean {
         val children = dir.listFiles() ?: return false

@@ -167,6 +167,8 @@ internal fun MainActivityDrawerContentHost(
             onOpenRemoteDialog = {
                 gitDialogState.showRemoteDialog = true
             },
+            recentCommitMessages = gitUiState.recentCommitMessages,
+            onClearCommitMessageHistory = gitViewModel::clearRecentCommitMessages,
         ),
         aiChatViewModel = currentAiChatViewModel,
         aiCallbacks = DrawerAiCallbacks(

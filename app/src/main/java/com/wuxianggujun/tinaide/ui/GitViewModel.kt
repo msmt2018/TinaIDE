@@ -31,6 +31,7 @@ class GitViewModel(
 
     companion object {
         private const val TAG = "GitViewModel"
+        private const val RECENT_COMMIT_MESSAGE_LIMIT = 10
     }
 
     private val _status = MutableStateFlow(GitStatus.NOT_A_REPOSITORY)
@@ -51,6 +52,9 @@ class GitViewModel(
     // 提交历史
     private val _commitHistory = MutableStateFlow<List<GitCommit>>(emptyList())
     val commitHistory: StateFlow<List<GitCommit>> = _commitHistory.asStateFlow()
+
+    private val _recentCommitMessages = MutableStateFlow<List<String>>(emptyList())
+    val recentCommitMessages: StateFlow<List<String>> = _recentCommitMessages.asStateFlow()
 
     private val _isLoadingHistory = MutableStateFlow(false)
     val isLoadingHistory: StateFlow<Boolean> = _isLoadingHistory.asStateFlow()
@@ -176,6 +180,15 @@ class GitViewModel(
         }
     }
 
+    private fun updateCommitHistory(commits: List<GitCommit>) {
+        _commitHistory.value = commits
+        _recentCommitMessages.value = commits
+            .map { commit -> commit.fullMessage.ifBlank { commit.message }.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(RECENT_COMMIT_MESSAGE_LIMIT)
+    }
+
     // ========== 项目路径 ==========
 
     /**
@@ -235,8 +248,12 @@ class GitViewModel(
             loadingState = _isLoadingHistory,
             fallbackMessage = Strings.git_error_get_history_failed.str(),
             op = { gitService.getCommitHistory(path, maxCount) },
-            onSuccess = { _commitHistory.value = it }
+            onSuccess = { updateCommitHistory(it) }
         )
+    }
+
+    fun clearRecentCommitMessages() {
+        _recentCommitMessages.value = emptyList()
     }
 
     /**
@@ -353,6 +370,7 @@ class GitViewModel(
             op = { gitService.commit(path, message) },
             onSuccess = {
                 refresh()
+                loadCommitHistory()
                 onSuccess()
             }
         )

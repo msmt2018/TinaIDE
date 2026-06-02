@@ -125,7 +125,6 @@ fun MyPublishScreen(
                     } else {
                         items(myPluginsState.plugins, key = { it.id }) { plugin -> MyPluginCard(plugin = plugin) }
                     }
-
                 }
             }
         }
@@ -144,7 +143,6 @@ fun MyPublishScreen(
             onUpload = { uri, changelog -> viewModel.uploadPlugin(uri, changelog) { success, _ -> if (success) showUploadPluginDialog = false } }
         )
     }
-
 }
 
 // ── 内部辅助组件（插件相关，不属于 snippet） ──

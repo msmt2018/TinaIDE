@@ -67,6 +67,7 @@ data class UploadState(
     val progress: Float = 0f,
     val error: String? = null
 )
+
 @Serializable
 data class MyPluginSummary(
     val id: String,

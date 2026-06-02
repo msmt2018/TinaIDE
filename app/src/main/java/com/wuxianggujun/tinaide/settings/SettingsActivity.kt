@@ -83,7 +83,6 @@ internal object SettingsActivitySupport {
     fun resolveInitialRoute(routeId: String?): SettingsRoute = routeId?.takeUnless { it.isBlank() }?.let(initialRoutes::get) ?: SettingsRoute.Root
 
     fun resolveInitialRoute(intent: Intent): SettingsRoute = resolveInitialRoute(extractInitialRouteId(intent))
-
 }
 
 internal data class SettingsNavigationState(

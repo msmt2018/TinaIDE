@@ -109,5 +109,4 @@ class SettingsActivitySupportTest {
         assertThat(SettingsActivitySupport.resolveInitialRoute("   ")).isEqualTo(SettingsRoute.Root)
         assertThat(SettingsActivitySupport.resolveInitialRoute(null)).isEqualTo(SettingsRoute.Root)
     }
-
 }

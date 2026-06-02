@@ -70,12 +70,10 @@ private const val DEFAULT_SPLIT_EDITOR_PRIMARY_RATIO = 0.5f
 private const val MIN_SPLIT_EDITOR_PRIMARY_RATIO = 0.25f
 private const val MAX_SPLIT_EDITOR_PRIMARY_RATIO = 0.75f
 
-private fun coerceSplitEditorPrimaryRatio(ratio: Float): Float {
-    return if (ratio.isFinite()) {
-        ratio.coerceIn(MIN_SPLIT_EDITOR_PRIMARY_RATIO, MAX_SPLIT_EDITOR_PRIMARY_RATIO)
-    } else {
-        DEFAULT_SPLIT_EDITOR_PRIMARY_RATIO
-    }
+private fun coerceSplitEditorPrimaryRatio(ratio: Float): Float = if (ratio.isFinite()) {
+    ratio.coerceIn(MIN_SPLIT_EDITOR_PRIMARY_RATIO, MAX_SPLIT_EDITOR_PRIMARY_RATIO)
+} else {
+    DEFAULT_SPLIT_EDITOR_PRIMARY_RATIO
 }
 
 /**
@@ -402,9 +400,7 @@ class EditorContainerState(
     private fun resolveProjectRootPath(): String? = projectRootPathProvider()
         ?.takeIf { it.isNotBlank() }
 
-    private fun resolveSplitEditorSessionProjectPath(): String? {
-        return resolveProjectRootPath()?.let(::normalizeOpenTabLookupPath)
-    }
+    private fun resolveSplitEditorSessionProjectPath(): String? = resolveProjectRootPath()?.let(::normalizeOpenTabLookupPath)
 
     internal fun getEditorProjectRootPathOrNull(): String? = resolveProjectRootPath()
 
@@ -1440,9 +1436,7 @@ class EditorContainerState(
         splitEditorLayout = SplitEditorLayout.HORIZONTAL
     }
 
-    fun getTabsForPane(pane: EditorPaneId): List<EditorTabState> {
-        return getTabsForPaneInternal(pane)
-    }
+    fun getTabsForPane(pane: EditorPaneId): List<EditorTabState> = getTabsForPaneInternal(pane)
 
     fun getActiveIndexForPane(pane: EditorPaneId): Int {
         val activeTabId = activeTabIdByPane[pane]
@@ -1650,14 +1644,11 @@ class EditorContainerState(
         }
     }
 
-    private fun getTabsForPaneInternal(pane: EditorPaneId): List<EditorTabState> =
-        tabs.filter { isTabVisibleInPane(it.id, pane) }
+    private fun getTabsForPaneInternal(pane: EditorPaneId): List<EditorTabState> = tabs.filter { isTabVisibleInPane(it.id, pane) }
 
-    private fun isTabVisibleInPane(tabId: String, pane: EditorPaneId): Boolean =
-        resolvePaneForTab(tabId) == pane || isTabMirroredToPane(tabId, pane)
+    private fun isTabVisibleInPane(tabId: String, pane: EditorPaneId): Boolean = resolvePaneForTab(tabId) == pane || isTabMirroredToPane(tabId, pane)
 
-    private fun isTabMirroredToPane(tabId: String, pane: EditorPaneId): Boolean =
-        isSplitEditorEnabled && mirroredTabIdsByPane[pane]?.contains(tabId) == true
+    private fun isTabMirroredToPane(tabId: String, pane: EditorPaneId): Boolean = isSplitEditorEnabled && mirroredTabIdsByPane[pane]?.contains(tabId) == true
 
     private fun addMirroredTabToPane(pane: EditorPaneId, tabId: String) {
         if (resolvePaneForTab(tabId) == pane) return
@@ -1701,12 +1692,11 @@ class EditorContainerState(
         }
     }
 
-    private fun resolvePaneForTab(tabId: String): EditorPaneId =
-        if (isSplitEditorEnabled) {
-            tabPaneMap[tabId] ?: EditorPaneId.PRIMARY
-        } else {
-            EditorPaneId.PRIMARY
-        }
+    private fun resolvePaneForTab(tabId: String): EditorPaneId = if (isSplitEditorEnabled) {
+        tabPaneMap[tabId] ?: EditorPaneId.PRIMARY
+    } else {
+        EditorPaneId.PRIMARY
+    }
 
     private fun getActiveTab(): EditorTabState? = tabManager.getActiveTab()
 

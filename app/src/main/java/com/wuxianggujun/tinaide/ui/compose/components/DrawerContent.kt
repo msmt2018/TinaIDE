@@ -73,6 +73,8 @@ internal class DrawerGitCallbacks(
     val onInitRepository: () -> Unit = {},
     val onOpenSyncDialog: () -> Unit = {},
     val onOpenRemoteDialog: () -> Unit = {},
+    val recentCommitMessages: List<String> = emptyList(),
+    val onClearCommitMessageHistory: () -> Unit = {},
 )
 
 internal class DrawerAiCallbacks(
@@ -150,6 +152,8 @@ internal fun DrawerContent(
                     onInitRepository = gitCallbacks.onInitRepository,
                     onOpenSync = gitCallbacks.onOpenSyncDialog,
                     onOpenRemotes = gitCallbacks.onOpenRemoteDialog,
+                    recentCommitMessages = gitCallbacks.recentCommitMessages,
+                    onClearCommitMessageHistory = gitCallbacks.onClearCommitMessageHistory,
                     modifier = Modifier.weight(1f)
                 )
             }
