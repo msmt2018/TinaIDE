@@ -22,8 +22,20 @@ class DiagnosticsCallbacksImpl(
         // 根据请求过滤
         val filtered = if (request.filePath != null) {
             // 规范化请求的文件路径
-            val requestPath = PathUtils.normalizeFilePath(request.filePath!!)
-            val requestRelativePath = PathUtils.toRelativePath(requestPath, projectRoot)
+            val requestRelativePath = runCatching {
+                PathUtils.toRelativePath(
+                    PathUtils.resolveProjectFile(request.filePath!!, projectRoot).absolutePath,
+                    projectRoot
+                )
+            }.getOrElse {
+                return DiagnosticsResult(
+                    diagnostics = emptyList(),
+                    errorCount = 0,
+                    warningCount = 0,
+                    infoCount = 0,
+                    hintCount = 0
+                )
+            }
 
             allDiagnostics.filter { diagnostic ->
                 // 规范化诊断信息中的文件路径并转换为相对路径
@@ -71,8 +83,7 @@ class DiagnosticsCallbacksImpl(
 
     override fun clearDiagnostics(filePath: String): Boolean = try {
         // 规范化并转换为相对路径
-        val normalizedPath = PathUtils.normalizeFilePath(filePath)
-        val path = PathUtils.toAbsolutePath(normalizedPath, projectRoot)
+        val path = PathUtils.resolveProjectFile(filePath, projectRoot).absolutePath
 
         // 清除指定文件的诊断信息
         bottomPanelViewModel.replaceDiagnosticsForFile("file://$path", emptyList())

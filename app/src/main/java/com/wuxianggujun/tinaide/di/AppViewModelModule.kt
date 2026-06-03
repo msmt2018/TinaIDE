@@ -16,7 +16,6 @@ import com.wuxianggujun.tinaide.ui.MainViewModel
 import com.wuxianggujun.tinaide.ui.MultiTerminalViewModel
 import com.wuxianggujun.tinaide.ui.ProjectManagerViewModel
 import com.wuxianggujun.tinaide.ui.compose.screens.main.market.MarketScreenViewModel
-import com.wuxianggujun.tinaide.ui.compose.screens.main.market.MyPublishViewModel
 import com.wuxianggujun.tinaide.ui.compose.screens.main.profile.DownloadHistoryViewModel
 import com.wuxianggujun.tinaide.ui.compose.screens.main.profile.FavoritesViewModel
 import org.koin.android.ext.koin.androidApplication
@@ -55,7 +54,6 @@ val appViewModelModule = module {
     viewModel { FavoritesViewModel(get()) }
     viewModel { DownloadHistoryViewModel(get()) }
     viewModel { MarketScreenViewModel(androidApplication(), get()) }
-    viewModel { MyPublishViewModel(androidApplication()) }
     viewModel { MultiTerminalViewModel(androidApplication(), get()) }
     viewModel { GlobalSearchViewModel(androidApplication()) }
 }

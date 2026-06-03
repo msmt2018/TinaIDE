@@ -3,7 +3,8 @@ set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)"
-OUTPUT_ROOT="$REPO_ROOT/app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates"
+# Historical script name kept for now; starter packages are no longer written into APK assets.
+OUTPUT_ROOT="$REPO_ROOT/tools/plugin-starters/dist/tinaide.plugin.starters/templates"
 SHARED_ROOT="$SCRIPT_DIR/shared"
 STAGING_ROOT="$SCRIPT_DIR/.bundle"
 

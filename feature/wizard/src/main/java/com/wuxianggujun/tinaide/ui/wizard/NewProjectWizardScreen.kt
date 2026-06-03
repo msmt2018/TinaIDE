@@ -39,8 +39,6 @@ import com.wuxianggujun.tinaide.project.AndroidApiLevel
 import com.wuxianggujun.tinaide.project.ProjectBuildSystem
 import com.wuxianggujun.tinaide.project.ProjectTemplateOption
 import com.wuxianggujun.tinaide.project.CppStandard
-import com.wuxianggujun.tinaide.project.ProjectTemplateInstaller
-import com.wuxianggujun.tinaide.project.ProjectTemplateSpec
 import com.wuxianggujun.tinaide.project.getDisplayName
 import com.wuxianggujun.tinaide.storage.compose.rememberStoragePermissionRequester
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPrimaryButton
@@ -418,22 +416,14 @@ private fun TemplateEmptyState(isPluginProjectMode: Boolean) {
 }
 
 private fun iconForTemplate(option: ProjectTemplateOption): ImageVector {
-    return when (val spec = option.spec) {
-        is ProjectTemplateSpec.Asset -> when (spec.type) {
-            ProjectTemplateInstaller.TemplateType.CPP_SINGLE_FILE -> Icons.Default.Description
-            ProjectTemplateInstaller.TemplateType.CMAKE_EXECUTABLE -> Icons.Default.Code
-            ProjectTemplateInstaller.TemplateType.CMAKE_LIBRARY -> Icons.Default.Folder
-            ProjectTemplateInstaller.TemplateType.MAKE_EXECUTABLE -> Icons.Default.Construction
-            ProjectTemplateInstaller.TemplateType.NDK_SHARED_LIBRARY -> Icons.Default.PhoneAndroid
-        }
-        is ProjectTemplateSpec.Zip -> when {
-            NewProjectWizardSupport.isUserTemplate(option) -> Icons.Default.Folder
-            option.displayName.contains("sdl", ignoreCase = true) -> Icons.Default.Code
-            spec.isNdkTemplate -> Icons.Default.PhoneAndroid
-            spec.buildSystem == ProjectBuildSystem.PLUGIN -> Icons.Default.Extension
-            spec.buildSystem == ProjectBuildSystem.MAKE -> Icons.Default.Construction
-            else -> Icons.Default.Code
-        }
+    val spec = option.spec
+    return when {
+        NewProjectWizardSupport.isUserTemplate(option) -> Icons.Default.Folder
+        spec.isNdkTemplate -> Icons.Default.PhoneAndroid
+        spec.buildSystem == ProjectBuildSystem.SINGLE_FILE -> Icons.Default.Description
+        spec.buildSystem == ProjectBuildSystem.MAKE -> Icons.Default.Construction
+        spec.buildSystem == ProjectBuildSystem.PLUGIN -> Icons.Default.Extension
+        else -> Icons.Default.Code
     }
 }
 
@@ -566,7 +556,10 @@ private fun ConfigurationStep(
     var apiLevelExpanded by remember { mutableStateOf(false) }
     val guideTitleRes = NewProjectWizardSupport.resolveConfigurationGuideTitleRes(selectedTemplate)
     val guideBodyRes = NewProjectWizardSupport.resolveConfigurationGuideBodyRes(selectedTemplate)
-    val showsAuthorName = selectedTemplate?.spec is ProjectTemplateSpec.Zip
+    val showsAuthorName = selectedTemplate?.let { template ->
+        NewProjectWizardSupport.isPluginTemplate(template) ||
+            NewProjectWizardSupport.isUserTemplate(template)
+    } == true
 
     Column(
         modifier = Modifier

@@ -1,8 +1,6 @@
 package com.wuxianggujun.tinaide.project
 
-import android.content.Context
 import com.google.common.truth.Truth.assertThat
-import io.mockk.mockk
 import java.io.File
 import java.nio.file.Files
 import java.util.zip.ZipEntry
@@ -28,7 +26,6 @@ class ProjectCreationServiceTest {
         try {
             unsafeNames.forEach { name ->
                 val result = ProjectCreationService.createProject(
-                    context = testContext(),
                     projectRoot = projectRoot,
                     projectName = name,
                     templateSpec = zipTemplateSpec(templateZip)
@@ -53,7 +50,6 @@ class ProjectCreationServiceTest {
 
         try {
             val result = ProjectCreationService.createProject(
-                context = testContext(),
                 projectRoot = projectRoot,
                 projectName = "Safe_Project-1",
                 templateSpec = zipTemplateSpec(templateZip)
@@ -85,7 +81,6 @@ class ProjectCreationServiceTest {
             }
 
             val result = ProjectCreationService.createProject(
-                context = testContext(),
                 projectRoot = projectRoot,
                 projectName = "SafeProject",
                 templateSpec = zipTemplateSpec(brokenZip)
@@ -117,8 +112,6 @@ class ProjectCreationServiceTest {
         }
         return zipFile
     }
-
-    private fun testContext(): Context = mockk(relaxed = true)
 
     private fun ZipOutputStream.writeEntry(name: String, content: String) {
         putNextEntry(ZipEntry(name))

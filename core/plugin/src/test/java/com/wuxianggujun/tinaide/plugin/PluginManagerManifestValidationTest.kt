@@ -118,6 +118,22 @@ class PluginManagerManifestValidationTest {
     }
 
     @Test
+    fun `validateManifest should reject lsp socket and websocket transports`() {
+        listOf("socket", "websocket").forEach { transport ->
+            val pluginDir = createLspPluginDir("validate_lsp_transport_$transport")
+            val manifest = createLspManifest(
+                toolchains = emptyList(),
+                serverType = transport,
+            )
+
+            val error = runValidationFailure(manifest, pluginDir)
+
+            assertThat(error.message).contains(transport)
+            assertThat(error.message).contains("stdio")
+        }
+    }
+
+    @Test
     fun `validateManifest should accept lsp system toolchain package manager overrides`() {
         val pluginDir = createLspPluginDir("validate_lsp_system_packages")
         val manifest = createLspManifest(
@@ -159,6 +175,7 @@ class PluginManagerManifestValidationTest {
 
     private fun createLspManifest(
         toolchains: List<LspToolchainConfig>,
+        serverType: String = "stdio",
     ): PluginManifest {
         return PluginManifest(
             id = "test.plugin.lsp",
@@ -173,7 +190,7 @@ class PluginManagerManifestValidationTest {
                         languages = listOf("python"),
                         fileExtensions = listOf("py"),
                         server = LspServerConnectionConfig(
-                            type = "stdio",
+                            type = serverType,
                             command = "pylsp",
                         ),
                     )

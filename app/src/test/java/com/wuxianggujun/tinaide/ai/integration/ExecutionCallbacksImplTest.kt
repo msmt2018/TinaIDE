@@ -199,16 +199,13 @@ class ExecutionCallbacksImplTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun ExecutionCallbacksImpl.executionStatesForTest(): ConcurrentHashMap<String, ExecutionStatus> =
-        privateField("executionStates") as ConcurrentHashMap<String, ExecutionStatus>
+    private fun ExecutionCallbacksImpl.executionStatesForTest(): ConcurrentHashMap<String, ExecutionStatus> = privateField("executionStates") as ConcurrentHashMap<String, ExecutionStatus>
 
     @Suppress("UNCHECKED_CAST")
-    private fun ExecutionCallbacksImpl.executionResultsForTest(): ConcurrentHashMap<String, ExecutionResult> =
-        privateField("executionResults") as ConcurrentHashMap<String, ExecutionResult>
+    private fun ExecutionCallbacksImpl.executionResultsForTest(): ConcurrentHashMap<String, ExecutionResult> = privateField("executionResults") as ConcurrentHashMap<String, ExecutionResult>
 
     @Suppress("UNCHECKED_CAST")
-    private fun ExecutionCallbacksImpl.activeProcessExecutionIdForTest(): AtomicReference<String?> =
-        privateField("activeProcessExecutionId") as AtomicReference<String?>
+    private fun ExecutionCallbacksImpl.activeProcessExecutionIdForTest(): AtomicReference<String?> = privateField("activeProcessExecutionId") as AtomicReference<String?>
 
     private fun ExecutionCallbacksImpl.privateField(name: String): Any {
         val field = ExecutionCallbacksImpl::class.java.getDeclaredField(name)

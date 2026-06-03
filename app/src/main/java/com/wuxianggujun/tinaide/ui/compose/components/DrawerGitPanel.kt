@@ -49,7 +49,9 @@ fun DrawerGitPanelContent(
     onCommit: (String) -> Unit = {},
     onInitRepository: () -> Unit = {},
     onOpenSync: () -> Unit = {},
-    onOpenRemotes: () -> Unit = {}
+    onOpenRemotes: () -> Unit = {},
+    recentCommitMessages: List<String> = emptyList(),
+    onClearCommitMessageHistory: () -> Unit = {}
 ) {
     var commitMessage by remember { mutableStateOf("") }
 
@@ -112,7 +114,9 @@ fun DrawerGitPanelContent(
                         commitMessage = ""
                     }
                 },
-                canCommit = commitMessage.isNotBlank() && status.staged.isNotEmpty()
+                canCommit = commitMessage.isNotBlank() && status.staged.isNotEmpty(),
+                recentCommitMessages = recentCommitMessages,
+                onClearHistory = onClearCommitMessageHistory
             )
 
             if (!status.hasChanges) {
@@ -290,7 +294,7 @@ private fun CommitMessageSection(
     if (showEmojiPicker) {
         GitCommitEmojiPickerDialog(
             onEmojiSelected = { emoji ->
-                onMessageChange(emoji.emoji + " " + commitMessage)
+                onMessageChange("${emoji.emoji} ${commitMessage.trimStart()}")
             },
             onDismiss = { showEmojiPicker = false }
         )

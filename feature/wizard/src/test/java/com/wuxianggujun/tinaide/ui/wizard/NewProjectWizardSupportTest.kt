@@ -36,7 +36,7 @@ class NewProjectWizardSupportTest {
     @Test
     fun nonPluginTemplateHelpers_shouldKeepDefaultWizardBehavior() {
         val cppTemplate = template(
-            id = "builtin:cpp",
+            id = "template:cpp",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -75,7 +75,7 @@ class NewProjectWizardSupportTest {
     @Test
     fun resolveSelectedTemplate_shouldFallbackToFirstOption() {
         val first = template(
-            id = "builtin:first",
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -101,8 +101,8 @@ class NewProjectWizardSupportTest {
 
     @Test
     fun resolveVisibleTemplateOptions_shouldKeepAllTemplatesByDefault() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -115,15 +115,15 @@ class NewProjectWizardSupportTest {
         assertThat(
             NewProjectWizardSupport.resolveVisibleTemplateOptions(
                 preferPluginTemplate = false,
-                templateOptions = listOf(builtinTemplate, pluginTemplate),
+                templateOptions = listOf(plainTemplate, pluginTemplate),
             )
-        ).containsExactly(builtinTemplate, pluginTemplate).inOrder()
+        ).containsExactly(plainTemplate, pluginTemplate).inOrder()
     }
 
     @Test
     fun resolveVisibleTemplateOptions_shouldOnlyShowPluginTemplatesForPluginEntry() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -136,15 +136,15 @@ class NewProjectWizardSupportTest {
         assertThat(
             NewProjectWizardSupport.resolveVisibleTemplateOptions(
                 preferPluginTemplate = true,
-                templateOptions = listOf(builtinTemplate, pluginTemplate),
+                templateOptions = listOf(plainTemplate, pluginTemplate),
             )
         ).containsExactly(pluginTemplate)
     }
 
     @Test
     fun resolveVisibleTemplateOptions_shouldReturnEmptyWhenPluginEntryHasNoPluginTemplates() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -152,15 +152,15 @@ class NewProjectWizardSupportTest {
         assertThat(
             NewProjectWizardSupport.resolveVisibleTemplateOptions(
                 preferPluginTemplate = true,
-                templateOptions = listOf(builtinTemplate),
+                templateOptions = listOf(plainTemplate),
             )
         ).isEmpty()
     }
 
     @Test
     fun resolveInitialTemplateSelection_shouldUseExplicitTemplateFirst() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -172,17 +172,17 @@ class NewProjectWizardSupportTest {
 
         assertThat(
             NewProjectWizardSupport.resolveInitialTemplateSelection(
-                initialTemplateId = builtinTemplate.id,
+                initialTemplateId = plainTemplate.id,
                 preferPluginTemplate = true,
-                templateOptions = listOf(builtinTemplate, pluginTemplate),
+                templateOptions = listOf(plainTemplate, pluginTemplate),
             )
-        ).isEqualTo(builtinTemplate)
+        ).isEqualTo(plainTemplate)
     }
 
     @Test
     fun resolveInitialTemplateSelection_shouldPreferPluginTemplate() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -196,7 +196,7 @@ class NewProjectWizardSupportTest {
             NewProjectWizardSupport.resolveInitialTemplateSelection(
                 initialTemplateId = null,
                 preferPluginTemplate = true,
-                templateOptions = listOf(builtinTemplate, pluginTemplate),
+                templateOptions = listOf(plainTemplate, pluginTemplate),
             )
         ).isEqualTo(pluginTemplate)
     }
@@ -220,8 +220,8 @@ class NewProjectWizardSupportTest {
 
     @Test
     fun resolveInitialTemplateSelection_shouldWaitWhenTargetMissing() {
-        val builtinTemplate = template(
-            id = "builtin:first",
+        val plainTemplate = template(
+            id = "template:first",
             buildSystem = ProjectBuildSystem.CMAKE,
             primaryLanguage = ProjectLanguage.CPP,
         )
@@ -230,7 +230,7 @@ class NewProjectWizardSupportTest {
             NewProjectWizardSupport.resolveInitialTemplateSelection(
                 initialTemplateId = "plugin:missing",
                 preferPluginTemplate = false,
-                templateOptions = listOf(builtinTemplate),
+                templateOptions = listOf(plainTemplate),
             )
         ).isNull()
     }

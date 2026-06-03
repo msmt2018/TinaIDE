@@ -36,7 +36,11 @@ object ToolParameterParser {
         if (raw.isBlank()) return emptyList()
         return runCatching {
             json.parseToJsonElement(raw).jsonArray.mapNotNull { element ->
-                element.jsonPrimitive.content.trim().takeIf(String::isNotEmpty)
+                (element as? JsonPrimitive)
+                    ?.takeUnless { it is JsonNull }
+                    ?.content
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
             }
         }.getOrElse {
             raw.split(',').mapNotNull { it.trim().takeIf(String::isNotEmpty) }

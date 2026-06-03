@@ -16,7 +16,7 @@
 当前已通过插件项目专用启动参数修正：教程快捷入口会进入“新建插件项目”语境，
 只展示 `ProjectBuildSystem.PLUGIN` 模板。
 
-插件模板通过内置配置插件 `tinaide.plugin.starters` 的
+插件模板通过用户已安装并启用的 `tinaide.plugin.starters` 的
 `contributions.projectTemplates` 注入到模板列表里。也就是说，插件模板目前只是通用项目模板列表中的一类模板。
 
 当前真实流程仍然是：
@@ -36,7 +36,7 @@
 ```text
 插件教程快捷操作
 └── NewProjectWizardActivity
-    ├── BuiltInProjectTemplates.createOptions()
+    ├── BuiltInProjectTemplates.defaultTemplateId
     ├── PluginManager.listProjectTemplateOptions()
     └── NewProjectWizardScreen
         ├── TemplateSelectionStep
@@ -45,7 +45,7 @@
 
 也就是说：
 
-- 内置 C/C++ 模板和插件模板共用同一个 `templateOptions` 列表
+- 内置基础 C/C++ 模板和已安装插件模板共用同一个 `templateOptions` 列表
 - 插件模板只是额外模板项，不会自动生成全新的插件专属页面
 - 教程快捷入口如果只调用默认新建项目 Intent，就不会天然选中插件模板
 - 创建阶段统一走 `ProjectCreationService.createProject()`
@@ -59,7 +59,7 @@
 
 - 打开新建插件项目语境的向导，而不是普通 C/C++ 新建项目语境
 - 插件入口下只展示插件项目模板，避免用户误选普通项目模板
-- 优先选择内置插件模板 `plugin:tinaide.plugin.starters:config-basic`
+- 优先选择已安装的 starter 模板 `plugin:tinaide.plugin.starters:config-basic`
 - 如果精确模板暂时不可用，则回退到第一个可用插件模板
 - 如果没有任何插件模板，显示“暂无插件项目模板”的明确提示
 - 配置步骤隐藏 C++ 标准等无关字段
@@ -115,9 +115,9 @@
 
 如果后续又出现“插件教程打开后不像插件创建”的问题，按下面顺序查：
 
-1. 检查内置插件是否安装并启用
+1. 检查 starter 插件是否安装并启用
    - 插件 ID：`tinaide.plugin.starters`
-   - 资源目录：`app/src/main/assets/bundled_plugins/tinaide.plugin.starters/`
+   - 来源：插件市场 / GitHub Registry
 
 2. 检查模板贡献项是否存在
    - 文件：`manifest.json`
@@ -174,7 +174,7 @@
 
 ## 9. 2026-04-26 二次教程审查记录
 
-本轮继续检查“插件教程”和“内置 starter 模板”是否还有旧口径，发现并修正：
+本轮继续检查“插件教程”和“starter 模板”是否还有旧口径，发现并修正：
 
 1. `Plugin-Authoring-Tutorial.md` 仍把插件创建描述成偏通用新建项目流程。
    - 已改为优先从“创建插件项目”快捷入口进入。
@@ -195,7 +195,7 @@
    - 已改为 IDE 内点击 **运行** 优先，脚本打包用于离线分发。
    - 已修正 `config-basic` 的菜单命令边界说明。
 
-6. 内置 starter zip 已根据源模板重新生成。
+6. starter zip 已根据源模板重新生成，并应同步到 Registry 发布目录。
    - `tina-config-plugin.zip`
    - `tina-script-command-plugin.zip`
    - `tina-script-plugin.zip`

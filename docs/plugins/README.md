@@ -14,7 +14,7 @@
 - APK 导出模板（`contributions.apkExports`）
 - **LSP 插件**：通过插件安装语言服务器，提供代码补全、诊断等功能（`type: "lsp"`）
 - **脚本 / hybrid 插件**：Lua 运行时、权限确认、日志与宿主 API 边界
-- 内置插件（assets 自动安装）
+- 内置兜底插件（assets 自动安装；当前仅保留基础项目模板）
 
 > 为满足 Google Play 合规性：当前仍不支持动态加载 DEX；脚本 / hybrid
 > 插件走仓库内已集成的 Lua 运行时与权限确认流程，不再是“QuickJS 未来阶段”。
@@ -34,7 +34,7 @@
 | [Plugin-Authoring-Tutorial.md](Plugin-Authoring-Tutorial.md) | **插件编写教程（基于模板）** |
 | [Plugin-API-Guide.md](Plugin-API-Guide.md) | **插件 API 指南（稳定 / Beta 边界）** |
 | [LSP-Plugin-Development-Guide.md](LSP-Plugin-Development-Guide.md) | **LSP 插件开发指南**（新） |
-| [Plugin-Marketplace-Troubleshooting.md](Plugin-Marketplace-Troubleshooting.md) | 插件市场安装、更新与服务端存储排障 |
+| [Plugin-Marketplace-Troubleshooting.md](Plugin-Marketplace-Troubleshooting.md) | 插件市场 Registry 安装与更新排障 |
 
 ---
 
@@ -57,14 +57,14 @@
 
 - 向导标题显示 `新建插件项目`
 - 模板列表只展示插件项目模板
-- 默认优先定位到内置 starter 模板
+- 默认优先定位到已安装的 starter 模板
 
 如果从项目页右下角 `+` 进入，仍是通用“新建项目”向导；
 这条路径只作为手动兜底，需要主动选择带插件标识的模板。
 
 ### 2. 选择模板并创建工程
 
-内置 `TinaIDE Plugin Starters` 当前提供：
+`TinaIDE Plugin Starters` 需要先从插件市场 / Registry 安装并启用。当前提供：
 
 - `config-basic`：配置型插件，适合主题、片段、菜单等声明式扩展
 - `script-command`：脚本命令插件，适合先验证菜单命令闭环

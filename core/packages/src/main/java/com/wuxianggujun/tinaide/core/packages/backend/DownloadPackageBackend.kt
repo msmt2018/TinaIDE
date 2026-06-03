@@ -4,6 +4,7 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.common.io.TarExtractor
 import com.wuxianggujun.tinaide.core.packages.api.PackageApiClient
 import com.wuxianggujun.tinaide.core.network.ApiResult
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
 import com.wuxianggujun.tinaide.core.packages.download.DownloadError
 import com.wuxianggujun.tinaide.core.packages.download.DownloadResult
 import com.wuxianggujun.tinaide.core.packages.download.ResumableDownloader
@@ -44,7 +45,10 @@ class DownloadPackageBackend(
     }
 
     private val downloader: ResumableDownloader by lazy {
-        ResumableDownloader(downloadDir)
+        ResumableDownloader(
+            downloadDir = downloadDir,
+            client = GitHubRegistryHttpClientFactory.download(context.applicationContext),
+        )
     }
 
     suspend fun install(

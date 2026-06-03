@@ -8,6 +8,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import java.io.File
+import java.nio.file.Files
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -105,5 +106,29 @@ class PluginCommandRegistryTest {
 
         assertThat(PluginCommandRegistry.isRegistered("plugin.sayHello")).isFalse()
         assertThat(PluginCommandRegistry.isRegistered("plugin.sayBye")).isFalse()
+    }
+
+    @Test
+    fun `commands module should reject invocation target in sibling directory with shared prefix`() {
+        val projectRoot = Files.createTempDirectory("tina-command-root").toFile()
+        val siblingRoot = File(projectRoot.parentFile, "${projectRoot.name}-escape")
+        try {
+            val projectFile = File(projectRoot, "src/Main.kt").apply {
+                parentFile?.mkdirs()
+                writeText("fun main() = Unit")
+            }
+            val outsideFile = File(siblingRoot, "src/Main.kt").apply {
+                parentFile?.mkdirs()
+                writeText("fun outside() = Unit")
+            }
+            val module = CommandsApiModule { projectRoot.absolutePath }
+
+            assertThat(module.resolveInvocationFile(projectFile.absolutePath)?.canonicalFile)
+                .isEqualTo(projectFile.canonicalFile)
+            assertThat(module.resolveInvocationFile(outsideFile.absolutePath)).isNull()
+        } finally {
+            projectRoot.deleteRecursively()
+            siblingRoot.deleteRecursively()
+        }
     }
 }

@@ -26,12 +26,6 @@ data class PluginSummary(
     val publisher: PluginPublisher,
     @SerialName("latest_version")
     val latestVersion: String? = null,
-    @SerialName("download_count")
-    val downloadCount: Long = 0,
-    @SerialName("rating_avg")
-    val ratingAvg: Double = 0.0,
-    @SerialName("rating_count")
-    val ratingCount: Int = 0,
     @SerialName("updated_at")
     val updatedAt: String
 )
@@ -55,35 +49,6 @@ data class PluginVersion(
 )
 
 @Serializable
-data class PluginCommentAuthor(
-    val id: String,
-    @SerialName("display_name")
-    val displayName: String,
-    @SerialName("avatar_url")
-    val avatarUrl: String? = null
-)
-
-@Serializable
-data class PluginComment(
-    val id: String,
-    val author: PluginCommentAuthor,
-    val content: String,
-    @SerialName("is_mine")
-    val isMine: Boolean = false,
-    @SerialName("created_at")
-    val createdAt: String,
-    @SerialName("updated_at")
-    val updatedAt: String
-)
-
-@Serializable
-data class ReportPluginCommentResponse(
-    @SerialName("report_id")
-    val reportId: String,
-    val status: String
-)
-
-@Serializable
 data class PluginDetail(
     val id: String,
     @SerialName("plugin_id")
@@ -101,19 +66,6 @@ data class PluginDetail(
     val license: String? = null,
     val publisher: PluginPublisher,
     val versions: List<PluginVersion> = emptyList(),
-    val comments: List<PluginComment> = emptyList(),
-    @SerialName("can_comment")
-    val canComment: Boolean = true,
-    @SerialName("comment_disabled_reason")
-    val commentDisabledReason: String? = null,
-    @SerialName("download_count")
-    val downloadCount: Long = 0,
-    @SerialName("rating_avg")
-    val ratingAvg: Double = 0.0,
-    @SerialName("rating_count")
-    val ratingCount: Int = 0,
-    @SerialName("my_rating")
-    val myRating: Int? = null,
     @SerialName("created_at")
     val createdAt: String,
     @SerialName("updated_at")
@@ -169,19 +121,7 @@ data class CheckUpdateData(
 )
 
 @Serializable
-data class RatePluginResponse(
-    @SerialName("my_rating")
-    val myRating: Int,
-    @SerialName("rating_avg")
-    val ratingAvg: Double,
-    @SerialName("rating_count")
-    val ratingCount: Int
-)
-
-@Serializable
 enum class PluginSortType(val value: String) {
-    DOWNLOADS("downloads"),
-    RATING("rating"),
     NEWEST("newest"),
     UPDATED("updated")
 }

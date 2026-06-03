@@ -34,6 +34,16 @@ class ToolParameterParserTest {
     }
 
     @Test
+    fun `getStringListParameter ignores non primitive json array entries`() {
+        val values = ToolParameterParser.getStringListParameter(
+            mapOf("arguments" to """["--verbose",{"flag":true},null," --filter=Foo "]"""),
+            "arguments"
+        )
+
+        assertThat(values).containsExactly("--verbose", "--filter=Foo").inOrder()
+    }
+
+    @Test
     fun `typed parameter helpers apply defaults for invalid values`() {
         val args = mapOf("enabled" to "not-bool", "count" to "NaN")
 
@@ -47,6 +57,13 @@ class ToolParameterParserTest {
     fun `parseArguments rejects invalid json`() {
         assertFailsWith<IllegalArgumentException> {
             ToolParameterParser.parseArguments(toolCall("fake", "{invalid-json"))
+        }
+    }
+
+    @Test
+    fun `parseArguments rejects non object json`() {
+        assertFailsWith<IllegalArgumentException> {
+            ToolParameterParser.parseArguments(toolCall("fake", """["path","value"]"""))
         }
     }
 }

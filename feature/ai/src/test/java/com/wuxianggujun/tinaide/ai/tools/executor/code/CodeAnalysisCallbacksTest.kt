@@ -288,6 +288,28 @@ class CodeAnalysisCallbacksTest {
     }
 
     @Test
+    fun testSearchCode_rejectsSiblingDirectoryWithSharedPrefix() {
+        val siblingDir = File(tempDir.parentFile, "${tempDir.name}-outside").apply { mkdirs() }
+        try {
+            File(siblingDir, "Outside.kt").writeText("class OutsidePrefixSecret")
+
+            val result = callbacks.searchCode(
+                CodeSearchRequest(
+                    query = "OutsidePrefixSecret",
+                    path = siblingDir.absolutePath,
+                    maxResults = 10
+                )
+            )
+
+            assertTrue(result.matches.isEmpty(), "Sibling directory with shared prefix should not be searched")
+            assertEquals(0, result.totalCount)
+            assertEquals(false, result.truncated)
+        } finally {
+            siblingDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun testGetCodeOutline_rejectsPathOutsideProjectRoot() {
         val outsideDir = createTempDirectory(prefix = "code-outline-outside-").toFile()
         try {

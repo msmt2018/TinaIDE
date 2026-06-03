@@ -181,7 +181,7 @@ android {
     // Some default ignore patterns may exclude double-underscore directories in assets.
     @Suppress("UnstableApiUsage")
     androidResources {
-        // Do not ignore any assets to ensure libc++ internals like c++/v1/__ios are packaged
+        // Do not ignore any assets to ensure libc++ internals like c++/v1/__ios are packaged.
         ignoreAssetsPattern = ""
         // 禁止 AAPT 压缩已压缩的文件（tar.gz, proot binary 等）
         // 否则 assets.open() 可能无法正确读取

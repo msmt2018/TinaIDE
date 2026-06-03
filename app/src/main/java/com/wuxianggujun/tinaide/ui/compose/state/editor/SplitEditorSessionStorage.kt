@@ -1,9 +1,9 @@
 package com.wuxianggujun.tinaide.ui.compose.state.editor
 
 import android.content.Context
+import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 
 internal class SplitEditorSessionStorage(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -25,32 +25,28 @@ internal class SplitEditorSessionStorage(context: Context) {
             .apply()
     }
 
-    private fun encodeSnapshot(snapshot: EditorContainerState.SplitEditorStateSnapshot): JSONObject {
-        return JSONObject()
-            .put(KEY_VERSION, SNAPSHOT_VERSION)
-            .put(KEY_ENABLED, snapshot.isEnabled)
-            .put(KEY_FOCUSED_PANE, snapshot.focusedPane.name)
-            .put(KEY_LAYOUT, snapshot.layout.name)
-            .put(KEY_PRIMARY_RATIO, snapshot.primaryRatio.toDouble())
-            .put(KEY_TAB_ASSIGNMENTS, encodeAssignments(snapshot.tabPaneAssignments))
-            .put(KEY_MIRRORED_PATHS, encodePanePathSets(snapshot.mirroredFilePathsByPane))
-            .put(KEY_ACTIVE_PATHS, encodeActivePaths(snapshot.activeFilePathByPane))
-    }
+    private fun encodeSnapshot(snapshot: EditorContainerState.SplitEditorStateSnapshot): JSONObject = JSONObject()
+        .put(KEY_VERSION, SNAPSHOT_VERSION)
+        .put(KEY_ENABLED, snapshot.isEnabled)
+        .put(KEY_FOCUSED_PANE, snapshot.focusedPane.name)
+        .put(KEY_LAYOUT, snapshot.layout.name)
+        .put(KEY_PRIMARY_RATIO, snapshot.primaryRatio.toDouble())
+        .put(KEY_TAB_ASSIGNMENTS, encodeAssignments(snapshot.tabPaneAssignments))
+        .put(KEY_MIRRORED_PATHS, encodePanePathSets(snapshot.mirroredFilePathsByPane))
+        .put(KEY_ACTIVE_PATHS, encodeActivePaths(snapshot.activeFilePathByPane))
 
-    private fun decodeSnapshot(json: JSONObject): EditorContainerState.SplitEditorStateSnapshot {
-        return EditorContainerState.SplitEditorStateSnapshot(
-            isEnabled = json.optBoolean(KEY_ENABLED, false),
-            focusedPane = parsePane(json.optString(KEY_FOCUSED_PANE)),
-            layout = parseLayout(json.optString(KEY_LAYOUT)),
-            primaryRatio = json.optDouble(
-                KEY_PRIMARY_RATIO,
-                DEFAULT_PRIMARY_RATIO.toDouble()
-            ).toFloat(),
-            tabPaneAssignments = decodeAssignments(json.optJSONArray(KEY_TAB_ASSIGNMENTS)),
-            mirroredFilePathsByPane = decodePanePathSets(json.optJSONArray(KEY_MIRRORED_PATHS)),
-            activeFilePathByPane = decodeActivePaths(json.optJSONArray(KEY_ACTIVE_PATHS))
-        ).normalized()
-    }
+    private fun decodeSnapshot(json: JSONObject): EditorContainerState.SplitEditorStateSnapshot = EditorContainerState.SplitEditorStateSnapshot(
+        isEnabled = json.optBoolean(KEY_ENABLED, false),
+        focusedPane = parsePane(json.optString(KEY_FOCUSED_PANE)),
+        layout = parseLayout(json.optString(KEY_LAYOUT)),
+        primaryRatio = json.optDouble(
+            KEY_PRIMARY_RATIO,
+            DEFAULT_PRIMARY_RATIO.toDouble()
+        ).toFloat(),
+        tabPaneAssignments = decodeAssignments(json.optJSONArray(KEY_TAB_ASSIGNMENTS)),
+        mirroredFilePathsByPane = decodePanePathSets(json.optJSONArray(KEY_MIRRORED_PATHS)),
+        activeFilePathByPane = decodeActivePaths(json.optJSONArray(KEY_ACTIVE_PATHS))
+    ).normalized()
 
     private fun encodeAssignments(assignments: Map<String, EditorContainerState.EditorPaneId>): JSONArray {
         val array = JSONArray()
@@ -127,21 +123,15 @@ internal class SplitEditorSessionStorage(context: Context) {
         return result
     }
 
-    private fun parsePane(value: String?): EditorContainerState.EditorPaneId {
-        return runCatching {
-            EditorContainerState.EditorPaneId.valueOf(value.orEmpty())
-        }.getOrDefault(EditorContainerState.EditorPaneId.PRIMARY)
-    }
+    private fun parsePane(value: String?): EditorContainerState.EditorPaneId = runCatching {
+        EditorContainerState.EditorPaneId.valueOf(value.orEmpty())
+    }.getOrDefault(EditorContainerState.EditorPaneId.PRIMARY)
 
-    private fun parseLayout(value: String?): EditorContainerState.SplitEditorLayout {
-        return runCatching {
-            EditorContainerState.SplitEditorLayout.valueOf(value.orEmpty())
-        }.getOrDefault(EditorContainerState.SplitEditorLayout.HORIZONTAL)
-    }
+    private fun parseLayout(value: String?): EditorContainerState.SplitEditorLayout = runCatching {
+        EditorContainerState.SplitEditorLayout.valueOf(value.orEmpty())
+    }.getOrDefault(EditorContainerState.SplitEditorLayout.HORIZONTAL)
 
-    private fun keyForProject(projectPath: String): String {
-        return "$KEY_PROJECT_PREFIX${projectPath.sha256Hex()}"
-    }
+    private fun keyForProject(projectPath: String): String = "$KEY_PROJECT_PREFIX${projectPath.sha256Hex()}"
 
     private fun String.sha256Hex(): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))

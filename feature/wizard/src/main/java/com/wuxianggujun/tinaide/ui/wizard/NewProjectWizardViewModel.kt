@@ -187,7 +187,6 @@ class NewProjectWizardViewModel(
         viewModelScope.launch {
             val result = withContext(ioDispatcher) {
                 ProjectCreationService.createProject(
-                    context = context,
                     projectRoot = File(projectPath),
                     projectName = currentState.projectName,
                     templateSpec = selectedTemplate.spec,

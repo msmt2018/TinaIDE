@@ -101,6 +101,7 @@ fun SearchHistoryDropdown(
         }
     }
 }
+
 @Composable
 private fun SearchHistoryItem(
     entry: SearchHistoryEntry,

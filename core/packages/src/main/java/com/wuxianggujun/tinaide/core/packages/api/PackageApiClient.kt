@@ -1,10 +1,14 @@
 package com.wuxianggujun.tinaide.core.packages.api
 
+import android.content.Context
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.network.ApiResult
 import com.wuxianggujun.tinaide.core.network.OkHttpClientProvider
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxyConfig
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxySettings
 import com.wuxianggujun.tinaide.core.network.registry.RegistryUrl
 import com.wuxianggujun.tinaide.core.packages.model.DownloadInfo
 import com.wuxianggujun.tinaide.core.packages.model.DownloadSource
@@ -28,6 +32,7 @@ import timber.log.Timber
 class PackageApiClient private constructor(
     private val indexUrls: List<RegistryUrl>,
     private val indexClient: OkHttpClient,
+    private val proxySettings: GitHubRegistryProxySettings,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
@@ -45,10 +50,32 @@ class PackageApiClient private constructor(
             }
         }
 
+        fun getInstance(context: Context): PackageApiClient {
+            val appContext = context.applicationContext
+            val settings = GitHubRegistryProxyConfig.load(appContext)
+            return synchronized(this) {
+                instance
+                    ?.takeIf { it.proxySettings == settings }
+                    ?: createInstance(appContext, settings).also { instance = it }
+            }
+        }
+
         private fun createInstance(): PackageApiClient {
             return PackageApiClient(
                 indexUrls = GitHubRegistryConfig.packageIndexUrls(),
                 indexClient = OkHttpClientProvider.probe,
+                proxySettings = GitHubRegistryProxySettings(),
+            )
+        }
+
+        private fun createInstance(
+            context: Context,
+            settings: GitHubRegistryProxySettings,
+        ): PackageApiClient {
+            return PackageApiClient(
+                indexUrls = GitHubRegistryConfig.packageIndexUrls(),
+                indexClient = GitHubRegistryHttpClientFactory.probe(context),
+                proxySettings = settings,
             )
         }
 

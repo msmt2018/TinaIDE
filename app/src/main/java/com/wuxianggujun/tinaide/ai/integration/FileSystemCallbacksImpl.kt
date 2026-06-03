@@ -543,12 +543,7 @@ class FileSystemCallbacksImpl(
     }
 
     override fun resolvePath(path: String): File {
-        val file = File(path)
-        return if (file.isAbsolute) {
-            file
-        } else {
-            File(projectRoot, path)
-        }
+        return PathUtils.resolveProjectFile(path, projectRoot)
     }
 
     override fun toRelativePath(absolutePath: String): String = PathUtils.toRelativePath(absolutePath, projectRoot)

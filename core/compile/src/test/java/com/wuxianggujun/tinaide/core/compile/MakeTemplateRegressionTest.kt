@@ -11,7 +11,8 @@ class MakeTemplateRegressionTest {
 
     @Test
     fun `make executable template keeps project-root include flow`() {
-        val zipPath = locateRepoRoot().resolve("app/src/main/assets/templates/make_executable.zip")
+        val zipPath = locateRepoRoot()
+            .resolve("app/src/main/assets/bundled_plugins/tinaide.project.templates/templates/make_executable.zip")
         val makefile = ZipFile(zipPath.toFile()).use { zip ->
             val entry = requireNotNull(zip.getEntry("Makefile")) {
                 "make_executable.zip 中缺少 Makefile"

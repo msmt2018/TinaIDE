@@ -4,8 +4,8 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.network.ApiResult
-import com.wuxianggujun.tinaide.core.network.OkHttpClientProvider
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
 import com.wuxianggujun.tinaide.core.network.registry.RegistryUrl
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import java.io.File
@@ -35,11 +35,11 @@ class PluginMarketplaceApi private constructor(
     companion object {
         private const val TAG = "PluginMarketplaceApi"
 
-        fun create(@Suppress("UNUSED_PARAMETER") context: Context): PluginMarketplaceApi {
+        fun create(context: Context): PluginMarketplaceApi {
             return PluginMarketplaceApi(
                 indexUrls = GitHubRegistryConfig.pluginIndexUrls(),
-                indexClient = OkHttpClientProvider.probe,
-                downloadClient = OkHttpClientProvider.download,
+                indexClient = GitHubRegistryHttpClientFactory.probe(context.applicationContext),
+                downloadClient = GitHubRegistryHttpClientFactory.download(context.applicationContext),
             )
         }
     }
@@ -89,23 +89,6 @@ class PluginMarketplaceApi private constructor(
         index.plugins.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
             ?.toDetail()
             ?: throw NoSuchElementException(Strings.plugin_marketplace_error_plugin_not_found.str(pluginId))
-    }
-
-    suspend fun ratePlugin(pluginId: String, rating: Int): ApiResult<RatePluginResponse> {
-        return ApiResult.Error(405, Strings.market_open_source_interaction_unavailable.str())
-    }
-
-    suspend fun submitPluginComment(pluginId: String, content: String): ApiResult<PluginComment> {
-        return ApiResult.Error(405, Strings.market_open_source_interaction_unavailable.str())
-    }
-
-    suspend fun reportPluginComment(
-        pluginId: String,
-        commentId: String,
-        reason: String,
-        details: String?,
-    ): ApiResult<ReportPluginCommentResponse> {
-        return ApiResult.Error(405, Strings.market_open_source_interaction_unavailable.str())
     }
 
     suspend fun checkUpdates(
@@ -296,12 +279,9 @@ class PluginMarketplaceApi private constructor(
 
     private fun pluginSortComparator(sort: String?): Comparator<PluginRegistryEntry> {
         return when (sort) {
-            PluginSortType.RATING.value -> compareByDescending<PluginRegistryEntry> { it.ratingAvg }
-                .thenByDescending { it.ratingCount }
             PluginSortType.NEWEST.value -> compareByDescending { it.createdAt }
             PluginSortType.UPDATED.value -> compareByDescending { it.updatedAt }
-            else -> compareByDescending<PluginRegistryEntry> { it.downloadCount }
-                .thenByDescending { it.updatedAt }
+            else -> compareByDescending { it.updatedAt }
         }
     }
 
@@ -361,12 +341,6 @@ data class PluginRegistryEntry(
     val license: String? = null,
     val publisher: PluginPublisher,
     val versions: List<PluginVersion> = emptyList(),
-    @SerialName("download_count")
-    val downloadCount: Long = 0,
-    @SerialName("rating_avg")
-    val ratingAvg: Double = 0.0,
-    @SerialName("rating_count")
-    val ratingCount: Int = 0,
     @SerialName("created_at")
     val createdAt: String,
     @SerialName("updated_at")
@@ -397,9 +371,6 @@ data class PluginRegistryEntry(
             iconUrl = iconUrl,
             publisher = publisher,
             latestVersion = latestVersionEntry()?.version,
-            downloadCount = downloadCount,
-            ratingAvg = ratingAvg,
-            ratingCount = ratingCount,
             updatedAt = updatedAt,
         )
     }
@@ -418,13 +389,6 @@ data class PluginRegistryEntry(
             license = license,
             publisher = publisher,
             versions = versions.sortedWith(compareByDescending<PluginVersion> { it.versionCode }.thenByDescending { it.version }),
-            comments = emptyList(),
-            canComment = false,
-            commentDisabledReason = Strings.market_open_source_interaction_unavailable.str(),
-            downloadCount = downloadCount,
-            ratingAvg = ratingAvg,
-            ratingCount = ratingCount,
-            myRating = null,
             createdAt = createdAt,
             updatedAt = updatedAt,
         )

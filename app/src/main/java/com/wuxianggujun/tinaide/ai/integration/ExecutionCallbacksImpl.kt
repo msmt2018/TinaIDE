@@ -263,16 +263,17 @@ class ExecutionCallbacksImpl(
                     val duration = System.currentTimeMillis() - startTime
                     val message = "Failed to run tests: ${e.message}"
                     if (completeExecutionIfActive(
-                        ExecutionResult(
-                            executionId = executionId,
-                            success = false,
-                            exitCode = -1,
-                            output = "",
-                            errorOutput = message,
-                            duration = duration,
-                            status = ExecutionStatus.FAILED
+                            ExecutionResult(
+                                executionId = executionId,
+                                success = false,
+                                exitCode = -1,
+                                output = "",
+                                errorOutput = message,
+                                duration = duration,
+                                status = ExecutionStatus.FAILED
+                            )
                         )
-                    )) {
+                    ) {
                         outputManager.appendOutput("$message\n", IOutputManager.OutputChannel.RUN)
                     }
                 }
@@ -493,45 +494,43 @@ class ExecutionCallbacksImpl(
 
     override fun stopExecution(executionId: String): Boolean {
         return try {
-        // 停止当前进程
-        val status = executionStates[executionId] ?: return false
-        if (status != ExecutionStatus.RUNNING && status != ExecutionStatus.PENDING) {
-            return false
-        }
+            // 停止当前进程
+            val status = executionStates[executionId] ?: return false
+            if (status != ExecutionStatus.RUNNING && status != ExecutionStatus.PENDING) {
+                return false
+            }
 
-        if (!activeProcessExecutionId.compareAndSet(executionId, null)) {
-            Timber.tag(TAG).w("Skip stopping non-active execution: $executionId")
-            return false
-        }
+            if (!activeProcessExecutionId.compareAndSet(executionId, null)) {
+                Timber.tag(TAG).w("Skip stopping non-active execution: $executionId")
+                return false
+            }
 
-        if (!processManager.stopCurrentProcess()) {
-            activeProcessExecutionId.compareAndSet(null, executionId)
-            Timber.tag(TAG).w("No active process stopped for execution: $executionId")
-            return false
-        }
-        executionStates[executionId] = ExecutionStatus.CANCELLED
+            if (!processManager.stopCurrentProcess()) {
+                activeProcessExecutionId.compareAndSet(null, executionId)
+                Timber.tag(TAG).w("No active process stopped for execution: $executionId")
+                return false
+            }
+            executionStates[executionId] = ExecutionStatus.CANCELLED
 
-        // 更新结果
-        executionResults[executionId]?.let { result ->
-            storeExecutionResult(
-                result.copy(
-                    status = ExecutionStatus.CANCELLED,
-                    errorOutput = "Execution cancelled by user"
+            // 更新结果
+            executionResults[executionId]?.let { result ->
+                storeExecutionResult(
+                    result.copy(
+                        status = ExecutionStatus.CANCELLED,
+                        errorOutput = "Execution cancelled by user"
+                    )
                 )
-            )
+            }
+            Timber.tag(TAG).i("Stopped execution: $executionId")
+            true
+        } catch (e: Exception) {
+            activeProcessExecutionId.compareAndSet(null, executionId)
+            Timber.tag(TAG).e(e, "Failed to stop execution: $executionId")
+            false
         }
-        Timber.tag(TAG).i("Stopped execution: $executionId")
-        true
-    } catch (e: Exception) {
-        activeProcessExecutionId.compareAndSet(null, executionId)
-        Timber.tag(TAG).e(e, "Failed to stop execution: $executionId")
-        false
-    }
     }
 
-    override fun getExecutionStatus(executionId: String): ExecutionStatus? {
-        return executionStates[executionId]
-    }
+    override fun getExecutionStatus(executionId: String): ExecutionStatus? = executionStates[executionId]
 
     override fun getExecutionOutput(executionId: String): ExecutionOutputResult? {
         val result = executionResults[executionId] ?: return null

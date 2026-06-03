@@ -14,6 +14,29 @@ import org.junit.Test
 class PluginLspConnectionProviderTest {
 
     @Test
+    fun `start should reject socket and websocket before resolving linux environment`() {
+        listOf(" Socket ", " WebSocket ").forEach { transport ->
+            val provider = PluginLspConnectionProvider(
+                config = lspServerConfig(type = transport),
+                workingDir = "/workspace",
+                projectRoot = "/workspace",
+                linuxEnvironmentProvider = object : LinuxEnvironmentProvider {
+                    override fun get(): LinuxEnvironment {
+                        error("Linux environment should not be resolved for unsupported transport")
+                    }
+                },
+            )
+
+            val result = runCatching { provider.start() }
+
+            assertThat(result.isFailure).isTrue()
+            assertThat(result.exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
+            assertThat(result.exceptionOrNull()?.message).contains(transport.trim().lowercase())
+            assertThat(result.exceptionOrNull()?.message).contains("only stdio transport is currently supported")
+        }
+    }
+
+    @Test
     fun `start should fail before interactive process when command is missing`() {
         val environment = RecordingLinuxEnvironment(
             probeResult = LinuxExecutionResult(
@@ -50,6 +73,17 @@ class PluginLspConnectionProviderTest {
         assertThat(environment.interactiveStarted).isFalse()
         assertThat(stderrLines).containsExactly("LSP server command not found: pylsp")
     }
+
+    private fun lspServerConfig(type: String): LspServerConfig = LspServerConfig(
+        id = "pylsp",
+        name = "Python Language Server",
+        languages = listOf("python"),
+        fileExtensions = listOf("py"),
+        server = LspServerConnectionConfig(
+            type = type,
+            command = "pylsp",
+        ),
+    )
 
     private class StaticLinuxEnvironmentProvider(
         private val environment: LinuxEnvironment,

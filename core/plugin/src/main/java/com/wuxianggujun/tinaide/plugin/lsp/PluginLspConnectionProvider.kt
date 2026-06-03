@@ -43,10 +43,12 @@ class PluginLspConnectionProvider(
     override fun start() {
         val serverConfig = config.server
 
-        when (serverConfig.type) {
+        when (val type = serverConfig.type.trim().lowercase()) {
             "stdio" -> startStdioServer(serverConfig)
-            "socket" -> throw UnsupportedOperationException("Socket server not yet implemented")
-            "websocket" -> throw UnsupportedOperationException("WebSocket server not yet implemented")
+            "socket", "websocket" -> throw IllegalStateException(
+                "LSP server transport '$type' is declared by plugin '${config.id}', " +
+                    "but only stdio transport is currently supported.",
+            )
             else -> throw IllegalArgumentException("Unsupported server type: ${serverConfig.type}")
         }
     }

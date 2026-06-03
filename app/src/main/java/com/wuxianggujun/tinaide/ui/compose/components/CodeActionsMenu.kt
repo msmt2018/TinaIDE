@@ -89,6 +89,7 @@ fun CodeActionsMenu(
         modifier = modifier
     )
 }
+
 @Composable
 private fun CodeActionItem(
     action: LspCodeActionService.CodeActionItem,

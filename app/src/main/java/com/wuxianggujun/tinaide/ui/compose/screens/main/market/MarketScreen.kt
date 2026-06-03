@@ -21,14 +21,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Inventory
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,7 +46,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,25 +64,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.packages.model.GUIPackage
-import com.wuxianggujun.tinaide.plugin.marketplace.PluginComment
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginDetail
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginMarketplaceSelectionSupport
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginSummary
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginVersion
 import com.wuxianggujun.tinaide.ui.compose.components.PluginCardSkeleton
-import com.wuxianggujun.tinaide.ui.compose.components.TinaAlertDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaBackHandlers
 import com.wuxianggujun.tinaide.ui.compose.components.TinaCard
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogCard
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogContentColumn
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogTitleText
 import com.wuxianggujun.tinaide.ui.compose.components.TinaOutlinedButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPrimaryButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPullToRefreshBox
-import com.wuxianggujun.tinaide.ui.compose.components.TinaTextButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
 import com.wuxianggujun.tinaide.ui.compose.components.tinaBackAction
-import java.util.Locale
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -97,7 +87,6 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun MarketScreen(
     modifier: Modifier = Modifier,
-    onNavigateToMyPublish: () -> Unit = {},
     viewModel: MarketScreenViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
@@ -145,20 +134,11 @@ fun MarketScreen(
         PluginDetailScreen(
             plugin = detail,
             isPluginDetailLoading = pluginState.isPluginDetailLoading,
-            isPluginRatingSubmitting = pluginState.isPluginRatingSubmitting,
-            isPluginCommentSubmitting = pluginState.isPluginCommentSubmitting,
-            isPluginCommentReporting = pluginState.isPluginCommentReporting,
-            reportingCommentId = pluginState.reportingCommentId,
             isInstalled = plugin.pluginId in pluginState.installedPlugins,
             isUpdatable = plugin.pluginId in pluginState.updatablePlugins,
             isFavorited = plugin.pluginId in pluginState.favoritedPlugins,
             downloadProgress = pluginState.downloadingPlugins[plugin.pluginId],
-            commentDraft = pluginState.pluginCommentDraft,
             onInstall = { viewModel.installPlugin(plugin) },
-            onRate = viewModel::rateSelectedPlugin,
-            onCommentDraftChange = viewModel::updatePluginCommentDraft,
-            onSubmitComment = viewModel::submitSelectedPluginComment,
-            onReportComment = viewModel::reportSelectedPluginComment,
             onToggleFavorite = { viewModel.togglePluginFavorite(plugin.pluginId) },
             onNavigateBack = closePluginDetails
         )
@@ -168,15 +148,7 @@ fun MarketScreen(
     Scaffold(
         topBar = {
             TinaTopBar(
-                title = stringResource(Strings.market_title),
-                actions = {
-                    IconButton(onClick = onNavigateToMyPublish) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = stringResource(Strings.my_publish_title)
-                        )
-                    }
-                }
+                title = stringResource(Strings.market_title)
             )
         }
     ) { padding ->
@@ -359,10 +331,9 @@ private fun PluginCard(
                 Column(Modifier.weight(1f)) {
                     Text(plugin.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(plugin.description ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(stringResource(Strings.market_download_count, plugin.downloadCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(Strings.market_rating, plugin.ratingAvg), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    plugin.latestVersion?.let { version ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(stringResource(Strings.market_version, version), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Spacer(Modifier.width(8.dp))
@@ -475,7 +446,7 @@ private fun SearchTextField(query: String, onQueryChange: (String) -> Unit, modi
         onValueChange = onQueryChange,
         modifier = modifier,
         placeholder = { Text(stringResource(Strings.market_search_hint)) },
-        leadingIcon = { Icon(Icons.Default.Download, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+        leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface)
@@ -523,27 +494,14 @@ private fun MarketErrorState(icon: androidx.compose.ui.graphics.vector.ImageVect
 private fun PluginDetailScreen(
     plugin: PluginDetail,
     isPluginDetailLoading: Boolean,
-    isPluginRatingSubmitting: Boolean,
-    isPluginCommentSubmitting: Boolean,
-    isPluginCommentReporting: Boolean,
-    reportingCommentId: String?,
     isInstalled: Boolean,
     isUpdatable: Boolean,
     isFavorited: Boolean,
     downloadProgress: Float?,
-    commentDraft: String,
     onInstall: () -> Unit,
-    onRate: (Int) -> Unit,
-    onCommentDraftChange: (String) -> Unit,
-    onSubmitComment: () -> Unit,
-    onReportComment: (String, String, String?) -> Unit,
     onToggleFavorite: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    var reportingComment by remember { mutableStateOf<PluginComment?>(null) }
-    var reportReason by remember { mutableStateOf("sexual") }
-    var reportDetails by remember { mutableStateOf("") }
-
     Scaffold(
         topBar = {
             TinaTopBar(
@@ -568,7 +526,6 @@ private fun PluginDetailScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ── 顶部：插件图标 + 名称 + 发布者 + 安装按钮 ──
             item {
                 TinaCard {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -617,76 +574,6 @@ private fun PluginDetailScreen(
                         HorizontalDivider()
                         Spacer(Modifier.height(16.dp))
 
-                        // 统计信息行：下载量 / 评分 / 版本号
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            // 下载量
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.Download,
-                                    null,
-                                    Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    plugin.downloadCount.toString(),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    stringResource(Strings.market_downloads),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            // 评分
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.Star,
-                                    null,
-                                    Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    String.format(Locale.ROOT, "%.1f", plugin.ratingAvg),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "(${plugin.ratingCount})",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            // 版本
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.Refresh,
-                                    null,
-                                    Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    plugin.latestVersionLabel(),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    stringResource(Strings.plugin_marketplace_version),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(16.dp))
-
-                        // 安装 / 下载进度按钮
                         when {
                             downloadProgress != null -> Column {
                                 Text(
@@ -720,7 +607,6 @@ private fun PluginDetailScreen(
                 }
             }
 
-            // ── 插件信息卡片（更新时间等）──
             item {
                 TinaCard {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -731,20 +617,17 @@ private fun PluginDetailScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        // 发布者
                         PluginInfoRow(
                             label = stringResource(Strings.plugin_marketplace_publisher),
                             value = plugin.publisher.displayName
                         )
 
-                        // 最新版本
                         Spacer(Modifier.height(8.dp))
                         PluginInfoRow(
                             label = stringResource(Strings.plugin_marketplace_version),
                             value = plugin.latestVersionLabel()
                         )
 
-                        // 分类
                         plugin.category?.let { cat ->
                             Spacer(Modifier.height(8.dp))
                             PluginInfoRow(
@@ -753,11 +636,10 @@ private fun PluginDetailScreen(
                             )
                         }
 
-                        // 更新时间
                         Spacer(Modifier.height(8.dp))
                         PluginInfoRow(
                             label = stringResource(Strings.plugin_marketplace_sort_updated),
-                            value = plugin.updatedAt.take(10) // 只取日期部分 yyyy-MM-dd
+                            value = plugin.updatedAt.take(10)
                         )
 
                         plugin.repositoryUrl?.takeIf { it.isNotBlank() }?.let { repositoryUrl ->
@@ -787,72 +669,6 @@ private fun PluginDetailScreen(
                 }
             }
 
-            item {
-                TinaCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            stringResource(Strings.plugin_marketplace_rate_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = plugin.myRating?.let { currentRating ->
-                                stringResource(Strings.plugin_marketplace_my_rating, currentRating)
-                            } ?: stringResource(Strings.plugin_marketplace_rate_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            (1..5).forEach { rating ->
-                                IconButton(
-                                    onClick = { onRate(rating) },
-                                    enabled = !isPluginRatingSubmitting
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = if ((plugin.myRating ?: 0) >= rating) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.outline
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        if (isPluginRatingSubmitting) {
-                            Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-            }
-
-            item {
-                PluginCommentsCard(
-                    comments = plugin.comments,
-                    canComment = plugin.canComment,
-                    commentDisabledReason = plugin.commentDisabledReason,
-                    commentDraft = commentDraft,
-                    isPluginCommentSubmitting = isPluginCommentSubmitting,
-                    isPluginCommentReporting = isPluginCommentReporting,
-                    reportingCommentId = reportingCommentId,
-                    onCommentDraftChange = onCommentDraftChange,
-                    onSubmitComment = onSubmitComment,
-                    onReportCommentClick = { comment ->
-                        reportingComment = comment
-                        reportReason = "sexual"
-                        reportDetails = ""
-                    }
-                )
-            }
-
-            // ── 描述卡片 ──
             plugin.description?.let { description ->
                 item {
                     TinaCard {
@@ -913,7 +729,6 @@ private fun PluginDetailScreen(
                 }
             }
 
-            // ── 标签卡片 ──
             if (plugin.tags.isNotEmpty()) {
                 item {
                     TinaCard {
@@ -941,26 +756,7 @@ private fun PluginDetailScreen(
             }
         }
     }
-
-    reportingComment?.let { comment ->
-        ReportPluginCommentDialog(
-            reason = reportReason,
-            details = reportDetails,
-            onReasonChange = { reportReason = it },
-            onDetailsChange = { reportDetails = it },
-            onDismiss = { reportingComment = null },
-            onConfirm = {
-                onReportComment(
-                    comment.id,
-                    reportReason,
-                    reportDetails.trim().ifBlank { null }
-                )
-                reportingComment = null
-            }
-        )
-    }
 }
-
 private fun PluginDetail.latestVersionLabel(): String = versions.firstOrNull()?.version ?: "-"
 
 private fun PluginSummary.toPluginDetailFallback(): PluginDetail {
@@ -991,216 +787,8 @@ private fun PluginSummary.toPluginDetailFallback(): PluginDetail {
         license = null,
         publisher = publisher,
         versions = fallbackVersions,
-        comments = emptyList(),
-        canComment = true,
-        commentDisabledReason = null,
-        downloadCount = downloadCount,
-        ratingAvg = ratingAvg,
-        ratingCount = ratingCount,
-        myRating = null,
         createdAt = updatedAt,
         updatedAt = updatedAt
-    )
-}
-
-@Composable
-private fun PluginCommentsCard(
-    comments: List<PluginComment>,
-    canComment: Boolean,
-    commentDisabledReason: String?,
-    commentDraft: String,
-    isPluginCommentSubmitting: Boolean,
-    isPluginCommentReporting: Boolean,
-    reportingCommentId: String?,
-    onCommentDraftChange: (String) -> Unit,
-    onSubmitComment: () -> Unit,
-    onReportCommentClick: (PluginComment) -> Unit
-) {
-    TinaCard {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                stringResource(Strings.plugin_marketplace_comments, comments.size),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(Strings.plugin_marketplace_comment_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = commentDraft,
-                onValueChange = onCommentDraftChange,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canComment && !isPluginCommentSubmitting,
-                minLines = 3,
-                maxLines = 5,
-                placeholder = {
-                    Text(stringResource(Strings.plugin_marketplace_comment_hint))
-                }
-            )
-            Spacer(Modifier.height(12.dp))
-            TinaPrimaryButton(
-                text = stringResource(Strings.plugin_marketplace_comment_submit),
-                onClick = onSubmitComment,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canComment && commentDraft.isNotBlank() && !isPluginCommentSubmitting
-            )
-            if (isPluginCommentSubmitting) {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-            if (!canComment && !commentDisabledReason.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = commentDisabledReason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            if (comments.isEmpty()) {
-                Text(
-                    stringResource(Strings.plugin_marketplace_comments_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                comments.forEachIndexed { index, comment ->
-                    PluginCommentItem(
-                        comment = comment,
-                        isReporting = isPluginCommentReporting && reportingCommentId == comment.id,
-                        onReportClick = if (comment.isMine) {
-                            null
-                        } else {
-                            { onReportCommentClick(comment) }
-                        }
-                    )
-                    if (index != comments.lastIndex) {
-                        Spacer(Modifier.height(12.dp))
-                        HorizontalDivider()
-                        Spacer(Modifier.height(12.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PluginCommentItem(
-    comment: PluginComment,
-    isReporting: Boolean,
-    onReportClick: (() -> Unit)?
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = comment.author.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Text(
-                text = comment.createdAt.take(10),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Text(
-            text = comment.content,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (onReportClick != null) {
-            TextButton(
-                onClick = onReportClick,
-                enabled = !isReporting
-            ) {
-                Text(stringResource(Strings.plugin_marketplace_comment_report))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportPluginCommentDialog(
-    reason: String,
-    details: String,
-    onReasonChange: (String) -> Unit,
-    onDetailsChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    val reasons = listOf(
-        "sexual" to Strings.plugin_marketplace_report_reason_sexual,
-        "violence" to Strings.plugin_marketplace_report_reason_violence,
-        "vulgar" to Strings.plugin_marketplace_report_reason_vulgar,
-        "politics" to Strings.plugin_marketplace_report_reason_politics,
-        "spam" to Strings.plugin_marketplace_report_reason_spam,
-        "other" to Strings.plugin_marketplace_report_reason_other
-    )
-
-    TinaAlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            TinaDialogTitleText(stringResource(Strings.plugin_marketplace_comment_report_title))
-        },
-        text = {
-            TinaDialogContentColumn {
-                TinaDialogCard(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f)
-                ) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(reasons) { item ->
-                            FilterChip(
-                                selected = reason == item.first,
-                                onClick = { onReasonChange(item.first) },
-                                label = { Text(stringResource(item.second)) }
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = details,
-                        onValueChange = onDetailsChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
-                        placeholder = {
-                            Text(stringResource(Strings.plugin_marketplace_comment_report_details))
-                        }
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TinaPrimaryButton(
-                text = stringResource(Strings.plugin_marketplace_comment_report_submit),
-                onClick = onConfirm,
-                enabled = reason.isNotBlank()
-            )
-        },
-        dismissButton = {
-            TinaTextButton(
-                text = stringResource(Strings.btn_cancel),
-                onClick = onDismiss
-            )
-        }
     )
 }
 

@@ -110,7 +110,7 @@ class CommandsApiModule(
         runtime = null
     }
 
-    private fun resolveInvocationFile(path: String): File? {
+    internal fun resolveInvocationFile(path: String): File? {
         if (path.isBlank()) return null
         val projectRoot = projectRootProvider() ?: return null
         val rootFile = File(projectRoot)
@@ -125,6 +125,8 @@ class CommandsApiModule(
 
         val canonicalRoot = runCatching { rootFile.canonicalFile }.getOrNull() ?: return null
         val canonicalTarget = runCatching { rawTarget.canonicalFile }.getOrNull() ?: return null
-        return canonicalTarget.takeIf { it.path.startsWith(canonicalRoot.path) }
+        return canonicalTarget.takeIf {
+            it == canonicalRoot || it.path.startsWith(canonicalRoot.path + File.separator)
+        }
     }
 }

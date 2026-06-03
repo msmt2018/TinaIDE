@@ -11,7 +11,7 @@ import org.koin.dsl.module
 
 val packagesModule = module {
     factory<PackageManager> {
-        val apiClient = PackageApiClient.getInstance()
+        val apiClient = PackageApiClient.getInstance(get())
         val installStateStore = LocalInstallStateStore(get())
         val prootEnv = PRootEnvironment(get())
         PackageManagerImpl(get(), apiClient, installStateStore, prootEnv = prootEnv)

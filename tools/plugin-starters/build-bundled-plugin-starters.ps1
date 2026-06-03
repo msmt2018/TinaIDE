@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $repoRoot = Split-Path -Parent $root
-$outputRoot = Join-Path $repoRoot "app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates"
+# Historical script name kept for now; starter packages are no longer written into APK assets.
+$outputRoot = Join-Path $repoRoot "tools/plugin-starters/dist/tinaide.plugin.starters/templates"
 $sharedRoot = Join-Path $PSScriptRoot "shared"
 $stagingRoot = Join-Path $PSScriptRoot ".bundle"
 

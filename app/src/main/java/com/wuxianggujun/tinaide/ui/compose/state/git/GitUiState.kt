@@ -13,6 +13,7 @@ internal data class GitUiState(
     val status: GitStatus,
     val isLoading: Boolean,
     val commitHistory: List<GitCommit>,
+    val recentCommitMessages: List<String>,
     val branches: List<GitBranch>,
     val isLoadingHistory: Boolean,
     val commitError: String?,
@@ -40,6 +41,7 @@ internal fun rememberGitUiState(viewModel: GitViewModel): GitUiState {
     val status = viewModel.status.collectAsStateWithLifecycle().value
     val isLoading = viewModel.isLoading.collectAsStateWithLifecycle().value
     val commitHistory = viewModel.commitHistory.collectAsStateWithLifecycle().value
+    val recentCommitMessages = viewModel.recentCommitMessages.collectAsStateWithLifecycle().value
     val branches = viewModel.branches.collectAsStateWithLifecycle().value
     val isLoadingHistory = viewModel.isLoadingHistory.collectAsStateWithLifecycle().value
     val commitError = viewModel.commitError.collectAsStateWithLifecycle().value
@@ -70,6 +72,7 @@ internal fun rememberGitUiState(viewModel: GitViewModel): GitUiState {
         status = status,
         isLoading = isLoading,
         commitHistory = commitHistory,
+        recentCommitMessages = recentCommitMessages,
         branches = branches,
         isLoadingHistory = isLoadingHistory,
         commitError = commitError,

@@ -25,8 +25,39 @@ fun ensureIncludedBuildLocalProperties(includedBuildDir: File) {
     target.writeText("sdk.dir=${escapePropertiesValue(sdkDir)}\n", Charsets.UTF_8)
 }
 
+val requestedGradleTasks = (
+    gradle.startParameter.taskNames +
+        gradle.startParameter.taskRequests.flatMap { request -> request.args }
+    )
+    .distinct()
+    .filterNot { arg -> arg.startsWith("-") || arg.contains(".") }
+fun isTaskUnderModule(taskName: String, modulePath: String): Boolean {
+    val normalizedTaskName = if (taskName.startsWith(":")) taskName else ":$taskName"
+    return normalizedTaskName == modulePath || normalizedTaskName.startsWith("$modulePath:")
+}
+
+fun isLocalTestOrHelpTask(taskName: String): Boolean {
+    val leafTaskName = taskName.substringAfterLast(":")
+    return leafTaskName == "help" || leafTaskName.startsWith("test")
+}
+
+fun isTreeSitterIndependentLocalTestRequest(): Boolean =
+    requestedGradleTasks.isNotEmpty() &&
+        requestedGradleTasks.all { taskName ->
+            isLocalTestOrHelpTask(taskName) &&
+                (
+                    isTaskUnderModule(taskName, ":core:plugin") ||
+                        isTaskUnderModule(taskName, ":feature:ai")
+                    )
+        }
+
+val shouldIncludeTreeSitterComposite =
+    !isTreeSitterIndependentLocalTestRequest()
+
 // 让 composite build 的 Android 工程也能找到 SDK（避免单独配置时失败）
-ensureIncludedBuildLocalProperties(file("external/tina-android-tree-sitter"))
+if (shouldIncludeTreeSitterComposite) {
+    ensureIncludedBuildLocalProperties(file("external/tina-android-tree-sitter"))
+}
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -83,20 +114,24 @@ plugins {
 }
 
 // 包含本地的 tina-android-tree-sitter 项目，替换 Maven 依赖
-includeBuild("external/tina-android-tree-sitter") {
-    dependencySubstitution {
-        substitute(module("com.itsaky.androidide.treesitter:android-tree-sitter")).using(project(":android-tree-sitter"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-java")).using(project(":tree-sitter-java"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-json")).using(project(":tree-sitter-json"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-c")).using(project(":tree-sitter-c"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-cpp")).using(project(":tree-sitter-cpp"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-bash")).using(project(":tree-sitter-bash"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-yaml")).using(project(":tree-sitter-yaml"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-make")).using(project(":tree-sitter-make"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-cmake")).using(project(":tree-sitter-cmake"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-rust")).using(project(":tree-sitter-rust"))
-        substitute(module("com.itsaky.androidide.treesitter:tree-sitter-toml")).using(project(":tree-sitter-toml"))
+if (shouldIncludeTreeSitterComposite) {
+    includeBuild("external/tina-android-tree-sitter") {
+        dependencySubstitution {
+            substitute(module("com.itsaky.androidide.treesitter:android-tree-sitter")).using(project(":android-tree-sitter"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-java")).using(project(":tree-sitter-java"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-json")).using(project(":tree-sitter-json"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-c")).using(project(":tree-sitter-c"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-cpp")).using(project(":tree-sitter-cpp"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-bash")).using(project(":tree-sitter-bash"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-yaml")).using(project(":tree-sitter-yaml"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-make")).using(project(":tree-sitter-make"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-cmake")).using(project(":tree-sitter-cmake"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-rust")).using(project(":tree-sitter-rust"))
+            substitute(module("com.itsaky.androidide.treesitter:tree-sitter-toml")).using(project(":tree-sitter-toml"))
+        }
     }
+} else {
+    logger.lifecycle("Skipping tina-android-tree-sitter included build for isolated local tests.")
 }
 
 dependencyResolutionManagement {

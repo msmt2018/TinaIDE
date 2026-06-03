@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -30,8 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -473,7 +473,7 @@ private fun EditorPane(
             pluginManager = pluginManager,
             hostCommandExecutor = hostCommandExecutor,
             isLoading = activeTabLoading,
-            onTabClick = tabClick@ { localIndex ->
+            onTabClick = tabClick@{ localIndex ->
                 val tab = paneTabs.getOrNull(localIndex) ?: return@tabClick
                 val globalIndex = allTabs.indexOfFirst { it.id == tab.id }
                 if (localIndex == safeSelectedLocalIndex) {
@@ -484,7 +484,7 @@ private fun EditorPane(
                     state.selectTabInPane(pane, globalIndex)
                 }
             },
-            onTabDoubleClick = tabDoubleClick@ { localIndex ->
+            onTabDoubleClick = tabDoubleClick@{ localIndex ->
                 val tab = paneTabs.getOrNull(localIndex) ?: return@tabDoubleClick
                 val globalIndex = allTabs.indexOfFirst { it.id == tab.id }
                 if (globalIndex >= 0) {
@@ -497,7 +497,7 @@ private fun EditorPane(
                 }
             },
             onMenuDismiss = { showTabMenu = false },
-            onCloseCurrent = closeCurrent@ { localIndex ->
+            onCloseCurrent = closeCurrent@{ localIndex ->
                 showTabMenu = false
                 val tab = paneTabs.getOrNull(localIndex) ?: return@closeCurrent
                 val globalIndex = allTabs.indexOfFirst { it.id == tab.id }
@@ -505,7 +505,7 @@ private fun EditorPane(
                     state.requestCloseTab(globalIndex)
                 }
             },
-            onCloseOthers = closeOthers@ { localIndex ->
+            onCloseOthers = closeOthers@{ localIndex ->
                 showTabMenu = false
                 val tab = paneTabs.getOrNull(localIndex) ?: return@closeOthers
                 val globalIndex = allTabs.indexOfFirst { it.id == tab.id }
@@ -636,12 +636,14 @@ private fun SplitEditorResizeHandle(
     val handleColor = MaterialTheme.colorScheme.outlineVariant
     val gripColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     val handleModifier = when (layout) {
-        SplitEditorLayout.HORIZONTAL -> modifier
-            .width(16.dp)
-            .fillMaxHeight()
-        SplitEditorLayout.VERTICAL -> modifier
-            .height(16.dp)
-            .fillMaxWidth()
+        SplitEditorLayout.HORIZONTAL ->
+            modifier
+                .width(16.dp)
+                .fillMaxHeight()
+        SplitEditorLayout.VERTICAL ->
+            modifier
+                .height(16.dp)
+                .fillMaxWidth()
     }
     val dragModifier = when (layout) {
         SplitEditorLayout.HORIZONTAL -> Modifier.pointerInput(state, containerMainAxisPx) {
@@ -670,22 +672,26 @@ private fun SplitEditorResizeHandle(
     ) {
         Box(
             modifier = when (layout) {
-                SplitEditorLayout.HORIZONTAL -> Modifier
-                    .width(1.dp)
-                    .fillMaxHeight()
-                SplitEditorLayout.VERTICAL -> Modifier
-                    .height(1.dp)
-                    .fillMaxWidth()
+                SplitEditorLayout.HORIZONTAL ->
+                    Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                SplitEditorLayout.VERTICAL ->
+                    Modifier
+                        .height(1.dp)
+                        .fillMaxWidth()
             }.background(handleColor)
         )
         Box(
             modifier = when (layout) {
-                SplitEditorLayout.HORIZONTAL -> Modifier
-                    .width(3.dp)
-                    .height(32.dp)
-                SplitEditorLayout.VERTICAL -> Modifier
-                    .width(32.dp)
-                    .height(3.dp)
+                SplitEditorLayout.HORIZONTAL ->
+                    Modifier
+                        .width(3.dp)
+                        .height(32.dp)
+                SplitEditorLayout.VERTICAL ->
+                    Modifier
+                        .width(32.dp)
+                        .height(3.dp)
             }
                 .clip(RoundedCornerShape(2.dp))
                 .background(gripColor)

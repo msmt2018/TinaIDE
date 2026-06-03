@@ -19,7 +19,7 @@ data class PluginMarketplaceUiState(
     val plugins: List<PluginSummary> = emptyList(),
     val selectedCategory: String? = null,
     val searchQuery: String = "",
-    val sortType: PluginSortType = PluginSortType.DOWNLOADS,
+    val sortType: PluginSortType = PluginSortType.UPDATED,
     val currentPage: Int = 1,
     val hasMorePages: Boolean = true,
     val error: String? = null,
@@ -225,24 +225,8 @@ class PluginMarketplaceViewModel(application: Application) : AndroidViewModel(ap
             }
 
             if (result.isSuccess) {
-                incrementPluginDownloadCount(plugin.pluginId)
                 loadPlugins()
             }
-        }
-    }
-
-    private fun incrementPluginDownloadCount(pluginId: String) {
-        _uiState.update { state ->
-            val newPlugins = state.plugins.map { plugin ->
-                if (plugin.pluginId == pluginId) {
-                    plugin.copy(downloadCount = plugin.downloadCount + 1)
-                } else {
-                    plugin
-                }
-            }
-            state.copy(
-                plugins = newPlugins
-            )
         }
     }
 

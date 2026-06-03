@@ -470,6 +470,8 @@
   <string name="template_desc_make_exe">Classic Makefile project structure</string>
   <string name="template_ndk_shared_lib">NDK Shared Library</string>
   <string name="template_desc_ndk_shared_lib">Android NDK shared library project with custom API level</string>
+  <string name="template_sdl3_cmake">SDL3 CMake Project</string>
+  <string name="template_desc_sdl3_cmake">SDL3 sample project for graphics and multimedia apps</string>
   <string name="template_desc_user_zip">User template: %1$s</string>
 
   <!-- C++ Standard -->
@@ -503,9 +505,9 @@
   <string name="wizard_plugin_template_config_guide_title">Plugin project next steps</string>
   <string name="wizard_plugin_template_config_guide_body">After creation, open the project and tap Run to validate, package, and hot-install it. Tap Package to create a .tinaplug for sharing or install-from-file.</string>
   <string name="wizard_templates_empty_title">No templates available</string>
-  <string name="wizard_templates_empty_body">There are no templates available for project creation. Please try again later.</string>
+  <string name="wizard_templates_empty_body">Install and enable the matching project template plugin from the plugin marketplace, then reopen the new project wizard.</string>
   <string name="wizard_plugin_templates_empty_title">No plugin project templates</string>
-  <string name="wizard_plugin_templates_empty_body">Make sure TinaIDE Plugin Starters is installed and enabled, then open the plugin tutorial entry again.</string>
+  <string name="wizard_plugin_templates_empty_body">Install and enable TinaIDE Plugin Starters from the plugin marketplace, then reopen the plugin tutorial entry to continue.</string>
 
   <!-- Project Tags -->
   <string name="tag_public_source">Public</string>
@@ -2530,11 +2532,6 @@ kept=%3$d bytes
   <string name="dev_options_editor_fling_touch_log">Editor fling logs</string>
   <string name="dev_options_editor_fling_touch_log_desc">Output fling start/end logs (axis, offset, max range)</string>
   <string name="dev_options_runtime_tools">Runtime tools</string>
-  <string name="dev_options_reinstall_bundled_packages">Reinstall Bundled Packages</string>
-  <string name="dev_options_reinstall_bundled_packages_desc">Force re-extract precompiled libraries (SDL3, etc.) from assets</string>
-  <string name="toast_reinstalling_bundled_packages">Reinstalling bundled packages...</string>
-  <string name="toast_reinstall_bundled_packages_success">Bundled packages reinstalled successfully</string>
-  <string name="toast_reinstall_bundled_packages_failed">Failed to reinstall bundled packages: %1$s</string>
   <string name="dev_options_tina_server_url">TinaServer URL</string>
   <string name="dev_options_tina_server_url_desc">Switch backend URL and test connectivity</string>
   <string name="diagnostic_error">Error</string>
@@ -2645,6 +2642,19 @@ kept=%3$d bytes
   <string name="git_section_changes">Changes</string>
   <string name="git_settings_tab_https">HTTPS</string>
   <string name="git_settings_tab_ssh">SSH</string>
+  <string name="git_settings_tab_github">GitHub</string>
+  <string name="settings_cat_github_registry">GitHub Access Proxy</string>
+  <string name="github_registry_proxy_enabled_title">Enable GitHub proxy</string>
+  <string name="github_registry_proxy_enabled_desc">Only used for plugin marketplace and package Registry access through GitHub Raw/jsDelivr</string>
+  <string name="github_registry_proxy_scope_desc">This proxy does not affect Git HTTPS credentials, SSH keys, AI channels, or Tina server requests.</string>
+  <string name="github_registry_proxy_host_label">Proxy host</string>
+  <string name="github_registry_proxy_host_placeholder">127.0.0.1 or proxy.example.com</string>
+  <string name="github_registry_proxy_port_label">Proxy port</string>
+  <string name="github_registry_proxy_port_placeholder">7890</string>
+  <string name="github_registry_proxy_error_host_required">Proxy host is required when proxy is enabled</string>
+  <string name="github_registry_proxy_error_port_invalid">Proxy port must be between 1 and 65535</string>
+  <string name="github_registry_proxy_save_ok">GitHub proxy settings saved</string>
+  <string name="btn_save">Save</string>
   <string name="git_staged_changes">Staged changes</string>
   <string name="git_staged_changes_section">Staged changes</string>
   <string name="git_status_added">Added</string>
@@ -3376,8 +3386,6 @@ kept=%3$d bytes
   <string name="plugin_marketplace_category_snippet">Snippet</string>
   <string name="plugin_marketplace_category_tool">Tool</string>
   <string name="plugin_marketplace_category_language">Language</string>
-  <string name="plugin_marketplace_sort_downloads">Downloads</string>
-  <string name="plugin_marketplace_sort_rating">Rating</string>
   <string name="plugin_marketplace_sort_newest">Newest</string>
   <string name="plugin_marketplace_sort_updated">Recently updated</string>
   <string name="plugin_marketplace_install_success">Plugin installed successfully</string>
@@ -3388,31 +3396,11 @@ kept=%3$d bytes
   <string name="plugin_marketplace_tags">Tags</string>
   <string name="market_favorite_failed">Failed to add to favorites</string>
   <string name="market_unfavorite_failed">Failed to remove from favorites</string>
-  <string name="market_open_source_interaction_unavailable">Server-backed interactions are not bundled in the open-source build. Rating, comments, and reports are unavailable.</string>
-  <string name="market_publish_unavailable">Publishing is not bundled in the open-source build. Plugin browsing, downloads, favorites, and download history remain available.</string>
   <string name="market_downloading">Downloading %1$d%%</string>
   <string name="plugin_marketplace_error_plugin_not_found">Plugin not found: %1$s</string>
   <string name="plugin_marketplace_error_plugin_version_not_found">Plugin version not found: %1$s</string>
   <string name="plugin_marketplace_error_download_url_missing">Plugin download URL is not configured: %1$s</string>
-  <string name="plugin_marketplace_rate_title">Rate This Plugin</string>
-  <string name="plugin_marketplace_rate_hint">Tap a star to submit your rating</string>
-  <string name="plugin_marketplace_my_rating">My rating: %1$d stars</string>
   <string name="plugin_marketplace_detail_loading">Loading plugin details...</string>
-  <string name="plugin_marketplace_comments">Comments (%1$d)</string>
-  <string name="plugin_marketplace_comment_hint">Write your feedback. Submitting again updates your comment.</string>
-  <string name="plugin_marketplace_comment_submit">Submit Comment</string>
-  <string name="plugin_marketplace_comments_empty">No comments yet. Be the first to write one.</string>
-  <string name="plugin_marketplace_comment_required">Comment content cannot be empty</string>
-  <string name="plugin_marketplace_comment_report">Report</string>
-  <string name="plugin_marketplace_comment_report_title">Report Comment</string>
-  <string name="plugin_marketplace_comment_report_details">Additional details (optional)</string>
-  <string name="plugin_marketplace_comment_report_submit">Submit Report</string>
-  <string name="plugin_marketplace_report_reason_sexual">Sexual</string>
-  <string name="plugin_marketplace_report_reason_violence">Violence</string>
-  <string name="plugin_marketplace_report_reason_vulgar">Vulgar</string>
-  <string name="plugin_marketplace_report_reason_politics">Political</string>
-  <string name="plugin_marketplace_report_reason_spam">Spam</string>
-  <string name="plugin_marketplace_report_reason_other">Other</string>
 
   <!-- Profile & Download History -->
   <string name="profile_load_failed">Failed to load</string>
@@ -3582,19 +3570,7 @@ kept=%3$d bytes
   <string name="market_error_retry">Retry</string>
   <string name="market_installed">Installed</string>
   <string name="market_install">Install</string>
-  <string name="market_downloads">downloads</string>
-  <string name="market_rating">Rating %1$.1f</string>
   <string name="pkg_manager_bundled">Bundled</string>
-
-  <!-- My Publish Screen -->
-  <string name="my_publish_title">My Publish</string>
-  <string name="my_publish_plugins_section">My Plugins</string>
-  <string name="my_publish_no_plugins">No plugins published yet</string>
-  <string name="my_publish_upload_plugin">Upload Plugin</string>
-  <string name="my_publish_select_plugin_file">Select plugin file (.tinaplug)</string>
-  <string name="my_publish_changelog">Changelog</string>
-  <string name="my_publish_changelog_hint">Describe what\'s new in this version (optional)</string>
-  <string name="my_publish_uploading">Uploading...</string>
 
   <!-- Status -->
   <string name="status_published">Published</string>
@@ -4024,7 +4000,6 @@ kept=%3$d bytes
   <string name="market_category_theme">Themes</string>
   <string name="market_category_tool">Tools</string>
   <string name="market_category_language">Language Support</string>
-  <string name="market_download_count">%1$d downloads</string>
   <string name="market_version">Version: %1$s</string>
 
   <!-- Plugin Log -->

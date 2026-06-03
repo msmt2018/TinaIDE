@@ -41,7 +41,7 @@ class MarketScreenViewModel(
     private val packageManager: PackageManager
 
     init {
-        val apiClient = PackageApiClient.getInstance()
+        val apiClient = PackageApiClient.getInstance(application)
         val installStateStore = LocalInstallStateStore(application)
         val prootEnv = PRootEnvironment(application)
         packageManager = PackageManagerImpl(application, apiClient, installStateStore, prootEnv = prootEnv)
@@ -199,31 +199,9 @@ class MarketScreenViewModel(
             }
 
             if (result.isSuccess) {
-                incrementPluginDownloadCount(pluginId)
                 recordPluginDownload(plugin)
                 loadPlugins()
             }
-        }
-    }
-
-    private fun incrementPluginDownloadCount(pluginId: String) {
-        _pluginState.update { state ->
-            state.copy(
-                plugins = state.plugins.map { plugin ->
-                    if (plugin.pluginId == pluginId) {
-                        plugin.copy(downloadCount = plugin.downloadCount + 1)
-                    } else {
-                        plugin
-                    }
-                },
-                selectedPluginDetail = state.selectedPluginDetail?.let { detail ->
-                    if (detail.pluginId == pluginId) {
-                        detail.copy(downloadCount = detail.downloadCount + 1)
-                    } else {
-                        detail
-                    }
-                }
-            )
         }
     }
 
@@ -271,39 +249,6 @@ class MarketScreenViewModel(
                 isPluginDetailLoading = false,
                 error = null
             )
-        }
-    }
-
-    fun rateSelectedPlugin(rating: Int) {
-        _pluginState.update {
-            it.copy(error = Strings.market_open_source_interaction_unavailable.str())
-        }
-    }
-
-    fun updatePluginCommentDraft(draft: String) {
-        _pluginState.update { it.copy(pluginCommentDraft = draft) }
-    }
-
-    fun submitSelectedPluginComment() {
-        val selectedPluginId = _pluginState.value.selectedPluginId ?: return
-        val content = _pluginState.value.pluginCommentDraft.trim()
-        if (content.isBlank()) {
-            _pluginState.update {
-                it.copy(error = Strings.plugin_marketplace_comment_required.str())
-            }
-            return
-        }
-
-        viewModelScope.launch {
-            _pluginState.update {
-                it.copy(error = Strings.market_open_source_interaction_unavailable.str())
-            }
-        }
-    }
-
-    fun reportSelectedPluginComment(commentId: String, reason: String, details: String?) {
-        _pluginState.update {
-            it.copy(error = Strings.market_open_source_interaction_unavailable.str())
         }
     }
 
@@ -429,12 +374,7 @@ class MarketScreenViewModel(
             it.copy(
                 selectedPluginId = plugin.pluginId,
                 selectedPluginDetail = null,
-                isPluginDetailLoading = true,
-                isPluginRatingSubmitting = false,
-                isPluginCommentSubmitting = false,
-                isPluginCommentReporting = false,
-                reportingCommentId = null,
-                pluginCommentDraft = ""
+                isPluginDetailLoading = true
             )
         }
         loadPluginDetail(plugin.pluginId)
@@ -445,12 +385,7 @@ class MarketScreenViewModel(
             it.copy(
                 selectedPluginId = null,
                 selectedPluginDetail = null,
-                isPluginDetailLoading = false,
-                isPluginRatingSubmitting = false,
-                isPluginCommentSubmitting = false,
-                isPluginCommentReporting = false,
-                reportingCommentId = null,
-                pluginCommentDraft = ""
+                isPluginDetailLoading = false
             )
         }
     }
@@ -464,9 +399,6 @@ private fun PluginSummary.merge(detail: PluginDetail): PluginSummary = copy(
     iconUrl = detail.iconUrl,
     publisher = detail.publisher,
     latestVersion = detail.versions.firstOrNull()?.version ?: latestVersion,
-    downloadCount = detail.downloadCount,
-    ratingAvg = detail.ratingAvg,
-    ratingCount = detail.ratingCount,
     updatedAt = detail.updatedAt
 )
 
@@ -480,11 +412,6 @@ data class PluginState(
     val selectedPluginId: String? = null,
     val selectedPluginDetail: PluginDetail? = null,
     val isPluginDetailLoading: Boolean = false,
-    val isPluginRatingSubmitting: Boolean = false,
-    val isPluginCommentSubmitting: Boolean = false,
-    val isPluginCommentReporting: Boolean = false,
-    val reportingCommentId: String? = null,
-    val pluginCommentDraft: String = "",
     val error: String? = null,
     val message: String? = null
 )

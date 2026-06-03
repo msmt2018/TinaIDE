@@ -9,6 +9,30 @@ import java.io.File
  */
 object PathUtils {
     /**
+     * 将 AI 工具传入的路径解析为项目范围内的文件。
+     *
+     * 相对路径以 [projectRoot] 为基准；绝对路径只有在规范化后仍位于
+     * [projectRoot] 内部时才允许使用。
+     */
+    fun resolveProjectFile(path: String, projectRoot: String): File {
+        val normalizedPath = normalizeFilePath(path).trim()
+        require(normalizedPath.isNotEmpty()) { "Path is required" }
+
+        val rootFile = File(projectRoot).canonicalFile
+        val rawFile = File(normalizedPath)
+        val candidate = if (rawFile.isAbsolute) {
+            rawFile
+        } else {
+            File(rootFile, normalizedPath)
+        }.canonicalFile
+
+        require(candidate.startsWith(rootFile)) {
+            "Path is outside project root: $path"
+        }
+        return candidate
+    }
+
+    /**
      * 将绝对路径转换为相对于项目根目录的相对路径
      *
      * @param absolutePath 绝对路径

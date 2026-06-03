@@ -12,7 +12,6 @@ import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
 import com.wuxianggujun.tinaide.core.linux.LinuxEnvironmentProvider
 import com.wuxianggujun.tinaide.core.linux.LinuxRunModePolicy
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -68,7 +67,7 @@ class EditorToolCallbacksImpl(
     override suspend fun formatCode(filePath: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val file = File(projectRoot, filePath)
+                val file = PathUtils.resolveProjectFile(filePath, projectRoot)
                 if (!file.exists()) {
                     Timber.tag(TAG).e("File not found: $filePath")
                     return@withContext false
@@ -154,7 +153,7 @@ class EditorToolCallbacksImpl(
     override suspend fun formatCodeRange(filePath: String, startLine: Int, endLine: Int): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val file = File(projectRoot, filePath)
+                val file = PathUtils.resolveProjectFile(filePath, projectRoot)
                 if (!file.exists()) {
                     Timber.tag(TAG).e("File not found: $filePath")
                     return@withContext false

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.git.AndroidGitCredentialManager
@@ -41,6 +43,7 @@ import com.wuxianggujun.tinaide.core.git.ssh.GitSshKeyMeta
 import com.wuxianggujun.tinaide.core.git.ssh.GitSshManager
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxyConfig
 import com.wuxianggujun.tinaide.ui.compose.components.TinaAlertDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDangerButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogContentColumn
@@ -53,6 +56,7 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaTextField
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.components.SettingsCard
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.components.SettingsCategoryTitle
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.components.SettingsClickableItem
+import com.wuxianggujun.tinaide.ui.compose.screens.settings.components.SettingsSwitchItem
 import java.util.Locale
 import kotlinx.coroutines.launch
 
@@ -64,7 +68,8 @@ internal fun GitSettingsSection() {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf(
         stringResource(Strings.git_settings_tab_https),
-        stringResource(Strings.git_settings_tab_ssh)
+        stringResource(Strings.git_settings_tab_ssh),
+        stringResource(Strings.git_settings_tab_github),
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -103,6 +108,7 @@ internal fun GitSettingsSection() {
             when (selectedTabIndex) {
                 0 -> GitHttpsContent()
                 1 -> GitSshContent()
+                2 -> GitHubRegistryContent()
             }
         }
     }
@@ -899,6 +905,113 @@ private fun GitSshContent() {
             },
             onDismiss = { selectingBindingKey = false }
         )
+    }
+}
+
+@Composable
+private fun GitHubRegistryContent() {
+    val context = LocalContext.current
+    val appContext = context.applicationContext
+    val saveOk = stringResource(Strings.github_registry_proxy_save_ok)
+
+    var enabled by remember { mutableStateOf(false) }
+    var host by remember { mutableStateOf("") }
+    var port by remember { mutableStateOf("") }
+    var errorRes by remember { mutableStateOf<Int?>(null) }
+
+    fun loadSettings() {
+        val editorState = GitSettingsSectionSupport.createGitHubRegistryProxyEditorState(
+            GitHubRegistryProxyConfig.load(appContext)
+        )
+        enabled = editorState.enabled
+        host = editorState.host
+        port = editorState.port
+        errorRes = null
+    }
+
+    LaunchedEffect(Unit) {
+        loadSettings()
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+    SettingsCategoryTitle(stringResource(Strings.settings_cat_github_registry))
+
+    SettingsCard {
+        SettingsSwitchItem(
+            title = stringResource(Strings.github_registry_proxy_enabled_title),
+            subtitle = stringResource(Strings.github_registry_proxy_enabled_desc),
+            checked = enabled,
+            onCheckedChange = {
+                enabled = it
+                errorRes = null
+            },
+            showDivider = false,
+        )
+    }
+
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = stringResource(Strings.github_registry_proxy_scope_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TinaTextField(
+                value = host,
+                onValueChange = {
+                    host = it
+                    errorRes = null
+                },
+                label = stringResource(Strings.github_registry_proxy_host_label),
+                placeholder = stringResource(Strings.github_registry_proxy_host_placeholder),
+                enabled = enabled,
+            )
+            TinaTextField(
+                value = port,
+                onValueChange = {
+                    port = it.filter(Char::isDigit)
+                    errorRes = null
+                },
+                label = stringResource(Strings.github_registry_proxy_port_label),
+                placeholder = stringResource(Strings.github_registry_proxy_port_placeholder),
+                enabled = enabled,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            )
+            errorRes?.let { resId ->
+                TinaDialogMessageCard(
+                    message = stringResource(resId),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
+                    textColor = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+            TinaPrimaryButton(
+                text = stringResource(Strings.btn_save),
+                onClick = {
+                    val result = GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                        enabled = enabled,
+                        rawHost = host,
+                        rawPort = port,
+                    )
+                    val settings = result.settings
+                    if (settings == null) {
+                        errorRes = result.errorRes
+                        return@TinaPrimaryButton
+                    }
+
+                    GitHubRegistryProxyConfig.save(appContext, settings)
+                    val editorState = GitSettingsSectionSupport.createGitHubRegistryProxyEditorState(settings)
+                    enabled = editorState.enabled
+                    host = editorState.host
+                    port = editorState.port
+                    errorRes = null
+                    Toast.makeText(context, saveOk, Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

@@ -29,8 +29,6 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:ndk"))
     implementation(project(":core:network"))
-    // BundledPackagesInstaller
-    implementation(project(":core:packages"))
     implementation(project(":core:plugin"))
     implementation(project(":core:project"))
     implementation(project(":core:proot"))

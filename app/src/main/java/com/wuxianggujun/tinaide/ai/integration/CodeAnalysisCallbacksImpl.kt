@@ -24,7 +24,15 @@ class CodeAnalysisCallbacksImpl(
 
     override fun searchCode(request: CodeSearchRequest): CodeSearchResult {
         val matches = mutableListOf<CodeMatch>()
-        val rootDir = File(projectRoot, request.path)
+        val rootDir = runCatching {
+            PathUtils.resolveProjectFile(request.path, projectRoot)
+        }.getOrElse {
+            return CodeSearchResult(
+                matches = emptyList(),
+                totalCount = 0,
+                truncated = false
+            )
+        }
 
         if (!rootDir.exists() || !rootDir.isDirectory) {
             return CodeSearchResult(
@@ -223,7 +231,7 @@ class CodeAnalysisCallbacksImpl(
     }
 
     override fun getCodeOutline(filePath: String): CodeOutlineResult {
-        val file = File(filePath)
+        val file = PathUtils.resolveProjectFile(filePath, projectRoot)
         if (!file.exists() || !file.isFile) {
             throw IllegalArgumentException("File not found: $filePath")
         }
@@ -231,7 +239,7 @@ class CodeAnalysisCallbacksImpl(
         val service = symbolIndexService
         if (service == null) {
             return CodeOutlineResult(
-                filePath = toRelativePath(filePath),
+                filePath = toRelativePath(file.absolutePath),
                 language = detectLanguage(file),
                 items = emptyList()
             )
@@ -258,7 +266,7 @@ class CodeAnalysisCallbacksImpl(
         }
 
         return CodeOutlineResult(
-            filePath = toRelativePath(filePath),
+            filePath = toRelativePath(file.absolutePath),
             language = detectLanguage(file),
             items = items
         )

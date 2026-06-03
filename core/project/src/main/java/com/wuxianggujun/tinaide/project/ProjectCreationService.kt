@@ -1,6 +1,5 @@
 package com.wuxianggujun.tinaide.project
 
-import android.content.Context
 import java.io.File
 import timber.log.Timber
 
@@ -15,30 +14,9 @@ object ProjectCreationService {
     private val SAFE_PROJECT_NAME_REGEX = Regex("^[A-Za-z0-9_-]+$")
 
     fun createProject(
-        context: Context,
         projectRoot: File,
         projectName: String,
-        templateType: ProjectTemplateInstaller.TemplateType = ProjectTemplateInstaller.TemplateType.CPP_SINGLE_FILE,
-        cppStandard: CppStandard = CppStandard.DEFAULT,
-        ndkApiLevel: AndroidApiLevel? = null,
-        authorName: String = ""
-    ): ProjectCreationResult {
-        return createProject(
-            context = context,
-            projectRoot = projectRoot,
-            projectName = projectName,
-            templateSpec = ProjectTemplateSpec.Asset(templateType),
-            cppStandard = cppStandard,
-            ndkApiLevel = ndkApiLevel,
-            authorName = authorName
-        )
-    }
-
-    fun createProject(
-        context: Context,
-        projectRoot: File,
-        projectName: String,
-        templateSpec: ProjectTemplateSpec,
+        templateSpec: ProjectTemplateSpec.Zip,
         cppStandard: CppStandard = CppStandard.DEFAULT,
         ndkApiLevel: AndroidApiLevel? = null,
         authorName: String = ""
@@ -110,25 +88,14 @@ object ProjectCreationService {
         }
 
         val templateInstalled = runCatching {
-            when (templateSpec) {
-                is ProjectTemplateSpec.Asset -> ProjectTemplateInstaller.install(
-                    context = context,
-                    destDir = projectDir,
-                    projectName = normalizedName,
-                    type = templateSpec.type,
-                    cppStandard = cppStandard,
-                    ndkApiLevel = ndkApiLevel,
-                    authorName = authorName
-                )
-                is ProjectTemplateSpec.Zip -> ProjectTemplateInstaller.install(
-                    destDir = projectDir,
-                    projectName = normalizedName,
-                    templateSpec = templateSpec,
-                    cppStandard = cppStandard,
-                    ndkApiLevel = ndkApiLevel,
-                    authorName = authorName
-                )
-            }
+            ProjectTemplateInstaller.install(
+                destDir = projectDir,
+                projectName = normalizedName,
+                templateSpec = templateSpec,
+                cppStandard = cppStandard,
+                ndkApiLevel = ndkApiLevel,
+                authorName = authorName,
+            )
         }.onFailure { throwable ->
             Timber.tag(TAG).e(throwable, "Create project failed: %s", normalizedName)
         }.getOrDefault(false)
