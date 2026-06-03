@@ -69,9 +69,6 @@ class PluginMarketplaceSelectionSupportTest {
                 displayName = "Publisher $pluginId",
             ),
             latestVersion = "1.0.0",
-            downloadCount = 0,
-            ratingAvg = 0.0,
-            ratingCount = 0,
             updatedAt = "2026-04-22T00:00:00Z",
         )
     }

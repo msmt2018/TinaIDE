@@ -186,7 +186,7 @@ fun PluginCardSkeleton(
 
                 Spacer(modifier = Modifier.height(TinaSpacing.xs))
 
-                // 底部信息行（作者、版本、下载量）
+                // 底部信息行（作者、版本、大小）
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(TinaSpacing.md)
                 ) {

@@ -42,9 +42,6 @@ class PluginMarketplaceInstallStateResolverTest {
             category = "tool",
             latestVersion = latestVersion,
             iconUrl = null,
-            downloadCount = 0L,
-            ratingAvg = 0.0,
-            ratingCount = 0,
             publisher = PluginPublisher(
                 id = "publisher.$pluginId",
                 displayName = "Publisher",

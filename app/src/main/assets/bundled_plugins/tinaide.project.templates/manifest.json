@@ -1,0 +1,56 @@
+{
+  "id": "tinaide.project.templates",
+  "name": "TinaIDE C/C++ Project Templates",
+  "version": "1.0.1",
+  "apiVersion": 1,
+  "description": "Built-in offline C/C++ project templates for TinaIDE.",
+  "type": "config",
+  "author": {
+    "name": "TinaIDE"
+  },
+  "contributions": {
+    "projectTemplates": [
+      {
+        "id": "cpp-single-file",
+        "name": "C++ Single File",
+        "description": "Suitable for simple programs, examples, and learning.",
+        "templatePath": "templates/cpp_single_file.zip",
+        "buildSystem": "single_file",
+        "primaryLanguage": "CPP"
+      },
+      {
+        "id": "cmake-executable",
+        "name": "CMake Executable",
+        "description": "A standard CMake C++ executable project.",
+        "templatePath": "templates/cmake_executable.zip",
+        "buildSystem": "cmake",
+        "primaryLanguage": "CPP"
+      },
+      {
+        "id": "cmake-library",
+        "name": "CMake Library",
+        "description": "A CMake C++ library project with sample sources.",
+        "templatePath": "templates/cmake_library.zip",
+        "buildSystem": "cmake",
+        "primaryLanguage": "CPP"
+      },
+      {
+        "id": "make-executable",
+        "name": "Make Executable",
+        "description": "A Make-based C++ executable project.",
+        "templatePath": "templates/make_executable.zip",
+        "buildSystem": "make",
+        "primaryLanguage": "CPP"
+      },
+      {
+        "id": "ndk-shared-library",
+        "name": "NDK Shared Library",
+        "description": "An Android NDK shared library project.",
+        "templatePath": "templates/ndk_shared_library.zip",
+        "buildSystem": "cmake",
+        "primaryLanguage": "CPP",
+        "isNdkTemplate": true
+      }
+    ]
+  }
+}

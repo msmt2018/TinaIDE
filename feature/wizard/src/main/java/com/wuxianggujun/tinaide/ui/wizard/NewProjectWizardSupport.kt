@@ -35,9 +35,8 @@ internal object NewProjectWizardSupport {
         if (templateOptions.isEmpty()) return null
 
         if (!initialTemplateId.isNullOrBlank()) {
-            templateOptions
-                .firstOrNull { option -> option.id == initialTemplateId }
-                ?.let { option -> return option }
+            val exactTemplate = templateOptions.firstOrNull { option -> option.id == initialTemplateId }
+            if (exactTemplate != null) return exactTemplate
         }
 
         return if (preferPluginTemplate) {

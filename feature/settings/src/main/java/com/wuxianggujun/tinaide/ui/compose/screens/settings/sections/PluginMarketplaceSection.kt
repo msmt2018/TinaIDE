@@ -25,10 +25,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -68,7 +66,6 @@ import com.wuxianggujun.tinaide.plugin.marketplace.PluginSummary
 import com.wuxianggujun.tinaide.ui.compose.components.DetailHeaderCard
 import com.wuxianggujun.tinaide.ui.compose.components.DetailIconPlaceholder
 import com.wuxianggujun.tinaide.ui.compose.components.DetailInfoCard
-import com.wuxianggujun.tinaide.ui.compose.components.DetailMetadataItem
 import com.wuxianggujun.tinaide.ui.compose.components.TinaBackHandlers
 import com.wuxianggujun.tinaide.ui.compose.components.TinaShapes
 import com.wuxianggujun.tinaide.ui.compose.components.TinaSpacing
@@ -250,15 +247,11 @@ private fun SortChips(
     onSortSelected: (PluginSortType) -> Unit
 ) {
     // 预先获取字符串资源，避免在 LazyRow items 中调用 stringResource 导致潜在的 null 问题
-    val sortDownloads = stringResource(Strings.plugin_marketplace_sort_downloads)
-    val sortRating = stringResource(Strings.plugin_marketplace_sort_rating)
     val sortNewest = stringResource(Strings.plugin_marketplace_sort_newest)
     val sortUpdated = stringResource(Strings.plugin_marketplace_sort_updated)
 
-    val sortOptions = remember(sortDownloads, sortRating, sortNewest, sortUpdated) {
+    val sortOptions = remember(sortNewest, sortUpdated) {
         PluginMarketplaceSectionSupport.buildSortSpecs(
-            downloadsLabel = sortDownloads,
-            ratingLabel = sortRating,
             newestLabel = sortNewest,
             updatedLabel = sortUpdated,
         )
@@ -487,38 +480,6 @@ private fun PluginCard(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(TinaSpacing.xl)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(TinaSpacing.xs))
-                        Text(
-                            text = PluginMarketplaceSectionSupport.formatDownloadCount(plugin.downloadCount),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    if (plugin.ratingAvg > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(TinaSpacing.xs))
-                            Text(
-                                text = String.format("%.1f", plugin.ratingAvg),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
                     plugin.latestVersion?.let { version ->
                         Text(
                             text = "v$version",
@@ -638,31 +599,6 @@ private fun PluginDetailScreen(
                     },
                     title = plugin.name,
                     subtitle = plugin.publisher.displayName,
-                    metadata = {
-                        DetailMetadataItem(
-                            icon = {
-                                Icon(
-                                    Icons.Default.Download,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            text = PluginMarketplaceSectionSupport.formatDownloadCount(plugin.downloadCount)
-                        )
-
-                        if (plugin.ratingAvg > 0) {
-                            DetailMetadataItem(
-                                icon = {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                },
-                                text = String.format("%.1f", plugin.ratingAvg)
-                            )
-                        }
-                    },
                     actions = {
                         // 安装按钮
                         when (installActionSpec) {

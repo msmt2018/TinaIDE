@@ -16,7 +16,6 @@ import com.wuxianggujun.tinaide.core.config.NewProjectSourceLocation
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.plugin.PluginManager
-import com.wuxianggujun.tinaide.project.BuiltInProjectTemplates
 import com.wuxianggujun.tinaide.storage.ProjectPaths
 import com.wuxianggujun.tinaide.ui.theme.TinaIDETheme
 
@@ -53,9 +52,8 @@ class NewProjectWizardActivity : ComponentActivity() {
                     intent.getBooleanExtra(EXTRA_PREFER_PLUGIN_TEMPLATE, false)
                 }
                 val allTemplateOptions = remember(enabledPlugins, state.userTemplateOptions) {
-                    BuiltInProjectTemplates.createOptions(this@NewProjectWizardActivity) +
-                        state.userTemplateOptions +
-                        pluginManager.listProjectTemplateOptions()
+                    val pluginTemplateOptions = pluginManager.listProjectTemplateOptions()
+                    state.userTemplateOptions + pluginTemplateOptions
                 }
                 val templateOptions = remember(allTemplateOptions, preferPluginTemplate) {
                     NewProjectWizardSupport.resolveVisibleTemplateOptions(

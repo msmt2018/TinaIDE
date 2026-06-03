@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.git.GitCredential
 import com.wuxianggujun.tinaide.core.git.ssh.GitSshHostBinding
 import com.wuxianggujun.tinaide.core.git.ssh.GitSshKeyMeta
 import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxySettings
 import java.net.URI
 
 internal data class GitHttpsEditorState(
@@ -24,6 +25,17 @@ internal data class GitSshBindingEditorState(
     val host: String,
     val keyName: String,
     val port: String,
+)
+
+internal data class GitHubRegistryProxyEditorState(
+    val enabled: Boolean,
+    val host: String,
+    val port: String,
+)
+
+internal data class GitHubRegistryProxyResolveResult(
+    val settings: GitHubRegistryProxySettings?,
+    @StringRes val errorRes: Int?,
 )
 
 internal object GitSettingsSectionSupport {
@@ -112,6 +124,57 @@ internal object GitSettingsSectionSupport {
         notSelectedLabel: String,
     ): String = keyName.ifBlank { notSelectedLabel }
 
+    fun createGitHubRegistryProxyEditorState(
+        settings: GitHubRegistryProxySettings,
+    ): GitHubRegistryProxyEditorState = GitHubRegistryProxyEditorState(
+        enabled = settings.enabled,
+        host = settings.host,
+        port = settings.port.takeIf { it > 0 }?.toString().orEmpty(),
+    )
+
+    fun resolveGitHubRegistryProxySettings(
+        enabled: Boolean,
+        rawHost: String,
+        rawPort: String,
+    ): GitHubRegistryProxyResolveResult {
+        val hostWithOptionalPort = normalizeGitHubRegistryProxyHost(rawHost)
+        val hasSinglePortDelimiter = hostWithOptionalPort.count { it == ':' } == 1
+        val host = if (hasSinglePortDelimiter) {
+            hostWithOptionalPort.substringBeforeLast(":")
+        } else {
+            hostWithOptionalPort
+        }
+        val hostPort = if (hasSinglePortDelimiter) {
+            hostWithOptionalPort.substringAfterLast(":").takeIf { it.all(Char::isDigit) }
+        } else {
+            null
+        }
+        val portText = rawPort.trim().ifBlank { hostPort.orEmpty() }
+        val port = portText.toIntOrNull() ?: 0
+
+        if (enabled && host.isBlank()) {
+            return GitHubRegistryProxyResolveResult(
+                settings = null,
+                errorRes = Strings.github_registry_proxy_error_host_required,
+            )
+        }
+        if (enabled && port !in 1..65535) {
+            return GitHubRegistryProxyResolveResult(
+                settings = null,
+                errorRes = Strings.github_registry_proxy_error_port_invalid,
+            )
+        }
+
+        return GitHubRegistryProxyResolveResult(
+            settings = GitHubRegistryProxySettings(
+                enabled = enabled,
+                host = host,
+                port = port,
+            ),
+            errorRes = null,
+        )
+    }
+
     fun extractHost(input: String): String {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) return ""
@@ -126,6 +189,25 @@ internal object GitSettingsSectionSupport {
         }
 
         return trimmed
+    }
+
+    private fun normalizeGitHubRegistryProxyHost(input: String): String {
+        val trimmed = input.trim()
+        if (trimmed.isEmpty()) return ""
+
+        if (trimmed.contains("://")) {
+            val uri = runCatching { URI(trimmed) }.getOrNull() ?: return ""
+            return buildString {
+                append(uri.host?.trim().orEmpty())
+                if (uri.port > 0) append(":").append(uri.port)
+            }
+        }
+
+        return trimmed
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .substringBefore("/")
+            .trim()
     }
 
     fun suggestKeyName(lastPathSegment: String?): String {

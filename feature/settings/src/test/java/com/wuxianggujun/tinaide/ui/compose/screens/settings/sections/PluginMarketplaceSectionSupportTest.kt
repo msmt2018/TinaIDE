@@ -26,20 +26,10 @@ class PluginMarketplaceSectionSupportTest {
 
         assertThat(
             PluginMarketplaceSectionSupport.buildSortSpecs(
-                downloadsLabel = "Downloads",
-                ratingLabel = "Rating",
                 newestLabel = "Newest",
                 updatedLabel = "Updated",
             )
         ).containsExactly(
-            PluginMarketplaceSortSpec(
-                sortType = PluginSortType.DOWNLOADS,
-                label = "Downloads",
-            ),
-            PluginMarketplaceSortSpec(
-                sortType = PluginSortType.RATING,
-                label = "Rating",
-            ),
             PluginMarketplaceSortSpec(
                 sortType = PluginSortType.NEWEST,
                 label = "Newest",
@@ -84,15 +74,6 @@ class PluginMarketplaceSectionSupportTest {
         assertThat(
             PluginMarketplaceSectionSupport.resolvePluginInitial("")
         ).isEqualTo("P")
-        assertThat(
-            PluginMarketplaceSectionSupport.formatDownloadCount(999)
-        ).isEqualTo("999")
-        assertThat(
-            PluginMarketplaceSectionSupport.formatDownloadCount(1_250)
-        ).isEqualTo("1.3K")
-        assertThat(
-            PluginMarketplaceSectionSupport.formatDownloadCount(2_500_000)
-        ).isEqualTo("2.5M")
     }
 
     @Test

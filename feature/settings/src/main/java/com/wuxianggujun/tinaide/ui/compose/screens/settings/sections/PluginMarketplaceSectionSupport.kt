@@ -39,19 +39,9 @@ internal object PluginMarketplaceSectionSupport {
     )
 
     fun buildSortSpecs(
-        downloadsLabel: String,
-        ratingLabel: String,
         newestLabel: String,
         updatedLabel: String,
     ): List<PluginMarketplaceSortSpec> = listOf(
-        PluginMarketplaceSortSpec(
-            sortType = PluginSortType.DOWNLOADS,
-            label = downloadsLabel,
-        ),
-        PluginMarketplaceSortSpec(
-            sortType = PluginSortType.RATING,
-            label = ratingLabel,
-        ),
         PluginMarketplaceSortSpec(
             sortType = PluginSortType.NEWEST,
             label = newestLabel,
@@ -73,12 +63,6 @@ internal object PluginMarketplaceSectionSupport {
     }
 
     fun resolvePluginInitial(name: String): String = name.firstOrNull()?.uppercase() ?: "P"
-
-    fun formatDownloadCount(count: Long): String = when {
-        count >= 1_000_000 -> String.format("%.1fM", count / 1_000_000.0)
-        count >= 1_000 -> String.format("%.1fK", count / 1_000.0)
-        else -> count.toString()
-    }
 
     fun resolveInstallActionSpec(
         isInstalled: Boolean,

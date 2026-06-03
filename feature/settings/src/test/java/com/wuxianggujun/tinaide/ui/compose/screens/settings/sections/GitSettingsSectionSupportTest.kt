@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.git.GitCredential
 import com.wuxianggujun.tinaide.core.git.ssh.GitSshHostBinding
 import com.wuxianggujun.tinaide.core.git.ssh.GitSshKeyMeta
 import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxySettings
 import org.junit.Test
 
 class GitSettingsSectionSupportTest {
@@ -131,6 +132,89 @@ class GitSettingsSectionSupportTest {
                 password = "2",
             ),
         ).inOrder()
+    }
+
+    @Test
+    fun githubRegistryProxySettings_shouldResolveCommonInputs() {
+        assertThat(
+            GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                enabled = false,
+                rawHost = " ",
+                rawPort = " ",
+            )
+        ).isEqualTo(
+            GitHubRegistryProxyResolveResult(
+                settings = GitHubRegistryProxySettings(
+                    enabled = false,
+                    host = "",
+                    port = 0,
+                ),
+                errorRes = null,
+            )
+        )
+
+        assertThat(
+            GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                enabled = true,
+                rawHost = " 127.0.0.1 ",
+                rawPort = " 7890 ",
+            )
+        ).isEqualTo(
+            GitHubRegistryProxyResolveResult(
+                settings = GitHubRegistryProxySettings(
+                    enabled = true,
+                    host = "127.0.0.1",
+                    port = 7890,
+                ),
+                errorRes = null,
+            )
+        )
+
+        assertThat(
+            GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                enabled = true,
+                rawHost = " http://127.0.0.1:7890/proxy ",
+                rawPort = "",
+            )
+        ).isEqualTo(
+            GitHubRegistryProxyResolveResult(
+                settings = GitHubRegistryProxySettings(
+                    enabled = true,
+                    host = "127.0.0.1",
+                    port = 7890,
+                ),
+                errorRes = null,
+            )
+        )
+    }
+
+    @Test
+    fun githubRegistryProxySettings_shouldValidateEnabledInputs() {
+        assertThat(
+            GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                enabled = true,
+                rawHost = "",
+                rawPort = "7890",
+            )
+        ).isEqualTo(
+            GitHubRegistryProxyResolveResult(
+                settings = null,
+                errorRes = Strings.github_registry_proxy_error_host_required,
+            )
+        )
+
+        assertThat(
+            GitSettingsSectionSupport.resolveGitHubRegistryProxySettings(
+                enabled = true,
+                rawHost = "127.0.0.1",
+                rawPort = "bad",
+            )
+        ).isEqualTo(
+            GitHubRegistryProxyResolveResult(
+                settings = null,
+                errorRes = Strings.github_registry_proxy_error_port_invalid,
+            )
+        )
     }
 
     @Test

@@ -16,7 +16,7 @@
 - 插件教程像是在引导普通 C/C++ 新建项目。
 - 插件模板和普通模板混在一起，用户可能停在默认 C/C++ 模板。
 - 创建后的插件项目点击运行时，用户不清楚应该是热安装插件，而不是运行普通程序。
-- 教程、starter README、内置模板 zip 和排查文档的说法不完全一致。
+- 教程、starter README、Registry 模板包和排查文档的说法不完全一致。
 
 本轮目标不是新增复杂系统，而是把现有项目模板能力收束成一个清晰、可验收、可维护的插件开发闭环。
 
@@ -112,19 +112,19 @@ CompileActionsHelper
 
 ### 3.5 `TinaIDE Plugin Starters` 必须升版本
 
-决策：内置 starter 插件内容变化时，必须提升 `manifest.json` 版本。
+决策：starter 插件内容变化时，必须提升 `manifest.json` 版本。
 
-原因：内置插件同版本可能跳过覆盖安装，导致用户仍拿到旧模板和旧说明。
+原因：插件仓库同版本可能跳过覆盖安装，导致用户仍拿到旧模板和旧说明。
 
 本轮版本：
 
 - `tinaide.plugin.starters`：`1.0.0` → `1.0.1`
 
-### 3.6 源模板和内置 zip 必须同步
+### 3.6 源模板和 Registry zip 必须同步
 
-决策：修改 `tools/plugin-starters/**` 后，必须同步 `app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates/*.zip`。
+决策：修改 `tools/plugin-starters/**` 后，必须重新生成 starter zip，并同步到 TinaIDE Registry 的 `sources/plugin-starters/**` 或对应发布目录。
 
-原因：用户新建项目时拿到的是内置 zip，不是源目录。
+原因：用户新建插件项目时拿到的是已安装插件里的 zip，不是 Android 仓库中的源目录。
 
 本轮同步的模板包：
 
@@ -215,8 +215,8 @@ CompileActionsHelper
 - 新增 / 更新 4 个 starter 源模板 README。
 - 统一运行、打包、输出路径、从文件安装预检说明。
 - 修正 `command.execute` 权限说明：注册插件命令和调用宿主命令都需要它。
-- 同步内置模板 zip。
-- 内置 starter 插件版本提升到 `1.0.1`。
+- 同步 starter 模板 zip。
+- starter 插件版本提升到 `1.0.1`。
 
 主要文件：
 
@@ -226,9 +226,8 @@ CompileActionsHelper
 - `tools/plugin-starters/script-basic/README.md`
 - `tools/plugin-starters/script-basic/docs/permissions.md`
 - `tools/plugin-starters/lsp-basic/README.md`
-- `app/src/main/assets/bundled_plugins/tinaide.plugin.starters/README.md`
-- `app/src/main/assets/bundled_plugins/tinaide.plugin.starters/manifest.json`
-- `app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates/*.zip`
+- `tools/plugin-starters/dist/tinaide.plugin.starters/templates/*.zip`
+- TinaIDE Registry 中的 `sources/plugin-starters/**`
 
 ---
 
@@ -268,7 +267,7 @@ CompileActionsHelper
 - 尾随空白扫描
 - 冲突标记扫描
 - 旧误导文案扫描
-- starter 源模板与内置 zip 关键文件一致性比对
+- starter 源模板与发布 zip 关键文件一致性比对
 - 4 个 starter 的 `validate.ps1` 校验
 
 说明：
@@ -297,8 +296,8 @@ CompileActionsHelper
 必须同步检查：
 
 1. 源模板目录：`tools/plugin-starters/<template>/`
-2. 内置模板 zip：`app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates/*.zip`
-3. 内置 starter 插件版本：`app/src/main/assets/bundled_plugins/tinaide.plugin.starters/manifest.json`
+2. 发布模板 zip：`tools/plugin-starters/dist/tinaide.plugin.starters/templates/*.zip` 或 Registry 对应目录
+3. starter 插件版本：Registry 中 `tinaide.plugin.starters` 的 `manifest.json`
 4. 对应 README / permissions 文档
 5. `Plugin-Tutorial-Acceptance-Checklist.md` 中的模板验收项
 

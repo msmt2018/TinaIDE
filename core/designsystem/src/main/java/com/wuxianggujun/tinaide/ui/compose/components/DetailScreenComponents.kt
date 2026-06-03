@@ -84,7 +84,7 @@ fun DetailInfoCard(
  * @param icon 图标 Composable
  * @param title 主标题
  * @param subtitle 副标题（可选）
- * @param metadata 元数据行（可选，如下载量、评分等）
+ * @param metadata 元数据行（可选，如作者、版本、大小等）
  * @param actions 操作按钮区域（可选）
  */
 @Composable
@@ -149,7 +149,7 @@ fun DetailHeaderCard(
 /**
  * 详情页元数据项
  *
- * 用于显示图标+文本的元数据（如下载量、评分等）
+ * 用于显示图标+文本的元数据（如作者、版本、大小等）
  *
  * @param icon 图标
  * @param text 文本

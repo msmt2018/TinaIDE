@@ -35,17 +35,6 @@ internal data class DeveloperServerUrlDialogState(
     val feedback: DeveloperServerUrlFeedback? = null
 )
 
-internal enum class DeveloperBundledPackagesReinstallFeedback {
-    Started,
-    Success,
-    Failure
-}
-
-internal data class DeveloperBundledPackagesReinstallState(
-    val feedback: DeveloperBundledPackagesReinstallFeedback,
-    val errorMessage: String? = null
-)
-
 internal data class DeveloperServerConfigPreview(
     val version: Long,
     val updatedAt: String?,
@@ -143,52 +132,6 @@ internal object DeveloperOptionsSectionSupport {
         }
 
         null -> null
-    }
-
-    fun createBundledPackagesReinstallStartedState(): DeveloperBundledPackagesReinstallState = DeveloperBundledPackagesReinstallState(
-        feedback = DeveloperBundledPackagesReinstallFeedback.Started
-    )
-
-    fun resolveBundledPackagesReinstallResult(
-        errorMessage: String?
-    ): DeveloperBundledPackagesReinstallState {
-        val normalizedErrorMessage = errorMessage?.takeUnless { it.isBlank() }
-        return if (normalizedErrorMessage == null) {
-            DeveloperBundledPackagesReinstallState(
-                feedback = DeveloperBundledPackagesReinstallFeedback.Success
-            )
-        } else {
-            DeveloperBundledPackagesReinstallState(
-                feedback = DeveloperBundledPackagesReinstallFeedback.Failure,
-                errorMessage = normalizedErrorMessage
-            )
-        }
-    }
-
-    fun resolveBundledPackagesReinstallToast(
-        state: DeveloperBundledPackagesReinstallState,
-        unknownErrorMessage: String,
-        useLongDuration: Boolean = false
-    ): DeveloperToastSpec = when (state.feedback) {
-        DeveloperBundledPackagesReinstallFeedback.Started -> DeveloperToastSpec(
-            message = DeveloperMessageSpec(Strings.toast_reinstalling_bundled_packages)
-        )
-
-        DeveloperBundledPackagesReinstallFeedback.Success -> DeveloperToastSpec(
-            message = DeveloperMessageSpec(Strings.toast_reinstall_bundled_packages_success)
-        )
-
-        DeveloperBundledPackagesReinstallFeedback.Failure -> DeveloperToastSpec(
-            message = DeveloperMessageSpec(
-                messageRes = Strings.toast_reinstall_bundled_packages_failed,
-                formatArgs = listOf(state.errorMessage ?: unknownErrorMessage)
-            ),
-            duration = if (useLongDuration) {
-                DeveloperToastDuration.Long
-            } else {
-                DeveloperToastDuration.Short
-            }
-        )
     }
 
     fun resolveServerConfigPreview(config: ServerConfigResponse): DeveloperServerConfigPreview = DeveloperServerConfigPreview(

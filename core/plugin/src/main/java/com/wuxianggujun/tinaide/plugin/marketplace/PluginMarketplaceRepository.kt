@@ -56,23 +56,6 @@ class PluginMarketplaceRepository(
         return api.getPluginDetail(pluginId)
     }
 
-    suspend fun ratePlugin(pluginId: String, rating: Int): ApiResult<RatePluginResponse> {
-        return api.ratePlugin(pluginId, rating)
-    }
-
-    suspend fun submitPluginComment(pluginId: String, content: String): ApiResult<PluginComment> {
-        return api.submitPluginComment(pluginId, content)
-    }
-
-    suspend fun reportPluginComment(
-        pluginId: String,
-        commentId: String,
-        reason: String,
-        details: String?
-    ): ApiResult<ReportPluginCommentResponse> {
-        return api.reportPluginComment(pluginId, commentId, reason, details)
-    }
-
     suspend fun checkUpdates(): ApiResult<CheckUpdateData> {
         val installed = pluginManager.listInstalledPlugins()
         if (installed.isEmpty()) {

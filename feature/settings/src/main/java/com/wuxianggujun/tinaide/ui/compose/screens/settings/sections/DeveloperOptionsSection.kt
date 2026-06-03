@@ -29,8 +29,6 @@ import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.i18n.Drawables
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
-import com.wuxianggujun.tinaide.core.packages.BundledPackagesInstaller
-import com.wuxianggujun.tinaide.core.packages.store.LocalInstallStateStore
 import com.wuxianggujun.tinaide.ui.compose.components.TinaAlertDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogCard
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogContentColumn
@@ -356,48 +354,6 @@ internal fun DeveloperOptionsSection(
             checked = builtinCmakeLspEnabled,
             onCheckedChange = {
                 Prefs.devBuiltinCmakeLspEnabled = it
-            },
-            showDivider = true
-        )
-
-        SettingsMenuItemWithIcon(
-            iconRes = Drawables.ic_settings_developer,
-            iconBackgroundColor = Color(0xFF4CAF50),
-            title = stringResource(Strings.dev_options_reinstall_bundled_packages),
-            subtitle = stringResource(Strings.dev_options_reinstall_bundled_packages_desc),
-            onClick = {
-                coroutineScope.launch {
-                    val unknownErrorMessage = Strings.error_unknown.strOr(context)
-                    try {
-                        val startedState =
-                            DeveloperOptionsSectionSupport.createBundledPackagesReinstallStartedState()
-                        DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
-                            state = startedState,
-                            unknownErrorMessage = unknownErrorMessage
-                        ).show(context)
-
-                        val installer = BundledPackagesInstaller(
-                            context = context,
-                            installStateStore = LocalInstallStateStore(context)
-                        )
-                        installer.installBundledPackages(forceReinstall = true)
-
-                        val resultState = DeveloperOptionsSectionSupport
-                            .resolveBundledPackagesReinstallResult(null)
-                        DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
-                            state = resultState,
-                            unknownErrorMessage = unknownErrorMessage
-                        ).show(context)
-                    } catch (e: Exception) {
-                        val resultState = DeveloperOptionsSectionSupport
-                            .resolveBundledPackagesReinstallResult(e.message)
-                        DeveloperOptionsSectionSupport.resolveBundledPackagesReinstallToast(
-                            state = resultState,
-                            unknownErrorMessage = unknownErrorMessage,
-                            useLongDuration = true
-                        ).show(context)
-                    }
-                }
             },
             showDivider = false
         )

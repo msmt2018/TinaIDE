@@ -14,7 +14,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -37,7 +36,6 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaDialogTitleText
 import com.wuxianggujun.tinaide.ui.compose.components.TinaPrimaryButton
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTextButton
 import com.wuxianggujun.tinaide.ui.compose.screens.main.market.MarketScreen
-import com.wuxianggujun.tinaide.ui.compose.screens.main.market.MyPublishScreen
 import com.wuxianggujun.tinaide.ui.compose.screens.main.profile.ProfileScreen
 import com.wuxianggujun.tinaide.ui.compose.screens.main.project.ProjectScreen
 import com.wuxianggujun.tinaide.ui.compose.screens.main.tutorial.TutorialScreen
@@ -66,7 +64,6 @@ fun MainScreen(
     onNavigateToDownloadHistory: () -> Unit = {},
 ) {
     var selectedNavIndex by remember { mutableIntStateOf(0) }
-    var showMyPublish by remember { mutableStateOf(false) }
     val saveableStateHolder = rememberSaveableStateHolder()
 
     // Spotlight 注册表
@@ -78,7 +75,6 @@ fun MainScreen(
     val spotlightState by tutorialViewModel.spotlightState.collectAsState()
 
     fun navigateToSpotlightTarget(targetId: String) {
-        showMyPublish = false
         selectedNavIndex = when (targetId) {
             SpotlightTargets.BOTTOM_NAV_PROJECT,
             SpotlightTargets.FAB_PROJECT_ACTIONS,
@@ -114,46 +110,36 @@ fun MainScreen(
                         .weight(1f)
                         .fillMaxSize()
                 ) {
-                    if (showMyPublish) {
-                        MyPublishScreen(
-                            onNavigateBack = { showMyPublish = false }
-                        )
-                    } else {
-                        // 让各个 Tab 的 rememberSaveable 状态在切换时也能被保留，避免回到「项目」时重复触发刷新
-                        val tabKey = MainBottomNavItems.getOrNull(selectedNavIndex)?.route ?: "tab_$selectedNavIndex"
-                        saveableStateHolder.SaveableStateProvider(key = tabKey) {
-                            when (selectedNavIndex) {
-                                0 -> ProjectScreen(
-                                    onNewProjectClick = { onOpenProject("") },
-                                    onProjectClick = onOpenProject,
-                                    spotlightUiState = spotlightState
-                                )
-                                1 -> MarketScreen(
-                                    onNavigateToMyPublish = { showMyPublish = true }
-                                )
-                                2 -> TutorialScreen(viewModel = tutorialViewModel)
-                                3 -> ProfileScreen(
-                                    onNavigateToSettings = onNavigateToSettings,
-                                    onNavigateToFeedback = onNavigateToFeedback,
-                                    onNavigateToAbout = onNavigateToAbout,
-                                    onNavigateToPlugins = onNavigateToPlugins,
-                                    onNavigateToPackages = onNavigateToPackages,
-                                    onNavigateToFavorites = onNavigateToFavorites,
-                                    onNavigateToDownloadHistory = onNavigateToDownloadHistory,
-                                )
-                            }
+                    // 让各个 Tab 的 rememberSaveable 状态在切换时也能被保留，避免回到「项目」时重复触发刷新
+                    val tabKey = MainBottomNavItems.getOrNull(selectedNavIndex)?.route ?: "tab_$selectedNavIndex"
+                    saveableStateHolder.SaveableStateProvider(key = tabKey) {
+                        when (selectedNavIndex) {
+                            0 -> ProjectScreen(
+                                onNewProjectClick = { onOpenProject("") },
+                                onProjectClick = onOpenProject,
+                                spotlightUiState = spotlightState
+                            )
+                            1 -> MarketScreen()
+                            2 -> TutorialScreen(viewModel = tutorialViewModel)
+                            3 -> ProfileScreen(
+                                onNavigateToSettings = onNavigateToSettings,
+                                onNavigateToFeedback = onNavigateToFeedback,
+                                onNavigateToAbout = onNavigateToAbout,
+                                onNavigateToPlugins = onNavigateToPlugins,
+                                onNavigateToPackages = onNavigateToPackages,
+                                onNavigateToFavorites = onNavigateToFavorites,
+                                onNavigateToDownloadHistory = onNavigateToDownloadHistory,
+                            )
                         }
                     }
                 }
 
-                // 底部导航栏（在「我的发布」页面时隐藏）
-                if (!showMyPublish) {
-                    TinaBottomBar(
-                        items = MainBottomNavItems,
-                        selectedIndex = selectedNavIndex,
-                        onItemSelected = { selectedNavIndex = it }
-                    )
-                }
+                // 底部导航栏
+                TinaBottomBar(
+                    items = MainBottomNavItems,
+                    selectedIndex = selectedNavIndex,
+                    onItemSelected = { selectedNavIndex = it }
+                )
             }
 
             // Spotlight 遮罩引导
