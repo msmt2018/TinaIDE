@@ -339,6 +339,29 @@ private fun TemplateSelectionStep(
     selectedTemplateId: String,
     onTemplateSelected: (ProjectTemplateOption) -> Unit
 ) {
+    val categoryGroups = remember(templateOptions, isPluginProjectMode) {
+        if (isPluginProjectMode) {
+            emptyList()
+        } else {
+            NewProjectWizardSupport.resolveTemplateCategoryGroups(templateOptions)
+        }
+    }
+    val selectedCategory = remember(categoryGroups, selectedTemplateId) {
+        NewProjectWizardSupport.resolveSelectedTemplateCategory(
+            selectedTemplateId = selectedTemplateId,
+            groups = categoryGroups,
+        ) ?: categoryGroups.firstOrNull()?.category
+    }
+    val visibleOptions = remember(categoryGroups, selectedCategory, templateOptions) {
+        if (categoryGroups.size > 1 && selectedCategory != null) {
+            categoryGroups.firstOrNull { group -> group.category == selectedCategory }
+                ?.options
+                .orEmpty()
+        } else {
+            templateOptions
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -351,7 +374,20 @@ private fun TemplateSelectionStep(
             return@Column
         }
 
-        templateOptions.forEach { option ->
+        if (categoryGroups.size > 1 && selectedCategory != null) {
+            TemplateCategoryTabs(
+                groups = categoryGroups,
+                selectedCategory = selectedCategory,
+                onCategorySelected = { category ->
+                    NewProjectWizardSupport.resolveFirstTemplateInCategory(
+                        category = category,
+                        groups = categoryGroups,
+                    )?.let(onTemplateSelected)
+                }
+            )
+        }
+
+        visibleOptions.forEach { option ->
             TemplateCard(
                 icon = iconForTemplate(option),
                 title = option.displayName,
@@ -361,6 +397,35 @@ private fun TemplateSelectionStep(
                 isSelected = selectedTemplateId == option.id,
                 isRecommended = option.isRecommended,
                 onClick = { onTemplateSelected(option) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TemplateCategoryTabs(
+    groups: List<ProjectTemplateCategoryGroup>,
+    selectedCategory: ProjectTemplateCategory,
+    onCategorySelected: (ProjectTemplateCategory) -> Unit,
+) {
+    val selectedIndex = groups.indexOfFirst { group -> group.category == selectedCategory }
+        .coerceAtLeast(0)
+
+    PrimaryScrollableTabRow(
+        selectedTabIndex = selectedIndex,
+        edgePadding = 0.dp,
+        divider = {},
+    ) {
+        groups.forEach { group ->
+            Tab(
+                selected = group.category == selectedCategory,
+                onClick = { onCategorySelected(group.category) },
+                text = {
+                    Text(
+                        text = stringResource(group.category.labelRes),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                },
             )
         }
     }

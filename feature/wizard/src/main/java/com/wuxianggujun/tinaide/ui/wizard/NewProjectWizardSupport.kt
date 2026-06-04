@@ -6,6 +6,17 @@ import com.wuxianggujun.tinaide.project.ProjectBuildSystem
 import com.wuxianggujun.tinaide.project.ProjectLanguage
 import com.wuxianggujun.tinaide.project.ProjectTemplateOption
 
+internal enum class ProjectTemplateCategory(@param:StringRes val labelRes: Int) {
+    NATIVE(Strings.wizard_category_native_projects),
+    PLUGIN(Strings.wizard_category_plugin_projects),
+    USER(Strings.wizard_category_user_templates),
+}
+
+internal data class ProjectTemplateCategoryGroup(
+    val category: ProjectTemplateCategory,
+    val options: List<ProjectTemplateOption>,
+)
+
 internal object NewProjectWizardSupport {
 
     fun resolveSelectedTemplate(
@@ -44,6 +55,46 @@ internal object NewProjectWizardSupport {
         } else {
             null
         }
+    }
+
+    fun resolveTemplateCategory(option: ProjectTemplateOption?): ProjectTemplateCategory? {
+        if (option == null) return null
+        return when {
+            isUserTemplate(option) -> ProjectTemplateCategory.USER
+            isPluginTemplate(option) -> ProjectTemplateCategory.PLUGIN
+            else -> ProjectTemplateCategory.NATIVE
+        }
+    }
+
+    fun resolveTemplateCategoryGroups(
+        templateOptions: List<ProjectTemplateOption>,
+    ): List<ProjectTemplateCategoryGroup> {
+        return ProjectTemplateCategory.entries.mapNotNull { category ->
+            val options = templateOptions.filter { option ->
+                resolveTemplateCategory(option) == category
+            }
+            options.takeIf { it.isNotEmpty() }?.let {
+                ProjectTemplateCategoryGroup(category = category, options = it)
+            }
+        }
+    }
+
+    fun resolveSelectedTemplateCategory(
+        selectedTemplateId: String,
+        groups: List<ProjectTemplateCategoryGroup>,
+    ): ProjectTemplateCategory? {
+        return groups.firstOrNull { group ->
+            group.options.any { option -> option.id == selectedTemplateId }
+        }?.category
+    }
+
+    fun resolveFirstTemplateInCategory(
+        category: ProjectTemplateCategory,
+        groups: List<ProjectTemplateCategoryGroup>,
+    ): ProjectTemplateOption? {
+        return groups.firstOrNull { group -> group.category == category }
+            ?.options
+            ?.firstOrNull()
     }
 
     fun isPluginTemplate(option: ProjectTemplateOption?): Boolean {
