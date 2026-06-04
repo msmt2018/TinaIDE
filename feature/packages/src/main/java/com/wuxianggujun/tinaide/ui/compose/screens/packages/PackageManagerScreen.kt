@@ -774,6 +774,7 @@ private fun PackageDetailsDialog(
                 if (pkg.linux != null || pkg.android != null) {
                     TinaDialogCard(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         pkg.linux?.let { linuxPkg ->
+                            val linuxArtifactTypeLabel = stringResource(linuxPkg.artifactType.labelResId())
                             Text(
                                 text = stringResource(
                                     Strings.pkg_manager_detail_linux,
@@ -782,13 +783,28 @@ private fun PackageDetailsDialog(
                                 ),
                                 style = MaterialTheme.typography.bodySmall
                             )
+                            Text(
+                                text = stringResource(
+                                    Strings.pkg_manager_detail_artifact_type,
+                                    linuxArtifactTypeLabel
+                                ),
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                         pkg.android?.let { androidPkg ->
+                            val androidArtifactTypeLabel = stringResource(androidPkg.artifactType.labelResId())
                             Text(
                                 text = stringResource(
                                     Strings.pkg_manager_detail_android,
                                     androidPkg.version,
                                     androidPkg.installType.name.lowercase()
+                                ),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = stringResource(
+                                    Strings.pkg_manager_detail_artifact_type,
+                                    androidArtifactTypeLabel
                                 ),
                                 style = MaterialTheme.typography.bodySmall
                             )

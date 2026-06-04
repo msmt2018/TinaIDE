@@ -260,6 +260,7 @@ class BundledPackagesInstaller(
         val upstreamCommit: String? = null,
         val description: String? = null,
         val platform: String? = null,
+        val artifactType: String? = null,
         val installType: String? = null,
         val category: String? = null,
         val homepage: String? = null,
@@ -272,6 +273,7 @@ class BundledPackagesInstaller(
     @Serializable
     data class PackageFiles(
         val include: String? = null,
+        val source: String? = null,
         val lib: String? = null,
         val pkgconfig: String? = null
     )

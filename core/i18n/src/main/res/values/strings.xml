@@ -561,6 +561,9 @@
   <string name="wizard_btn_previous">上一步</string>
   <string name="wizard_btn_create">创建项目</string>
   <string name="wizard_template_recommended">推荐</string>
+  <string name="wizard_category_native_projects">C/C++ 项目</string>
+  <string name="wizard_category_plugin_projects">插件项目</string>
+  <string name="wizard_category_user_templates">自定义模板</string>
   <string name="wizard_plugin_template_badge">插件</string>
   <string name="wizard_plugin_template_card_hint">创建后可直接运行：IDE 会先校验 manifest，再热安装插件。</string>
   <string name="wizard_user_template_badge">自定义</string>
@@ -4518,4 +4521,12 @@ kept=%3$d bytes
   <string name="ai_tool_doc_property_description">%1$s 参数</string>
   <string name="ai_tool_doc_param_description">%1$s 的说明</string>
   <string name="ai_tool_doc_return_description">返回值说明</string>
+  <string name="pkg_manager_detail_artifact_type">产物类型：%1$s</string>
+  <string name="pkg_detail_artifact_type">产物类型</string>
+  <string name="pkg_artifact_type_source">源码</string>
+  <string name="pkg_artifact_type_header">头文件</string>
+  <string name="pkg_artifact_type_static">静态库</string>
+  <string name="pkg_artifact_type_shared">动态库</string>
+  <string name="pkg_artifact_type_executable">可执行文件</string>
+  <string name="pkg_artifact_type_mixed">混合内容</string>
 </resources>

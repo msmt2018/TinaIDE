@@ -182,6 +182,10 @@ private fun PlatformDetailCard(
                 InstallType.SCRIPT -> stringResource(Strings.pkg_install_type_script)
             }
             InfoRow(label = stringResource(Strings.pkg_detail_install_type), value = installTypeLabel)
+            InfoRow(
+                label = stringResource(Strings.pkg_detail_artifact_type),
+                value = stringResource(platformPackage.artifactType.labelResId())
+            )
 
             platformPackage.aptPackage?.let { apt ->
                 InfoRow(label = stringResource(Strings.pkg_detail_apt_package), value = apt)

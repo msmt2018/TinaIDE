@@ -126,6 +126,7 @@ function Write-SdlPackageJson {
         upstreamVersion = $UpstreamVersion
         description = "Simple DirectMedia Layer 3 - Cross-platform multimedia library"
         platform = "android"
+        artifactType = "shared"
         installType = "download"
         category = "library"
         homepage = "https://www.libsdl.org/"
@@ -185,6 +186,7 @@ package_version=$resolvedPackageVersion
 package_revision=$PackageRevision
 upstream_name=SDL3
 upstream_version=$upstreamVersion
+artifact_type=shared
 abis=$($abis -join ',')
 source_archive=$archiveName
 "@

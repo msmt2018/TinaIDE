@@ -46,6 +46,7 @@ data class InstalledPackageMetadata(
     val upstreamCommit: String? = null,
     val description: String? = null,
     val platform: String? = null,
+    val artifactType: String? = null,
     val installType: String? = null,
     val category: String? = null,
     val homepage: String? = null,
@@ -58,6 +59,7 @@ data class InstalledPackageMetadata(
 @Serializable
 data class InstalledPackageFiles(
     val include: String? = null,
+    val source: String? = null,
     val lib: String? = null,
     val pkgconfig: String? = null
 )

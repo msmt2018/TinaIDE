@@ -495,6 +495,9 @@
   <string name="wizard_btn_previous">Previous</string>
   <string name="wizard_btn_create">Create Project</string>
   <string name="wizard_template_recommended">Recommended</string>
+  <string name="wizard_category_native_projects">C/C++ Projects</string>
+  <string name="wizard_category_plugin_projects">Plugin Projects</string>
+  <string name="wizard_category_user_templates">Custom Templates</string>
   <string name="wizard_plugin_template_badge">Plugin</string>
   <string name="wizard_plugin_template_card_hint">After creation, Run validates manifest first, then hot-installs the plugin.</string>
   <string name="wizard_user_template_badge">Custom</string>
@@ -4378,4 +4381,12 @@ kept=%3$d bytes
   <string name="ai_tool_doc_property_description">The %1$s parameter</string>
   <string name="ai_tool_doc_param_description">Description of %1$s</string>
   <string name="ai_tool_doc_return_description">Description of return value</string>
+  <string name="pkg_manager_detail_artifact_type">Artifact type: %1$s</string>
+  <string name="pkg_detail_artifact_type">Artifact Type</string>
+  <string name="pkg_artifact_type_source">Source</string>
+  <string name="pkg_artifact_type_header">Headers</string>
+  <string name="pkg_artifact_type_static">Static Library</string>
+  <string name="pkg_artifact_type_shared">Shared Library</string>
+  <string name="pkg_artifact_type_executable">Executable</string>
+  <string name="pkg_artifact_type_mixed">Mixed Content</string>
 </resources>

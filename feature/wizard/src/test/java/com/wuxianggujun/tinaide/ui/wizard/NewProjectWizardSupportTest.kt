@@ -158,6 +158,99 @@ class NewProjectWizardSupportTest {
     }
 
     @Test
+    fun resolveTemplateCategory_shouldTreatUserTemplateAsCustomBeforeBuildSystem() {
+        val userPluginTemplate = template(
+            id = "${UserProjectTemplates.TEMPLATE_ID_PREFIX}plugin",
+            buildSystem = ProjectBuildSystem.PLUGIN,
+            primaryLanguage = ProjectLanguage.MIXED,
+        )
+
+        assertThat(
+            NewProjectWizardSupport.resolveTemplateCategory(userPluginTemplate)
+        ).isEqualTo(ProjectTemplateCategory.USER)
+    }
+
+    @Test
+    fun resolveTemplateCategoryGroups_shouldSplitNativePluginAndUserTemplates() {
+        val plainTemplate = template(
+            id = "template:first",
+            buildSystem = ProjectBuildSystem.CMAKE,
+            primaryLanguage = ProjectLanguage.CPP,
+        )
+        val pluginTemplate = template(
+            id = "plugin:starter",
+            buildSystem = ProjectBuildSystem.PLUGIN,
+            primaryLanguage = ProjectLanguage.MIXED,
+        )
+        val userTemplate = template(
+            id = "${UserProjectTemplates.TEMPLATE_ID_PREFIX}custom",
+            buildSystem = ProjectBuildSystem.CMAKE,
+            primaryLanguage = ProjectLanguage.CPP,
+        )
+
+        val groups = NewProjectWizardSupport.resolveTemplateCategoryGroups(
+            listOf(plainTemplate, pluginTemplate, userTemplate)
+        )
+
+        assertThat(groups.map { it.category }).containsExactly(
+            ProjectTemplateCategory.NATIVE,
+            ProjectTemplateCategory.PLUGIN,
+            ProjectTemplateCategory.USER,
+        ).inOrder()
+        assertThat(groups[0].options).containsExactly(plainTemplate)
+        assertThat(groups[1].options).containsExactly(pluginTemplate)
+        assertThat(groups[2].options).containsExactly(userTemplate)
+    }
+
+    @Test
+    fun resolveSelectedTemplateCategory_shouldFindCategoryFromSelection() {
+        val plainTemplate = template(
+            id = "template:first",
+            buildSystem = ProjectBuildSystem.CMAKE,
+            primaryLanguage = ProjectLanguage.CPP,
+        )
+        val pluginTemplate = template(
+            id = "plugin:starter",
+            buildSystem = ProjectBuildSystem.PLUGIN,
+            primaryLanguage = ProjectLanguage.MIXED,
+        )
+        val groups = NewProjectWizardSupport.resolveTemplateCategoryGroups(
+            listOf(plainTemplate, pluginTemplate)
+        )
+
+        assertThat(
+            NewProjectWizardSupport.resolveSelectedTemplateCategory(
+                selectedTemplateId = pluginTemplate.id,
+                groups = groups,
+            )
+        ).isEqualTo(ProjectTemplateCategory.PLUGIN)
+    }
+
+    @Test
+    fun resolveFirstTemplateInCategory_shouldReturnFirstTemplateForTabSwitch() {
+        val firstPluginTemplate = template(
+            id = "plugin:first",
+            buildSystem = ProjectBuildSystem.PLUGIN,
+            primaryLanguage = ProjectLanguage.MIXED,
+        )
+        val secondPluginTemplate = template(
+            id = "plugin:second",
+            buildSystem = ProjectBuildSystem.PLUGIN,
+            primaryLanguage = ProjectLanguage.MIXED,
+        )
+        val groups = NewProjectWizardSupport.resolveTemplateCategoryGroups(
+            listOf(firstPluginTemplate, secondPluginTemplate)
+        )
+
+        assertThat(
+            NewProjectWizardSupport.resolveFirstTemplateInCategory(
+                category = ProjectTemplateCategory.PLUGIN,
+                groups = groups,
+            )
+        ).isEqualTo(firstPluginTemplate)
+    }
+
+    @Test
     fun resolveInitialTemplateSelection_shouldUseExplicitTemplateFirst() {
         val plainTemplate = template(
             id = "template:first",
