@@ -173,3 +173,14 @@
 - [编译器设置说明](compiler-settings.md)
 - [终端与开发环境排障](terminal-troubleshooting.md)
 - [常见问题](faq.md)
+
+## Android 依赖包的 include 和源码使用
+
+Android 依赖包按产物类型使用，不按 ABI 拆成多个逻辑包。
+
+- `header` 包：安装后会暴露包内的 `include/` 目录。重新打开相关 C/C++ 文件后，clangd 补全和单文件编译会自动加入这些头文件搜索路径。
+- `source` 包：安装后同样会暴露 `include/`，但包内 `src/` 不会被 TinaIDE 自动编进你的项目。你需要在 CMake、Makefile 或项目源码配置里显式加入对应源码文件。
+- `static`、`shared`、`executable` 包：安装后会暴露 `lib/` 或可执行文件目录，并根据当前设备 ABI 选择可用内容；不匹配当前设备 ABI 的包会在安装前被拦截。
+
+例如，安装 `nlohmann-json`、`glm`、`stb` 这类 `header` 包后，可以直接在代码中 include 对应头文件。
+安装 `tinyxml2`、`fmt`、`imgui` 这类 `source` 包后，还需要把包内源码加入构建。
