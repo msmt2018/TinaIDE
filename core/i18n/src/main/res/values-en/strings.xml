@@ -4378,4 +4378,12 @@ kept=%3$d bytes
   <string name="ai_tool_doc_property_description">The %1$s parameter</string>
   <string name="ai_tool_doc_param_description">Description of %1$s</string>
   <string name="ai_tool_doc_return_description">Description of return value</string>
+  <string name="pkg_manager_detail_artifact_type">Artifact type: %1$s</string>
+  <string name="pkg_detail_artifact_type">Artifact Type</string>
+  <string name="pkg_artifact_type_source">Source</string>
+  <string name="pkg_artifact_type_header">Headers</string>
+  <string name="pkg_artifact_type_static">Static Library</string>
+  <string name="pkg_artifact_type_shared">Shared Library</string>
+  <string name="pkg_artifact_type_executable">Executable</string>
+  <string name="pkg_artifact_type_mixed">Mixed Content</string>
 </resources>

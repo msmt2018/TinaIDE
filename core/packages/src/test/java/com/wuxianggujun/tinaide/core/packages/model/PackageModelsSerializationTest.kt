@@ -19,6 +19,7 @@ class PackageModelsSerializationTest {
               "is_bundled": true,
               "android": {
                 "version": "3.2.0",
+                "artifact_type": "shared",
                 "install_type": "download",
                 "is_latest": true,
                 "release_notes": "stable"
@@ -30,6 +31,7 @@ class PackageModelsSerializationTest {
         assertThat(pkg.id).isEqualTo("sdl3")
         assertThat(pkg.iconUrl).isEqualTo("https://example.test/sdl.svg")
         assertThat(pkg.isBundled).isTrue()
+        assertThat(pkg.android?.artifactType).isEqualTo(PackageArtifactType.SHARED)
         assertThat(pkg.android?.installType).isEqualTo(InstallType.DOWNLOAD)
         assertThat(pkg.android?.isLatest).isTrue()
         assertThat(pkg.android?.releaseNotes).isEqualTo("stable")

@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.packages
 
 import android.content.Context
+import android.os.Build
 import com.wuxianggujun.tinaide.core.network.ApiResult
 import com.wuxianggujun.tinaide.core.packages.api.PackageApiClient
 import com.wuxianggujun.tinaide.core.packages.backend.ApkPackageBackend
@@ -182,6 +183,18 @@ class PackageManagerImpl(
 
         if (platformPkg == null) {
             val error = InstallError.UnknownError("Package not available for $platform")
+            progress(InstallProgressEvent.Failed(error))
+            return InstallResult.Failure(packageId, error)
+        }
+
+        if (
+            platform == Platform.ANDROID &&
+            !PackageAbiCompatibility.isCompatible(platformPkg.abi, Build.SUPPORTED_ABIS)
+        ) {
+            val error = InstallError.UnsupportedAbi(
+                currentAbi = PackageAbiCompatibility.currentAbiLabel(Build.SUPPORTED_ABIS),
+                supportedAbis = platformPkg.abi.orEmpty()
+            )
             progress(InstallProgressEvent.Failed(error))
             return InstallResult.Failure(packageId, error)
         }

@@ -1,12 +1,6 @@
 param(
     [string]$ImGuiSourceDir = "",
-    [string]$AndroidSdkDir = "",
-    [string]$AndroidNdkDir = "",
-    [string[]]$Abis = @("arm64-v8a"),
-    [int]$ApiLevel = 21,
-    [string]$AndroidStl = "c++_static",
-    [string]$PackageId = "imgui-android-gl3",
-    [string]$LibraryName = "imgui_android_gl3",
+    [string]$PackageId = "imgui",
     [string]$PackageVersion = "",
     [int]$PackageRevision = 1,
     [string]$OutputDir = "",
@@ -19,96 +13,19 @@ Set-StrictMode -Version Latest
 
 function Resolve-ExistingPath {
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$PathValue,
-        [Parameter(Mandatory = $true)]
-        [string]$Description
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)][string]$Description
     )
 
-    if (-not (Test-Path $PathValue)) {
+    if (-not (Test-Path -LiteralPath $PathValue)) {
         throw "$Description not found: $PathValue"
     }
 
-    return (Resolve-Path $PathValue).Path
+    return (Resolve-Path -LiteralPath $PathValue).Path
 }
 
 function Resolve-RepoRoot {
     return (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-}
-
-function Resolve-AndroidSdkDir {
-    param([string]$Override)
-
-    if ($Override) {
-        return Resolve-ExistingPath -PathValue $Override -Description "Android SDK directory"
-    }
-
-    $candidates = @(
-        $env:ANDROID_SDK_ROOT,
-        $env:ANDROID_HOME,
-        (Join-Path $env:LOCALAPPDATA "Android\Sdk")
-    ) | Where-Object { $_ }
-
-    foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) {
-            return (Resolve-Path $candidate).Path
-        }
-    }
-
-    throw "Android SDK directory not found. Pass -AndroidSdkDir explicitly."
-}
-
-function Resolve-AndroidNdkDir {
-    param(
-        [string]$Override,
-        [string]$SdkDir
-    )
-
-    if ($Override) {
-        return Resolve-ExistingPath -PathValue $Override -Description "Android NDK directory"
-    }
-
-    $ndkRoot = Join-Path $SdkDir "ndk"
-    if (-not (Test-Path $ndkRoot)) {
-        throw "Android NDK root not found under SDK: $ndkRoot"
-    }
-
-    $latest = Get-ChildItem $ndkRoot -Directory |
-        Sort-Object Name -Descending |
-        Select-Object -First 1
-
-    if ($null -eq $latest) {
-        throw "No Android NDK versions found under: $ndkRoot"
-    }
-
-    return $latest.FullName
-}
-
-function Resolve-AndroidCMakeBinDir {
-    param([string]$SdkDir)
-
-    $cmakeRoot = Join-Path $SdkDir "cmake"
-    if (-not (Test-Path $cmakeRoot)) {
-        throw "Android SDK CMake directory not found: $cmakeRoot"
-    }
-
-    $latest = Get-ChildItem $cmakeRoot -Directory |
-        Sort-Object Name -Descending |
-        Select-Object -First 1
-
-    if ($null -eq $latest) {
-        throw "No Android SDK CMake versions found under: $cmakeRoot"
-    }
-
-    $binDir = Join-Path $latest.FullName "bin"
-    if (-not (Test-Path (Join-Path $binDir "cmake.exe"))) {
-        throw "cmake.exe not found under: $binDir"
-    }
-    if (-not (Test-Path (Join-Path $binDir "ninja.exe"))) {
-        throw "ninja.exe not found under: $binDir"
-    }
-
-    return $binDir
 }
 
 function Resolve-ImGuiSourceDir {
@@ -149,77 +66,38 @@ function Get-ImGuiVersionInfo {
     }
 }
 
-function Write-PackageJson {
+function Copy-RequiredFile {
     param(
-        [string]$PathValue,
-        [string]$PackageIdValue,
-        [string]$PackageVersionValue,
-        [int]$PackageRevisionValue,
-        [string]$UpstreamNameValue,
-        [string]$UpstreamVersionValue,
-        [string]$UpstreamTagValue,
-        [string]$UpstreamCommitValue,
-        [string[]]$AbiValues
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
     )
 
-    $metadata = [ordered]@{
-        id = $PackageIdValue
-        name = "Dear ImGui Android OpenGL3"
-        version = $PackageVersionValue
-        packageRevision = $PackageRevisionValue
-        upstreamName = $UpstreamNameValue
-        upstreamVersion = $UpstreamVersionValue
-        upstreamTag = $UpstreamTagValue
-        upstreamCommit = $UpstreamCommitValue
-        description = "Dear ImGui shared library with official Android and OpenGL ES3 backends"
-        platform = "android"
-        installType = "download"
-        category = "library"
-        homepage = "https://github.com/ocornut/imgui"
-        license = "MIT"
-        files = [ordered]@{
-            include = "include"
-            lib = "lib"
-            pkgconfig = "pkgconfig/$PackageIdValue.pc"
-        }
-        abis = $AbiValues
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+        throw "Required ImGui file not found: $SourcePath"
     }
 
-    $json = $metadata | ConvertTo-Json -Depth 6
-    [System.IO.File]::WriteAllText($PathValue, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+    $parent = Split-Path -Parent $DestinationPath
+    if ($parent) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+    Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force
 }
 
-function Write-PkgConfigFile {
+function Copy-ImGuiPackageFiles {
     param(
-        [string]$PathValue,
-        [string]$VersionValue,
-        [string]$LibraryNameValue,
-        [string]$AbiValue,
-        [string]$PrefixExpression
+        [Parameter(Mandatory = $true)][string]$SourceDir,
+        [Parameter(Mandatory = $true)][string]$PackageRoot
     )
 
-    $content = @"
-prefix=$PrefixExpression
-exec_prefix=`${prefix}
-libdir=`${prefix}/lib/$AbiValue
-includedir=`${prefix}/include
+    $includeDir = Join-Path $PackageRoot "include"
+    $sourceOutDir = Join-Path $PackageRoot "src"
+    $backendIncludeDir = Join-Path $includeDir "backends"
+    $backendSourceDir = Join-Path $sourceOutDir "backends"
 
-Name: Dear ImGui Android OpenGL3
-Description: Dear ImGui shared library with official Android and OpenGL ES3 backends
-Version: $VersionValue
-Libs: -L`${libdir} -l$LibraryNameValue
-Libs.private: -landroid -lEGL -lGLESv3 -llog
-Cflags: -I`${includedir}
-"@
-
-    [System.IO.File]::WriteAllText($PathValue, $content, [System.Text.UTF8Encoding]::new($false))
-}
-
-function Copy-Headers {
-    param(
-        [string]$SourceDir,
-        [string]$IncludeDir
-    )
+    New-Item -ItemType Directory -Force -Path $includeDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $sourceOutDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $backendIncludeDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $backendSourceDir | Out-Null
 
     $rootHeaders = @(
         "imconfig.h",
@@ -229,24 +107,102 @@ function Copy-Headers {
         "imstb_textedit.h",
         "imstb_truetype.h"
     )
-
-    New-Item -ItemType Directory -Force -Path $IncludeDir | Out-Null
-    $backendIncludeDir = Join-Path $IncludeDir "backends"
-    New-Item -ItemType Directory -Force -Path $backendIncludeDir | Out-Null
-
     foreach ($header in $rootHeaders) {
-        Copy-Item (Join-Path $SourceDir $header) (Join-Path $IncludeDir $header) -Force
+        Copy-RequiredFile `
+            -SourcePath (Join-Path $SourceDir $header) `
+            -DestinationPath (Join-Path $includeDir $header)
     }
 
-    Copy-Item (Join-Path $SourceDir "backends\imgui_impl_android.h") (Join-Path $backendIncludeDir "imgui_impl_android.h") -Force
-    Copy-Item (Join-Path $SourceDir "backends\imgui_impl_opengl3.h") (Join-Path $backendIncludeDir "imgui_impl_opengl3.h") -Force
-    Copy-Item (Join-Path $SourceDir "LICENSE.txt") (Join-Path (Split-Path $IncludeDir -Parent) "LICENSE.txt") -Force
+    $rootSources = @(
+        "imgui.cpp",
+        "imgui_demo.cpp",
+        "imgui_draw.cpp",
+        "imgui_tables.cpp",
+        "imgui_widgets.cpp"
+    )
+    foreach ($source in $rootSources) {
+        Copy-RequiredFile `
+            -SourcePath (Join-Path $SourceDir $source) `
+            -DestinationPath (Join-Path $sourceOutDir $source)
+    }
+
+    $backendFiles = @(
+        "imgui_impl_android.h",
+        "imgui_impl_opengl3.h",
+        "imgui_impl_android.cpp",
+        "imgui_impl_opengl3.cpp"
+    )
+    foreach ($file in $backendFiles) {
+        $destinationDir = if ($file.EndsWith(".h")) { $backendIncludeDir } else { $backendSourceDir }
+        Copy-RequiredFile `
+            -SourcePath (Join-Path $SourceDir "backends\$file") `
+            -DestinationPath (Join-Path $destinationDir $file)
+    }
+
+    Copy-RequiredFile `
+        -SourcePath (Join-Path $SourceDir "LICENSE.txt") `
+        -DestinationPath (Join-Path $PackageRoot "LICENSE.txt")
+}
+
+function Write-PackageJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)][string]$PackageIdValue,
+        [Parameter(Mandatory = $true)][string]$PackageVersionValue,
+        [Parameter(Mandatory = $true)][int]$PackageRevisionValue,
+        [Parameter(Mandatory = $true)][string]$UpstreamVersionValue,
+        [Parameter(Mandatory = $true)][string]$UpstreamTagValue,
+        [Parameter(Mandatory = $true)][string]$UpstreamCommitValue
+    )
+
+    $metadata = [ordered]@{
+        id = $PackageIdValue
+        name = "Dear ImGui"
+        version = $PackageVersionValue
+        packageRevision = $PackageRevisionValue
+        upstreamName = "Dear ImGui"
+        upstreamVersion = $UpstreamVersionValue
+        upstreamTag = $UpstreamTagValue
+        upstreamCommit = $UpstreamCommitValue
+        description = "Dear ImGui source and headers with Android and OpenGL ES3 backends"
+        platform = "android"
+        artifactType = "source"
+        installType = "download"
+        category = "library"
+        homepage = "https://github.com/ocornut/imgui"
+        license = "MIT"
+        files = [ordered]@{
+            include = "include"
+            source = "src"
+            pkgconfig = "pkgconfig/imgui.pc"
+        }
+    }
+
+    $json = $metadata | ConvertTo-Json -Depth 8
+    [System.IO.File]::WriteAllText($PathValue, $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Write-PkgConfigFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$PathValue,
+        [Parameter(Mandatory = $true)][string]$VersionValue
+    )
+
+    $content = @"
+prefix=`${pcfiledir}/..
+includedir=`${prefix}/include
+sourcedir=`${prefix}/src
+
+Name: Dear ImGui
+Description: Dear ImGui source and headers with Android and OpenGL ES3 backends
+Version: $VersionValue
+Cflags: -I`${includedir}
+"@
+
+    [System.IO.File]::WriteAllText($PathValue, $content, [System.Text.UTF8Encoding]::new($false))
 }
 
 $repoRoot = Resolve-RepoRoot
-$sdkDir = Resolve-AndroidSdkDir -Override $AndroidSdkDir
-$ndkDir = Resolve-AndroidNdkDir -Override $AndroidNdkDir -SdkDir $sdkDir
-$cmakeBinDir = Resolve-AndroidCMakeBinDir -SdkDir $sdkDir
 $imguiSourceDir = Resolve-ImGuiSourceDir -Override $ImGuiSourceDir -RepoRoot $repoRoot
 $versionInfo = Get-ImGuiVersionInfo -SourceDir $imguiSourceDir
 $resolvedPackageVersion = if ($PackageVersion) {
@@ -257,17 +213,8 @@ $resolvedPackageVersion = if ($PackageVersion) {
     "$($versionInfo.Version)-pkg.$PackageRevision"
 }
 
-$cmakeExe = Join-Path $cmakeBinDir "cmake.exe"
-$ninjaExe = Join-Path $cmakeBinDir "ninja.exe"
-$toolchainFile = Join-Path $ndkDir "build\cmake\android.toolchain.cmake"
-$cMakeProjectDir = Join-Path $repoRoot "scripts\cmake\imgui-android-gl3"
-
-if (-not (Test-Path $toolchainFile)) {
-    throw "Android CMake toolchain not found: $toolchainFile"
-}
-
 if (-not $OutputDir) {
-    $OutputDir = Join-Path $repoRoot "temp\build-output\imgui-android-gl3"
+    $OutputDir = Join-Path $repoRoot "temp\build-output\imgui"
 }
 
 $outputDirResolved = $OutputDir
@@ -281,104 +228,65 @@ $artifactBaseName = if ($IncludeVersionInFileName) {
 } else {
     $PackageId
 }
-$zipPath = Join-Path $outputDirResolved "$artifactBaseName.zip"
+$archivePath = Join-Path $outputDirResolved "$artifactBaseName.tar.xz"
 $shaPath = Join-Path $outputDirResolved "$artifactBaseName.sha256.txt"
 
-if (Test-Path $workRoot) {
-    Remove-Item $workRoot -Recurse -Force
+if (Test-Path -LiteralPath $workRoot) {
+    Remove-Item -LiteralPath $workRoot -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
-$includeDir = Join-Path $packageRoot "include"
-Copy-Headers -SourceDir $imguiSourceDir -IncludeDir $includeDir
+Copy-ImGuiPackageFiles -SourceDir $imguiSourceDir -PackageRoot $packageRoot
 
-$rootPkgConfigDir = Join-Path $packageRoot "pkgconfig"
-New-Item -ItemType Directory -Force -Path $rootPkgConfigDir | Out-Null
-
-foreach ($abi in $Abis) {
-    $abiBuildDir = Join-Path $workRoot "build\$abi"
-    $abiLibDir = Join-Path $packageRoot "lib\$abi"
-    $abiPkgConfigDir = Join-Path $abiLibDir "pkgconfig"
-    New-Item -ItemType Directory -Force -Path $abiLibDir | Out-Null
-    New-Item -ItemType Directory -Force -Path $abiPkgConfigDir | Out-Null
-
-    & $cmakeExe `
-        -S $cMakeProjectDir `
-        -B $abiBuildDir `
-        -G Ninja `
-        "-DCMAKE_MAKE_PROGRAM=$ninjaExe" `
-        "-DCMAKE_TOOLCHAIN_FILE=$toolchainFile" `
-        "-DANDROID_ABI=$abi" `
-        "-DANDROID_PLATFORM=android-$ApiLevel" `
-        "-DANDROID_STL=$AndroidStl" `
-        "-DCMAKE_BUILD_TYPE=Release" `
-        "-DIMGUI_SOURCE_DIR=$imguiSourceDir"
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "CMake configure failed for ABI: $abi"
-    }
-
-    & $cmakeExe --build $abiBuildDir --config Release
-    if ($LASTEXITCODE -ne 0) {
-        throw "CMake build failed for ABI: $abi"
-    }
-
-    $builtLibrary = Join-Path $abiBuildDir "lib$LibraryName.so"
-    if (-not (Test-Path $builtLibrary)) {
-        throw "Built library not found for ABI ${abi}: $builtLibrary"
-    }
-
-    Copy-Item $builtLibrary (Join-Path $abiLibDir "lib$LibraryName.so") -Force
-
-    $abiPcPath = Join-Path $abiPkgConfigDir "$PackageId.pc"
-    Write-PkgConfigFile -PathValue $abiPcPath -VersionValue $versionInfo.Version -LibraryNameValue $LibraryName -AbiValue $abi -PrefixExpression '`${pcfiledir}/../../..'
-
-    if ($abi -eq $Abis[0]) {
-        Write-PkgConfigFile -PathValue (Join-Path $rootPkgConfigDir "$PackageId.pc") -VersionValue $versionInfo.Version -LibraryNameValue $LibraryName -AbiValue $abi -PrefixExpression '`${pcfiledir}/..'
-    }
-}
+$pkgConfigDir = Join-Path $packageRoot "pkgconfig"
+New-Item -ItemType Directory -Force -Path $pkgConfigDir | Out-Null
+Write-PkgConfigFile -PathValue (Join-Path $pkgConfigDir "imgui.pc") -VersionValue $versionInfo.Version
 
 Write-PackageJson `
     -PathValue (Join-Path $packageRoot "package.json") `
     -PackageIdValue $PackageId `
     -PackageVersionValue $resolvedPackageVersion `
     -PackageRevisionValue $PackageRevision `
-    -UpstreamNameValue "Dear ImGui" `
     -UpstreamVersionValue $versionInfo.Version `
     -UpstreamTagValue $versionInfo.Tag `
-    -UpstreamCommitValue $versionInfo.Commit `
-    -AbiValues $Abis
+    -UpstreamCommitValue $versionInfo.Commit
 
 $buildInfo = @"
 package_id=$PackageId
 package_version=$resolvedPackageVersion
 package_revision=$PackageRevision
-library_name=$LibraryName
+artifact_type=source
 imgui_tag=$($versionInfo.Tag)
 imgui_commit=$($versionInfo.Commit)
 imgui_version=$($versionInfo.Version)
-abis=$($Abis -join ',')
-android_api_level=$ApiLevel
-android_stl=$AndroidStl
-android_ndk=$ndkDir
 "@
 [System.IO.File]::WriteAllText((Join-Path $packageRoot "BUILD-INFO.txt"), $buildInfo, [System.Text.UTF8Encoding]::new($false))
 
-if (Test-Path $zipPath) {
-    Remove-Item $zipPath -Force
+if (Test-Path -LiteralPath $archivePath) {
+    Remove-Item -LiteralPath $archivePath -Force
 }
 
-Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zipPath -CompressionLevel Optimal
+Push-Location $packageRoot
+try {
+    tar -caf $archivePath *
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create archive: $archivePath"
+    }
+} finally {
+    Pop-Location
+}
 
-$hash = Get-FileHash -Path $zipPath -Algorithm SHA256
-$hashLine = "{0} *{1}" -f $hash.Hash.ToLowerInvariant(), [System.IO.Path]::GetFileName($zipPath)
+$hash = Get-FileHash -LiteralPath $archivePath -Algorithm SHA256
+$hashLine = "{0} *{1}" -f $hash.Hash.ToLowerInvariant(), [System.IO.Path]::GetFileName($archivePath)
 [System.IO.File]::WriteAllText($shaPath, $hashLine + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "Built package: $zipPath"
+Write-Host "Built package: $archivePath"
 Write-Host "Package version: $resolvedPackageVersion"
 Write-Host "Upstream version: $($versionInfo.Version) ($($versionInfo.Tag))"
+Write-Host "Artifact type: source"
+Write-Host "ABI: none"
 Write-Host "SHA256: $($hash.Hash.ToLowerInvariant())"
 
 if (-not $KeepWorkDir) {
-    Remove-Item $workRoot -Recurse -Force
+    Remove-Item -LiteralPath $workRoot -Recurse -Force
 }

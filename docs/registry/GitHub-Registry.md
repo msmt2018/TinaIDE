@@ -144,10 +144,12 @@ pwsh ./scripts/build-registry.ps1
       "category": "runtime",
       "android": {
         "version": "3.2.0",
+        "artifact_type": "shared",
         "install_type": "download",
         "size": 1234,
         "download_url": "packages/sdl3/3.2.0/sdl3.tar.xz",
         "checksum": "sha256:<sha256>",
+        "abi": ["arm64-v8a", "x86_64"],
         "is_latest": true
       }
     }
@@ -174,10 +176,12 @@ pwsh ./scripts/build-registry.ps1
           "package_id": "sdl3",
           "platform": "android",
           "version": "3.2.0",
+          "artifact_type": "shared",
           "install_type": "download",
           "download_size": 1234,
           "download_url": "packages/sdl3/3.2.0/sdl3.tar.xz",
           "checksum": "sha256:<sha256>",
+          "abi": ["arm64-v8a", "x86_64"],
           "is_latest": true
         }
       ]
@@ -185,6 +189,17 @@ pwsh ./scripts/build-registry.ps1
   }
 }
 ```
+
+## Android 包产物类型和 ABI
+
+Android 依赖包不按 ABI 拆成多个逻辑包。一个库只保留一个 `package_id`，
+用 `artifact_type` 和 `abi` 表达包内容与设备兼容性。
+
+- `artifact_type` 可取 `source`、`header`、`static`、`shared`、`executable`、`mixed`。
+- `source` / `header` 包不写 `abi`，表示所有 ABI 都可安装。
+- `static` / `shared` / `executable` 包必须写 `abi`。
+- 客户端会在下载前拦截不匹配的 Android ABI。
+- 同一个包可以同时包含多个 ABI 的二进制内容，例如 `lib/arm64-v8a/` 和 `lib/x86_64/`。
 
 客户端会继续保留本地安装状态、下载历史、缓存与插件系统能力。
 需要账号系统的互动和审核能力不在公开客户端实现。

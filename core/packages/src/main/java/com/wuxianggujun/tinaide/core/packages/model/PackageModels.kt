@@ -17,6 +17,16 @@ enum class InstallType {
 }
 
 @Serializable
+enum class PackageArtifactType {
+    @SerialName("source") SOURCE,
+    @SerialName("header") HEADER,
+    @SerialName("static") STATIC,
+    @SerialName("shared") SHARED,
+    @SerialName("executable") EXECUTABLE,
+    @SerialName("mixed") MIXED
+}
+
+@Serializable
 data class GUIPackage(
     val id: String,
     val name: String,
@@ -32,6 +42,7 @@ data class GUIPackage(
 @Serializable
 data class PlatformPackage(
     val version: String,
+    @SerialName("artifact_type") val artifactType: PackageArtifactType = PackageArtifactType.MIXED,
     @SerialName("install_type") val installType: InstallType,
     @SerialName("apt_package") val aptPackage: String? = null, // 历史字段名，当前承载 Linux 系统包名
     val size: Long? = null,
@@ -50,6 +61,7 @@ data class PackageVersion(
     @SerialName("package_id") val packageId: String,
     val platform: Platform,
     val version: String,
+    @SerialName("artifact_type") val artifactType: PackageArtifactType = PackageArtifactType.MIXED,
     @SerialName("install_type") val installType: InstallType,
     @SerialName("apt_package") val aptPackage: String? = null, // 历史字段名，当前承载 Linux 系统包名
     @SerialName("apt_repository") val aptRepository: String? = null,

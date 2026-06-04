@@ -74,6 +74,7 @@ sealed class InstallError {
     data class DiskFull(val required: Long, val available: Long) : InstallError()
     data class ExtractionFailed(val message: String) : InstallError()
     data class DependencyMissing(val dependencies: List<String>) : InstallError()
+    data class UnsupportedAbi(val currentAbi: String, val supportedAbis: List<String>) : InstallError()
     data class AptError(val exitCode: Int, val output: String) : InstallError()
     data class ScriptError(val exitCode: Int, val output: String) : InstallError()
     object Cancelled : InstallError()
@@ -85,6 +86,7 @@ sealed class InstallError {
         is DiskFull -> "Disk full: need $required bytes, available $available bytes"
         is ExtractionFailed -> message
         is DependencyMissing -> "Missing dependencies: ${dependencies.joinToString()}"
+        is UnsupportedAbi -> "Unsupported device ABI: $currentAbi. Supported ABI: ${supportedAbis.joinToString()}"
         is AptError -> "Linux package manager error (exit $exitCode): $output"
         is ScriptError -> "Script error (exit $exitCode): $output"
         is Cancelled -> "Installation cancelled"
