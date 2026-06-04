@@ -175,9 +175,11 @@ object CompileCommandsGenerator {
         val json = buildString {
             append("[\n")
             commands.forEachIndexed { index, cmd ->
+                val directory = cmd["directory"] as String
+                val file = cmd["file"] as String
                 append("  {\n")
-                append("    \"directory\": \"${cmd["directory"]}\",\n")
-                append("    \"file\": \"${cmd["file"]}\",\n")
+                append("    \"directory\": \"${escape(directory)}\",\n")
+                append("    \"file\": \"${escape(file)}\",\n")
                 append("    \"arguments\": [\n")
                 @Suppress("UNCHECKED_CAST")
                 val args = cmd["arguments"] as List<String>
@@ -251,5 +253,25 @@ object CompileCommandsGenerator {
     }
 
     private fun escape(value: String): String =
-        value.replace("\\", "\\\\").replace("\"", "\\\"")
+        buildString(value.length) {
+            value.forEach { ch ->
+                when (ch) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\b' -> append("\\b")
+                    '\u000C' -> append("\\f")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> {
+                        if (ch.code < 0x20) {
+                            append("\\u")
+                            append(ch.code.toString(16).padStart(4, '0'))
+                        } else {
+                            append(ch)
+                        }
+                    }
+                }
+            }
+        }
 }
