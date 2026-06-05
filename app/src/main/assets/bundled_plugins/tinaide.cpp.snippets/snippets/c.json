@@ -1,0 +1,46 @@
+{
+  "language": "c",
+  "snippets": [
+    {
+      "prefix": "main",
+      "name": "C main",
+      "description": "Minimal C main function",
+      "body": [
+        "#include <stdio.h>",
+        "",
+        "int main(void) {",
+        "    ${1:printf(\"Hello, TinaIDE!\\\\n\");}",
+        "    return 0;",
+        "}"
+      ]
+    },
+    {
+      "prefix": "fori",
+      "name": "for index loop",
+      "description": "Index-based for loop",
+      "body": [
+        "for (int ${1:i} = 0; ${1:i} < ${2:count}; ++${1:i}) {",
+        "    $0",
+        "}"
+      ]
+    },
+    {
+      "prefix": "printf",
+      "name": "printf",
+      "description": "printf call",
+      "body": [
+        "printf(\"${1:message}\\\\n\"${2});$0"
+      ]
+    },
+    {
+      "prefix": "struct",
+      "name": "C struct",
+      "description": "Struct typedef",
+      "body": [
+        "typedef struct ${1:Name} {",
+        "    ${2:int value;}",
+        "} ${1:Name};$0"
+      ]
+    }
+  ]
+}

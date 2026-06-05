@@ -1,0 +1,17 @@
+{
+  "id": "tinaide.cpp.snippets",
+  "name": "TinaIDE Built-in C/C++ Snippets",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Offline C and C++ code snippets for TinaIDE.",
+  "type": "config",
+  "author": {
+    "name": "TinaIDE"
+  },
+  "contributions": {
+    "snippets": [
+      "snippets/cpp.json",
+      "snippets/c.json"
+    ]
+  }
+}
