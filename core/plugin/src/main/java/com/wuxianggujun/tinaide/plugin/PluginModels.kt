@@ -197,7 +197,7 @@ data class TokenSettings(
 )
 
 /**
- * 代码片段（预留）
+ * 插件声明的代码片段文件。
  */
 @Serializable
 data class SnippetFile(
@@ -214,7 +214,7 @@ data class Snippet(
 )
 
 /**
- * 快捷键绑定（预留）
+ * 插件声明的宿主命令快捷键绑定。
  */
 @Serializable
 data class KeyBinding(

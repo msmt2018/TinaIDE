@@ -1,6 +1,6 @@
 # 插件开发者指南
 
-> 文档更新：2026-04-26
+> 文档更新：2026-06-05
 
 当前仓库已具备“配置插件 + LSP 插件 + 脚本 / hybrid 插件”的基础闭环，
 当前已支持：
@@ -8,13 +8,14 @@
 - 安装/卸载/启用/禁用插件（基于 `manifest.json` + zip 解包）
 - 插件管理 UI（设置 → 插件）
 - 从插件中加载并切换 **编辑器主题**（`contributions.themes`）
-- 代码片段、文件树菜单、编辑器 Tab 长按菜单
+- 代码片段、文件树菜单、编辑器 Tab 长按菜单、编辑器工具栏动作菜单
+- 插件快捷键、依赖声明提示、插件配置 UI
 - 项目模板（`contributions.projectTemplates`）
 - 插件教程 / 设置页显式“新建插件项目”入口（只展示插件模板）
 - APK 导出模板（`contributions.apkExports`）
 - **LSP 插件**：通过插件安装语言服务器，提供代码补全、诊断等功能（`type: "lsp"`）
 - **脚本 / hybrid 插件**：Lua 运行时、权限确认、日志与宿主 API 边界
-- 内置兜底插件（assets 自动安装；当前仅保留基础项目模板）
+- 内置兜底插件（assets 自动安装；当前包含基础项目模板与 C/C++ snippets）
 
 > 为满足 Google Play 合规性：当前仍不支持动态加载 DEX；脚本 / hybrid
 > 插件走仓库内已集成的 Lua 运行时与权限确认流程，不再是“QuickJS 未来阶段”。
@@ -719,9 +720,8 @@ Registry 中的 `sources/plugins/**`、`plugins/index.json` 和 `packages/index.
 负责市场分发。主仓库当前随 APK 分发的内置插件位于
 `app/src/main/assets/bundled_plugins/`，用于首次启动的兜底自动安装：
 
-- `tinaide.plugin.starters`：插件 starter 模板入口
-- `tinaide.lsp.python`：Python LSP 示例插件
-- `tinaide.linux-environment`：Linux/PRoot 环境能力插件
+- `tinaide.project.templates`：基础项目模板
+- `tinaide.cpp.snippets`：内置 C/C++ 代码片段
 
 应用启动时会自动把 `assets/bundled_plugins/*` 安装到 `filesDir/plugins/`（若已安装同版本则跳过）。
 
