@@ -23,7 +23,12 @@ class ProjectTemplateMetadataReaderTest {
                       "author": "Tina",
                       "buildSystem": "cmake",
                       "primaryLanguage": "c++",
-                      "ndkTemplate": true
+                      "ndkTemplate": true,
+                      "variables": {
+                        "AUTHOR": "TinaIDE",
+                        "EMPTY": "",
+                        "COUNT": 1
+                      }
                     }
                     """.trimIndent()
                 )
@@ -38,6 +43,7 @@ class ProjectTemplateMetadataReaderTest {
             assertThat(metadata?.buildSystem).isEqualTo(ProjectBuildSystem.CMAKE)
             assertThat(metadata?.primaryLanguage).isEqualTo(ProjectLanguage.CPP)
             assertThat(metadata?.isNdkTemplate).isTrue()
+            assertThat(metadata?.variables).containsExactly("AUTHOR", "TinaIDE")
         } finally {
             zipFile.delete()
         }

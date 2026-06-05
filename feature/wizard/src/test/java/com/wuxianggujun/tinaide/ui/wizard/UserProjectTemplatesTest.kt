@@ -64,7 +64,10 @@ class UserProjectTemplatesTest {
                       "author": "Tina",
                       "buildSystem": "makefile",
                       "primaryLanguage": "c",
-                      "ndkTemplate": true
+                      "ndkTemplate": true,
+                      "variables": {
+                        "AUTHOR": "TinaIDE"
+                      }
                     }
                     """.trimIndent()
                 )
@@ -83,6 +86,7 @@ class UserProjectTemplatesTest {
             assertThat(spec.buildSystem).isEqualTo(ProjectBuildSystem.MAKE)
             assertThat(spec.primaryLanguage).isEqualTo(ProjectLanguage.C)
             assertThat(spec.isNdkTemplate).isTrue()
+            assertThat(spec.variables).containsExactly("AUTHOR", "TinaIDE")
         } finally {
             templatesDir.deleteRecursively()
         }

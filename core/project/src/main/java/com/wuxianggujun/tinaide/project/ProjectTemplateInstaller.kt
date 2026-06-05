@@ -22,6 +22,7 @@ object ProjectTemplateInstaller {
     private const val CPP_STANDARD_FLAG_PLACEHOLDER = "{{CPP_STANDARD_FLAG}}"
     private const val NDK_API_LEVEL_PLACEHOLDER = "{{NDK_API_LEVEL}}"
     private const val AUTHOR_PLACEHOLDER = "{{AUTHOR}}"
+    private const val AUTHOR_VARIABLE_NAME = "AUTHOR"
 
     fun install(
         destDir: File,
@@ -39,6 +40,9 @@ object ProjectTemplateInstaller {
                 ndkApiLevel
             }
             val templateNativeApiLevel = effectiveNdkApiLevel?.level
+            val resolvedAuthorName = authorName.trim().ifBlank {
+                templateSpec.variables[AUTHOR_VARIABLE_NAME]?.trim().orEmpty()
+            }
             val staging = createStagingDirectory(destDir).also { stagingDir = it }
 
             extractZipTemplate(
@@ -47,7 +51,7 @@ object ProjectTemplateInstaller {
                 zipFile = templateSpec.zipFile,
                 cppStandard = cppStandard,
                 ndkApiLevel = effectiveNdkApiLevel,
-                authorName = authorName,
+                authorName = resolvedAuthorName,
             )
             copyStagedTemplate(staging, destDir)
             ProjectMetadataStore.ensure(

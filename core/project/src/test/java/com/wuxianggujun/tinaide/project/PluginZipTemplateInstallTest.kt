@@ -98,6 +98,38 @@ class PluginZipTemplateInstallTest {
     }
 
     @Test
+    fun `zip template install uses author variable default when author input is blank`() {
+        val tempDir = Files.createTempDirectory("template-author-default-install").toFile()
+        val zipFile = Files.createTempFile("template-author-default", ".zip").toFile()
+
+        try {
+            ZipOutputStream(zipFile.outputStream().buffered()).use { zip ->
+                zip.writeEntry("README.md", "# {{PROJECT_NAME}}\nAuthor: {{AUTHOR}}\n")
+            }
+
+            val installed = ProjectTemplateInstaller.install(
+                destDir = tempDir,
+                projectName = "hello-author-default",
+                templateSpec = ProjectTemplateSpec.Zip(
+                    id = "user:author-default-demo",
+                    zipFile = zipFile,
+                    buildSystem = ProjectBuildSystem.CMAKE,
+                    primaryLanguage = ProjectLanguage.CPP,
+                    variables = mapOf("AUTHOR" to "TinaIDE")
+                ),
+                authorName = " "
+            )
+
+            assertThat(installed).isTrue()
+            assertThat(tempDir.resolve("README.md").readText(Charsets.UTF_8))
+                .contains("Author: TinaIDE")
+        } finally {
+            tempDir.deleteRecursively()
+            zipFile.delete()
+        }
+    }
+
+    @Test
     fun `zip template install rejects entries escaping project directory`() {
         val tempRoot = Files.createTempDirectory("plugin-template-escape").toFile()
         val projectDir = tempRoot.resolve("project")

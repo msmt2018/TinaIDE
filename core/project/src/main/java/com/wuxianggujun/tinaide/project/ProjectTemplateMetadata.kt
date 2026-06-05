@@ -17,6 +17,7 @@ data class ProjectTemplateMetadata(
     val buildSystem: ProjectBuildSystem? = null,
     val primaryLanguage: ProjectLanguage? = null,
     val isNdkTemplate: Boolean? = null,
+    val variables: Map<String, String> = emptyMap(),
 ) {
     internal fun hasAnyField(): Boolean {
         return name != null ||
@@ -24,7 +25,8 @@ data class ProjectTemplateMetadata(
             author != null ||
             buildSystem != null ||
             primaryLanguage != null ||
-            isNdkTemplate != null
+            isNdkTemplate != null ||
+            variables.isNotEmpty()
     }
 }
 
@@ -64,6 +66,7 @@ object ProjectTemplateMetadataReader {
             buildSystem = parseBuildSystem(root.firstString("buildSystem", "build_system")),
             primaryLanguage = parseLanguage(root.firstString("primaryLanguage", "primary_language")),
             isNdkTemplate = root.firstBoolean("ndkTemplate", "ndk_template", "isNdkTemplate"),
+            variables = root.stringMap("variables"),
         )
         return metadata.takeIf { it.hasAnyField() }
     }
@@ -92,6 +95,28 @@ object ProjectTemplateMetadataReader {
         return keys.asSequence()
             .mapNotNull { key -> this[key]?.jsonPrimitive?.booleanOrNull }
             .firstOrNull()
+    }
+
+    private fun JsonObject.stringMap(key: String): Map<String, String> {
+        val content = runCatching { this[key]?.jsonObject }.getOrNull() ?: return emptyMap()
+        return content.entries
+            .mapNotNull { (entryKey, value) ->
+                val normalizedKey = entryKey.trim().takeIf { it.isNotBlank() }
+                val normalizedValue = value.stringContentOrNull()?.trim()?.takeIf { it.isNotBlank() }
+                if (normalizedKey != null && normalizedValue != null) {
+                    normalizedKey to normalizedValue
+                } else {
+                    null
+                }
+            }
+            .toMap()
+    }
+
+    private fun kotlinx.serialization.json.JsonElement.stringContentOrNull(): String? {
+        val primitive = runCatching { jsonPrimitive }.getOrNull() ?: return null
+        return primitive
+            .takeIf { it.toString().startsWith("\"") }
+            ?.contentOrNull
     }
 
     private fun parseBuildSystem(value: String?): ProjectBuildSystem? {

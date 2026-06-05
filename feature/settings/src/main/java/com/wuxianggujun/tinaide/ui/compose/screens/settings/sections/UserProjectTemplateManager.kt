@@ -3,6 +3,8 @@ package com.wuxianggujun.tinaide.ui.compose.screens.settings.sections
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.wuxianggujun.tinaide.project.ProjectBuildSystem
+import com.wuxianggujun.tinaide.project.ProjectLanguage
 import com.wuxianggujun.tinaide.project.ProjectTemplateMetadata
 import com.wuxianggujun.tinaide.project.ProjectTemplateMetadataReader
 import com.wuxianggujun.tinaide.storage.ProjectPaths
@@ -10,9 +12,16 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.Locale
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal data class UserProjectTemplateItem(
     val file: File,
@@ -20,6 +29,16 @@ internal data class UserProjectTemplateItem(
     val sizeBytes: Long,
     val lastModifiedMillis: Long,
     val metadata: ProjectTemplateMetadata? = null,
+)
+
+internal data class UserProjectTemplateMetadataUpdate(
+    val name: String? = null,
+    val description: String? = null,
+    val author: String? = null,
+    val buildSystem: ProjectBuildSystem? = null,
+    val primaryLanguage: ProjectLanguage? = null,
+    val isNdkTemplate: Boolean = false,
+    val variables: Map<String, String> = emptyMap(),
 )
 
 internal enum class UserProjectTemplateFailure {
@@ -31,7 +50,14 @@ internal enum class UserProjectTemplateFailure {
     RENAME_FAILED,
     EXPORT_FAILED,
     DELETE_FAILED,
+    METADATA_UPDATE_FAILED,
     UNSAFE_PATH,
+}
+
+internal enum class UserProjectTemplateVariableInputError {
+    MISSING_SEPARATOR,
+    INVALID_NAME,
+    EMPTY_VALUE,
 }
 
 internal class UserProjectTemplateException(
@@ -42,6 +68,11 @@ internal class UserProjectTemplateException(
 internal object UserProjectTemplateManager {
     private val invalidFileNameChars = Regex("[\\\\/:*?\"<>|\\p{Cntrl}]+")
     private val whitespace = Regex("\\s+")
+    private val variableName = Regex("[A-Za-z_][A-Za-z0-9_]*")
+    private val metadataJson = Json {
+        prettyPrint = true
+        encodeDefaults = false
+    }
 
     fun listTemplates(templatesDir: File): List<UserProjectTemplateItem> {
         return templatesDir
@@ -172,6 +203,80 @@ internal object UserProjectTemplateManager {
         }
     }
 
+    fun updateTemplateMetadata(
+        templatesDir: File,
+        templateName: String,
+        metadata: UserProjectTemplateMetadataUpdate,
+    ): UserProjectTemplateItem {
+        return try {
+            val root = ProjectPaths.ensureDir(templatesDir).canonicalFile
+            val source = resolveExistingTemplate(root, templateName)
+            val tempFile = File.createTempFile(".${source.nameWithoutExtension}-metadata-", ".zip", root)
+            try {
+                rewriteTemplateMetadataZip(
+                    source = source,
+                    target = tempFile,
+                    metadata = metadata,
+                )
+                replaceTemplateFile(
+                    source = source,
+                    replacement = tempFile,
+                )
+                toItem(source)
+            } finally {
+                if (tempFile.exists()) tempFile.delete()
+            }
+        } catch (error: UserProjectTemplateException) {
+            throw error
+        } catch (error: Throwable) {
+            throw UserProjectTemplateException(UserProjectTemplateFailure.METADATA_UPDATE_FAILED, error)
+        }
+    }
+
+    fun buildTemplateMetadataPreview(metadata: UserProjectTemplateMetadataUpdate): String {
+        return metadata.toMetadataBytes()
+            ?.toString(Charsets.UTF_8)
+            ?.trimEnd()
+            ?: "{}"
+    }
+
+    fun formatVariableDefaults(variables: Map<String, String>): String {
+        return variables.normalizedVariables()
+            .entries
+            .joinToString(separator = "\n") { (key, value) -> "$key=$value" }
+    }
+
+    fun validateVariableDefaultsInput(input: String): UserProjectTemplateVariableInputError? {
+        input.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { line ->
+                if (!line.contains('=')) {
+                    return UserProjectTemplateVariableInputError.MISSING_SEPARATOR
+                }
+                val key = line.substringBefore('=').trim()
+                val value = line.substringAfter('=').trim()
+                if (!variableName.matches(key)) {
+                    return UserProjectTemplateVariableInputError.INVALID_NAME
+                }
+                if (value.isBlank()) {
+                    return UserProjectTemplateVariableInputError.EMPTY_VALUE
+                }
+            }
+        return null
+    }
+
+    fun parseVariableDefaults(input: String): Map<String, String> {
+        return input.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() && it.contains('=') }
+            .map { line ->
+                line.substringBefore('=').trim() to line.substringAfter('=').trim()
+            }
+            .filter { (key, value) -> variableName.matches(key) && value.isNotBlank() }
+            .toMap()
+    }
+
     fun sanitizeTemplateFileName(sourceName: String?): String {
         val leafName = sourceName
             ?.replace('\\', '/')
@@ -222,6 +327,125 @@ internal object UserProjectTemplateManager {
         lastModifiedMillis = file.lastModified(),
         metadata = ProjectTemplateMetadataReader.readFromZip(file),
     )
+
+    private fun rewriteTemplateMetadataZip(
+        source: File,
+        target: File,
+        metadata: UserProjectTemplateMetadataUpdate,
+    ) {
+        val metadataBytes = metadata.toMetadataBytes()
+        val copiedEntryNames = linkedSetOf<String>()
+
+        ZipInputStream(source.inputStream().buffered()).use { input ->
+            ZipOutputStream(target.outputStream().buffered()).use { output ->
+                var entry = input.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name
+                    if (!ProjectTemplateMetadataReader.isMetadataEntry(entryName) &&
+                        copiedEntryNames.add(entryName)
+                    ) {
+                        val nextEntry = ZipEntry(entryName)
+                        if (entry.time >= 0L) {
+                            nextEntry.time = entry.time
+                        }
+                        output.putNextEntry(nextEntry)
+                        if (!entry.isDirectory) {
+                            input.copyTo(output)
+                        }
+                        output.closeEntry()
+                    }
+                    input.closeEntry()
+                    entry = input.nextEntry
+                }
+
+                if (metadataBytes != null) {
+                    output.putNextEntry(ZipEntry(ProjectTemplateMetadataReader.METADATA_FILE_NAME))
+                    output.write(metadataBytes)
+                    output.closeEntry()
+                }
+            }
+        }
+
+        runCatching { ZipFile(target).use { } }
+            .onFailure { throw UserProjectTemplateException(UserProjectTemplateFailure.METADATA_UPDATE_FAILED, it) }
+    }
+
+    private fun replaceTemplateFile(source: File, replacement: File) {
+        val backup = File(
+            source.parentFile,
+            ".${source.name}.${System.nanoTime()}.metadata.bak"
+        )
+        if (!source.renameTo(backup)) {
+            throw UserProjectTemplateException(UserProjectTemplateFailure.METADATA_UPDATE_FAILED)
+        }
+
+        try {
+            if (!replacement.renameTo(source)) {
+                throw UserProjectTemplateException(UserProjectTemplateFailure.METADATA_UPDATE_FAILED)
+            }
+            backup.delete()
+        } catch (error: Throwable) {
+            if (source.exists()) {
+                source.delete()
+            }
+            backup.renameTo(source)
+            throw error
+        }
+    }
+
+    private fun UserProjectTemplateMetadataUpdate.toMetadataBytes(): ByteArray? {
+        val content = toJsonObject()
+        if (content.isEmpty()) return null
+        val jsonText = metadataJson.encodeToString(JsonObject.serializer(), content)
+        return (jsonText + "\n").toByteArray(Charsets.UTF_8)
+    }
+
+    private fun UserProjectTemplateMetadataUpdate.toJsonObject(): JsonObject = buildJsonObject {
+        name.trimToNull()?.let { put("name", it) }
+        description.trimToNull()?.let { put("description", it) }
+        author.trimToNull()?.let { put("author", it) }
+        buildSystem?.takeUnless { it == ProjectBuildSystem.UNKNOWN }?.let {
+            put("buildSystem", it.toMetadataValue())
+        }
+        primaryLanguage?.takeUnless { it == ProjectLanguage.UNKNOWN }?.let {
+            put("primaryLanguage", it.name)
+        }
+        if (isNdkTemplate) {
+            put("ndkTemplate", true)
+        }
+        val normalizedVariables = variables.normalizedVariables()
+        if (normalizedVariables.isNotEmpty()) {
+            put("variables", buildJsonObject {
+                normalizedVariables.forEach { (key, value) ->
+                    put(key, value)
+                }
+            })
+        }
+    }
+
+    private fun ProjectBuildSystem.toMetadataValue(): String = when (this) {
+        ProjectBuildSystem.SINGLE_FILE -> "single_file"
+        ProjectBuildSystem.CMAKE -> "cmake"
+        ProjectBuildSystem.MAKE -> "make"
+        ProjectBuildSystem.PLUGIN -> "plugin"
+        ProjectBuildSystem.UNKNOWN -> "unknown"
+    }
+
+    private fun String?.trimToNull(): String? = this?.trim()?.takeIf { it.isNotBlank() }
+
+    private fun Map<String, String>.normalizedVariables(): Map<String, String> {
+        return entries
+            .mapNotNull { (key, value) ->
+                val normalizedKey = key.trim().takeIf { it.isNotBlank() }
+                val normalizedValue = value.trim().takeIf { it.isNotBlank() }
+                if (normalizedKey != null && normalizedValue != null) {
+                    normalizedKey to normalizedValue
+                } else {
+                    null
+                }
+            }
+            .toMap()
+    }
 
     private fun resolveExistingTemplate(root: File, templateName: String): File {
         if (!isZipFileName(templateName)) {

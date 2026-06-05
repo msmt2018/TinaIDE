@@ -876,17 +876,42 @@
   <string name="settings_user_templates_detail_description">说明：%1$s</string>
   <string name="settings_user_templates_detail_author">作者：%1$s</string>
   <string name="settings_user_templates_detail_build_system">构建系统：%1$s</string>
+  <string name="settings_user_templates_detail_language">主要语言：%1$s</string>
+  <string name="settings_user_templates_detail_ndk_template">包含 NDK 模板配置</string>
   <string name="settings_user_templates_detail_file">文件：%1$s</string>
   <string name="settings_user_templates_manage">管理</string>
   <string name="settings_user_templates_copy_file_path">复制文件路径</string>
   <string name="settings_user_templates_rename">重命名</string>
+  <string name="settings_user_templates_edit_metadata">编辑模板信息</string>
   <string name="settings_user_templates_export">导出 ZIP 模板</string>
+  <string name="settings_user_templates_edit_title">编辑模板信息</string>
+  <string name="settings_user_templates_edit_file">文件：%1$s</string>
+  <string name="settings_user_templates_edit_name_label">显示名称</string>
+  <string name="settings_user_templates_edit_name_placeholder">例如 CMake 游戏模板</string>
+  <string name="settings_user_templates_edit_description_label">说明</string>
+  <string name="settings_user_templates_edit_description_placeholder">说明这个模板适合的项目类型</string>
+  <string name="settings_user_templates_edit_author_label">作者</string>
+  <string name="settings_user_templates_edit_author_placeholder">例如 TinaIDE</string>
+  <string name="settings_user_templates_variables_label">变量默认值</string>
+  <string name="settings_user_templates_variables_placeholder">例如 AUTHOR=TinaIDE</string>
+  <string name="settings_user_templates_variables_desc">每行一个 KEY=VALUE，用于模板占位符默认值</string>
+  <string name="settings_user_templates_edit_build_system">构建系统</string>
+  <string name="settings_user_templates_edit_build_system_value">构建系统：%1$s</string>
+  <string name="settings_user_templates_edit_primary_language">主要语言</string>
+  <string name="settings_user_templates_edit_primary_language_value">主要语言：%1$s</string>
+  <string name="settings_user_templates_edit_ndk_template">作为 NDK 模板显示</string>
+  <string name="settings_user_templates_preview_title">tina-template.json 预览</string>
+  <string name="settings_user_templates_metadata_auto_detect">自动检测</string>
+  <string name="settings_user_templates_language_c">C</string>
+  <string name="settings_user_templates_language_cpp">C++</string>
+  <string name="settings_user_templates_language_mixed">混合语言</string>
   <string name="settings_user_templates_rename_title">重命名模板</string>
   <string name="settings_user_templates_rename_label">模板文件名</string>
   <string name="settings_user_templates_rename_placeholder">例如 cmake-demo.zip</string>
   <string name="settings_user_templates_delete_title">删除模板</string>
   <string name="settings_user_templates_delete_message">将删除模板“%1$s”。此操作不会影响已创建的项目，是否继续？</string>
   <string name="settings_user_templates_import_success">已导入模板：%1$s</string>
+  <string name="settings_user_templates_edit_success">已更新模板信息：%1$s</string>
   <string name="settings_user_templates_rename_success">已重命名为：%1$s</string>
   <string name="settings_user_templates_export_success">已导出模板：%1$s</string>
   <string name="settings_user_templates_delete_success">已删除模板：%1$s</string>
@@ -899,7 +924,11 @@
   <string name="settings_user_templates_error_rename_failed">模板重命名失败</string>
   <string name="settings_user_templates_error_export_failed">模板导出失败</string>
   <string name="settings_user_templates_error_delete_failed">模板删除失败</string>
+  <string name="settings_user_templates_error_metadata_update_failed">模板信息保存失败</string>
   <string name="settings_user_templates_error_unsafe_path">模板路径不安全，已拒绝操作</string>
+  <string name="settings_user_templates_variables_error_missing_separator">变量默认值必须使用 KEY=VALUE 格式</string>
+  <string name="settings_user_templates_variables_error_invalid_name">变量名只能包含英文字母、数字和下划线，且不能以数字开头</string>
+  <string name="settings_user_templates_variables_error_empty_value">变量默认值不能为空</string>
   <string name="project_source_location_public">公共目录（Documents/TinaIDE）</string>
   <string name="project_source_location_public_desc">卸载应用后源码仍保留，但创建项目时需要文件管理权限</string>
   <string name="project_source_location_private">私有目录（应用内部）</string>

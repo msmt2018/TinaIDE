@@ -678,17 +678,42 @@
   <string name="settings_user_templates_detail_description">Description: %1$s</string>
   <string name="settings_user_templates_detail_author">Author: %1$s</string>
   <string name="settings_user_templates_detail_build_system">Build system: %1$s</string>
+  <string name="settings_user_templates_detail_language">Primary language: %1$s</string>
+  <string name="settings_user_templates_detail_ndk_template">Includes NDK template settings</string>
   <string name="settings_user_templates_detail_file">File: %1$s</string>
   <string name="settings_user_templates_manage">Manage</string>
   <string name="settings_user_templates_copy_file_path">Copy file path</string>
   <string name="settings_user_templates_rename">Rename</string>
+  <string name="settings_user_templates_edit_metadata">Edit Template Info</string>
   <string name="settings_user_templates_export">Export ZIP Template</string>
+  <string name="settings_user_templates_edit_title">Edit template info</string>
+  <string name="settings_user_templates_edit_file">File: %1$s</string>
+  <string name="settings_user_templates_edit_name_label">Display name</string>
+  <string name="settings_user_templates_edit_name_placeholder">For example, CMake game template</string>
+  <string name="settings_user_templates_edit_description_label">Description</string>
+  <string name="settings_user_templates_edit_description_placeholder">Describe what this template is for</string>
+  <string name="settings_user_templates_edit_author_label">Author</string>
+  <string name="settings_user_templates_edit_author_placeholder">For example, TinaIDE</string>
+  <string name="settings_user_templates_variables_label">Variable defaults</string>
+  <string name="settings_user_templates_variables_placeholder">For example, AUTHOR=TinaIDE</string>
+  <string name="settings_user_templates_variables_desc">Use one KEY=VALUE pair per line for template placeholder defaults</string>
+  <string name="settings_user_templates_edit_build_system">Build system</string>
+  <string name="settings_user_templates_edit_build_system_value">Build system: %1$s</string>
+  <string name="settings_user_templates_edit_primary_language">Primary language</string>
+  <string name="settings_user_templates_edit_primary_language_value">Primary language: %1$s</string>
+  <string name="settings_user_templates_edit_ndk_template">Show as an NDK template</string>
+  <string name="settings_user_templates_preview_title">tina-template.json preview</string>
+  <string name="settings_user_templates_metadata_auto_detect">Auto detect</string>
+  <string name="settings_user_templates_language_c">C</string>
+  <string name="settings_user_templates_language_cpp">C++</string>
+  <string name="settings_user_templates_language_mixed">Mixed languages</string>
   <string name="settings_user_templates_rename_title">Rename template</string>
   <string name="settings_user_templates_rename_label">Template file name</string>
   <string name="settings_user_templates_rename_placeholder">For example, cmake-demo.zip</string>
   <string name="settings_user_templates_delete_title">Delete template</string>
   <string name="settings_user_templates_delete_message">Delete template "%1$s"? This will not affect projects that were already created. Continue?</string>
   <string name="settings_user_templates_import_success">Imported template: %1$s</string>
+  <string name="settings_user_templates_edit_success">Updated template info: %1$s</string>
   <string name="settings_user_templates_rename_success">Renamed template to: %1$s</string>
   <string name="settings_user_templates_export_success">Exported template: %1$s</string>
   <string name="settings_user_templates_delete_success">Deleted template: %1$s</string>
@@ -701,7 +726,11 @@
   <string name="settings_user_templates_error_rename_failed">Template rename failed</string>
   <string name="settings_user_templates_error_export_failed">Template export failed</string>
   <string name="settings_user_templates_error_delete_failed">Template deletion failed</string>
+  <string name="settings_user_templates_error_metadata_update_failed">Template info could not be saved</string>
   <string name="settings_user_templates_error_unsafe_path">Unsafe template path. Operation blocked</string>
+  <string name="settings_user_templates_variables_error_missing_separator">Variable defaults must use KEY=VALUE format</string>
+  <string name="settings_user_templates_variables_error_invalid_name">Variable names can only contain English letters, numbers, and underscores, and cannot start with a number</string>
+  <string name="settings_user_templates_variables_error_empty_value">Variable default values cannot be empty</string>
   <string name="project_source_location_public">Public Directory (Documents/TinaIDE)</string>
   <string name="project_source_location_public_desc">Source files remain after uninstall, but creating projects requires file-management permission.</string>
   <string name="project_source_location_private">Private Directory (App Internal)</string>

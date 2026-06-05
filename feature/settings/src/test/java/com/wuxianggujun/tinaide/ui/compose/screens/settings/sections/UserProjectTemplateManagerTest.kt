@@ -227,6 +227,123 @@ class UserProjectTemplateManagerTest {
     }
 
     @Test
+    fun updateTemplateMetadata_shouldWriteMetadataAndPreserveTemplateContent() {
+        val dir = tempDir("user-template-metadata-update")
+        try {
+            val source = dir.resolve("demo.zip")
+            zipFile(source, "main.cpp" to "int main() { return 0; }")
+
+            val item = UserProjectTemplateManager.updateTemplateMetadata(
+                templatesDir = dir,
+                templateName = "demo.zip",
+                metadata = UserProjectTemplateMetadataUpdate(
+                    name = "Native Demo",
+                    description = "Edited template",
+                    author = "Tina",
+                    buildSystem = ProjectBuildSystem.CMAKE,
+                    primaryLanguage = ProjectLanguage.CPP,
+                    isNdkTemplate = true,
+                    variables = mapOf("AUTHOR" to "TinaIDE"),
+                ),
+            )
+
+            assertThat(item.name).isEqualTo("demo.zip")
+            assertThat(item.metadata?.name).isEqualTo("Native Demo")
+            assertThat(item.metadata?.description).isEqualTo("Edited template")
+            assertThat(item.metadata?.author).isEqualTo("Tina")
+            assertThat(item.metadata?.buildSystem).isEqualTo(ProjectBuildSystem.CMAKE)
+            assertThat(item.metadata?.primaryLanguage).isEqualTo(ProjectLanguage.CPP)
+            assertThat(item.metadata?.isNdkTemplate).isTrue()
+            assertThat(item.metadata?.variables).containsExactly("AUTHOR", "TinaIDE")
+
+            val entries = java.util.zip.ZipFile(source).use { zip ->
+                zip.entries().asSequence().map { it.name }.toList()
+            }
+            assertThat(entries).contains("main.cpp")
+            assertThat(entries).contains(ProjectTemplateMetadataReader.METADATA_FILE_NAME)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun templateMetadataPreview_shouldMatchWrittenMetadata() {
+        val preview = UserProjectTemplateManager.buildTemplateMetadataPreview(
+            UserProjectTemplateMetadataUpdate(
+                name = "Native Demo",
+                buildSystem = ProjectBuildSystem.CMAKE,
+                variables = mapOf("AUTHOR" to "TinaIDE")
+            )
+        )
+
+        assertThat(preview).contains("\"name\": \"Native Demo\"")
+        assertThat(preview).contains("\"buildSystem\": \"cmake\"")
+        assertThat(preview).contains("\"variables\"")
+        assertThat(preview).contains("\"AUTHOR\": \"TinaIDE\"")
+    }
+
+    @Test
+    fun variableDefaultsInput_shouldValidateParseAndFormat() {
+        val raw = " AUTHOR = TinaIDE \nSDK_PATH=/opt/sdk\n"
+
+        assertThat(UserProjectTemplateManager.validateVariableDefaultsInput(raw)).isNull()
+        assertThat(UserProjectTemplateManager.parseVariableDefaults(raw))
+            .containsExactly("AUTHOR", "TinaIDE", "SDK_PATH", "/opt/sdk")
+        assertThat(
+            UserProjectTemplateManager.formatVariableDefaults(
+                mapOf("AUTHOR" to "TinaIDE", "EMPTY" to "")
+            )
+        ).isEqualTo("AUTHOR=TinaIDE")
+
+        assertThat(UserProjectTemplateManager.validateVariableDefaultsInput("AUTHOR"))
+            .isEqualTo(UserProjectTemplateVariableInputError.MISSING_SEPARATOR)
+        assertThat(UserProjectTemplateManager.validateVariableDefaultsInput("1AUTHOR=TinaIDE"))
+            .isEqualTo(UserProjectTemplateVariableInputError.INVALID_NAME)
+        assertThat(UserProjectTemplateManager.validateVariableDefaultsInput("AUTHOR="))
+            .isEqualTo(UserProjectTemplateVariableInputError.EMPTY_VALUE)
+    }
+
+    @Test
+    fun updateTemplateMetadata_shouldRemoveMetadataWhenFieldsAreBlank() {
+        val dir = tempDir("user-template-metadata-clear")
+        try {
+            val source = dir.resolve("demo.zip")
+            zipFile(
+                source,
+                ProjectTemplateMetadataReader.METADATA_FILE_NAME to """
+                    {
+                      "name": "Old Name",
+                      "buildSystem": "cmake"
+                    }
+                """.trimIndent(),
+                "main.cpp" to "int main() { return 0; }"
+            )
+
+            val item = UserProjectTemplateManager.updateTemplateMetadata(
+                templatesDir = dir,
+                templateName = "demo.zip",
+                metadata = UserProjectTemplateMetadataUpdate(
+                    name = " ",
+                    description = "",
+                    author = null,
+                    buildSystem = null,
+                    primaryLanguage = null,
+                    isNdkTemplate = false,
+                ),
+            )
+
+            assertThat(item.metadata).isNull()
+            val entries = java.util.zip.ZipFile(source).use { zip ->
+                zip.entries().asSequence().map { it.name }.toList()
+            }
+            assertThat(entries).contains("main.cpp")
+            assertThat(entries).doesNotContain(ProjectTemplateMetadataReader.METADATA_FILE_NAME)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun formatTemplateSize_shouldUseHumanReadableUnits() {
         assertThat(UserProjectTemplateManager.formatTemplateSize(0)).isEqualTo("0 B")
         assertThat(UserProjectTemplateManager.formatTemplateSize(512)).isEqualTo("512 B")

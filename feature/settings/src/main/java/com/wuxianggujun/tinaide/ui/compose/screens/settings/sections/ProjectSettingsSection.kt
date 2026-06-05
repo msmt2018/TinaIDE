@@ -6,11 +6,15 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,11 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.project.ProjectBuildSystem
+import com.wuxianggujun.tinaide.project.ProjectLanguage
 import com.wuxianggujun.tinaide.storage.ProjectPaths
 import com.wuxianggujun.tinaide.ui.compose.components.TinaActionChoiceDialog
 import com.wuxianggujun.tinaide.ui.compose.components.TinaAlertDialog
@@ -56,6 +63,8 @@ private val userProjectTemplateMimeTypes = arrayOf(
     "*/*"
 )
 
+private const val USER_TEMPLATE_METADATA_AUTO_VALUE = "__auto__"
+
 @Composable
 internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
     val context = LocalContext.current
@@ -74,6 +83,16 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
     var userTemplateRenameInput by remember { mutableStateOf("") }
     var pendingDeleteUserTemplate by remember { mutableStateOf<UserProjectTemplateItem?>(null) }
     var pendingExportUserTemplate by remember { mutableStateOf<UserProjectTemplateItem?>(null) }
+    var editingUserTemplateMetadata by remember { mutableStateOf<UserProjectTemplateItem?>(null) }
+    var userTemplateEditNameInput by remember { mutableStateOf("") }
+    var userTemplateEditDescriptionInput by remember { mutableStateOf("") }
+    var userTemplateEditAuthorInput by remember { mutableStateOf("") }
+    var userTemplateEditVariablesInput by remember { mutableStateOf("") }
+    var userTemplateEditBuildSystem by remember { mutableStateOf<ProjectBuildSystem?>(null) }
+    var userTemplateEditLanguage by remember { mutableStateOf<ProjectLanguage?>(null) }
+    var userTemplateEditIsNdkTemplate by remember { mutableStateOf(false) }
+    var selectingUserTemplateBuildSystem by remember { mutableStateOf(false) }
+    var selectingUserTemplateLanguage by remember { mutableStateOf(false) }
 
     val userTemplateRoot = remember(appContext) {
         ProjectPaths.getUserProjectTemplatesRoot(appContext)
@@ -90,6 +109,20 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
                 isLoadingUserTemplates = false
             }
         }
+    }
+
+    fun startEditingUserTemplateMetadata(template: UserProjectTemplateItem) {
+        val metadata = template.metadata
+        userTemplateEditNameInput = metadata?.name.orEmpty()
+        userTemplateEditDescriptionInput = metadata?.description.orEmpty()
+        userTemplateEditAuthorInput = metadata?.author.orEmpty()
+        userTemplateEditVariablesInput = UserProjectTemplateManager.formatVariableDefaults(
+            metadata?.variables.orEmpty()
+        )
+        userTemplateEditBuildSystem = metadata?.buildSystem?.takeUnless { it == ProjectBuildSystem.UNKNOWN }
+        userTemplateEditLanguage = metadata?.primaryLanguage?.takeUnless { it == ProjectLanguage.UNKNOWN }
+        userTemplateEditIsNdkTemplate = metadata?.isNdkTemplate == true
+        editingUserTemplateMetadata = template
     }
 
     val userTemplateImportLauncher = rememberLauncherForActivityResult(
@@ -469,6 +502,9 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
         val buildSystemLabel = metadata?.buildSystem?.let {
             stringResource(resolveUserProjectTemplateBuildSystemLabelRes(it))
         }
+        val languageLabel = metadata?.primaryLanguage?.let {
+            stringResource(resolveUserProjectTemplateLanguageLabelRes(it))
+        }
         val detailMessage = listOfNotNull(
             metadata?.description?.let {
                 stringResource(Strings.settings_user_templates_detail_description, it)
@@ -478,6 +514,14 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
             },
             buildSystemLabel?.let {
                 stringResource(Strings.settings_user_templates_detail_build_system, it)
+            },
+            languageLabel?.let {
+                stringResource(Strings.settings_user_templates_detail_language, it)
+            },
+            if (metadata?.isNdkTemplate == true) {
+                stringResource(Strings.settings_user_templates_detail_ndk_template)
+            } else {
+                null
             },
             stringResource(Strings.settings_user_templates_detail_file, template.file.absolutePath)
         ).joinToString(separator = "\n")
@@ -499,6 +543,10 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
                     selectedUserTemplate = null
                     renamingUserTemplate = template
                 },
+                stringResource(Strings.settings_user_templates_edit_metadata) to {
+                    selectedUserTemplate = null
+                    startEditingUserTemplateMetadata(template)
+                },
                 stringResource(Strings.settings_user_templates_export) to {
                     selectedUserTemplate = null
                     pendingExportUserTemplate = template
@@ -510,6 +558,106 @@ internal fun ProjectSettingsSection(viewModel: SettingsViewModel) {
                 }
             ),
             onDismiss = { selectedUserTemplate = null }
+        )
+    }
+
+    editingUserTemplateMetadata?.let { template ->
+        val variableDefaultsError = UserProjectTemplateManager.validateVariableDefaultsInput(
+            userTemplateEditVariablesInput
+        )
+        val updatedMetadata = UserProjectTemplateMetadataUpdate(
+            name = userTemplateEditNameInput,
+            description = userTemplateEditDescriptionInput,
+            author = userTemplateEditAuthorInput,
+            buildSystem = userTemplateEditBuildSystem,
+            primaryLanguage = userTemplateEditLanguage,
+            isNdkTemplate = userTemplateEditIsNdkTemplate,
+            variables = UserProjectTemplateManager.parseVariableDefaults(userTemplateEditVariablesInput),
+        )
+        UserProjectTemplateMetadataEditorDialog(
+            templateName = template.name,
+            displayName = userTemplateEditNameInput,
+            onDisplayNameChange = { userTemplateEditNameInput = it },
+            description = userTemplateEditDescriptionInput,
+            onDescriptionChange = { userTemplateEditDescriptionInput = it },
+            author = userTemplateEditAuthorInput,
+            onAuthorChange = { userTemplateEditAuthorInput = it },
+            variableDefaults = userTemplateEditVariablesInput,
+            onVariableDefaultsChange = { userTemplateEditVariablesInput = it },
+            variableDefaultsErrorRes = variableDefaultsError?.let(::resolveUserProjectTemplateVariableErrorRes),
+            buildSystemLabel = stringResource(
+                userTemplateEditBuildSystem?.let(::resolveUserProjectTemplateBuildSystemLabelRes)
+                    ?: Strings.settings_user_templates_metadata_auto_detect
+            ),
+            onSelectBuildSystem = { selectingUserTemplateBuildSystem = true },
+            languageLabel = stringResource(
+                userTemplateEditLanguage?.let(::resolveUserProjectTemplateLanguageLabelRes)
+                    ?: Strings.settings_user_templates_metadata_auto_detect
+            ),
+            onSelectLanguage = { selectingUserTemplateLanguage = true },
+            isNdkTemplate = userTemplateEditIsNdkTemplate,
+            onNdkTemplateChange = { userTemplateEditIsNdkTemplate = it },
+            metadataPreview = UserProjectTemplateManager.buildTemplateMetadataPreview(updatedMetadata),
+            canSave = variableDefaultsError == null,
+            onConfirm = {
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            UserProjectTemplateManager.updateTemplateMetadata(
+                                templatesDir = userTemplateRoot,
+                                templateName = template.name,
+                                metadata = updatedMetadata,
+                            )
+                        }
+                    }
+                    result
+                        .onSuccess {
+                            Toast.makeText(
+                                context,
+                                context.getString(Strings.settings_user_templates_edit_success, template.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            editingUserTemplateMetadata = null
+                            refreshUserTemplates()
+                        }
+                        .onFailure { error ->
+                            Toast.makeText(
+                                context,
+                                context.getString(resolveUserProjectTemplateFailureMessageRes(error)),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                }
+            },
+            onDismiss = { editingUserTemplateMetadata = null },
+        )
+    }
+
+    if (selectingUserTemplateBuildSystem) {
+        TinaSingleChoiceDialog(
+            title = stringResource(Strings.settings_user_templates_edit_build_system),
+            options = buildUserProjectTemplateBuildSystemOptions()
+                .map { it.value to stringResource(it.labelRes) },
+            selectedValue = userTemplateEditBuildSystem?.name ?: USER_TEMPLATE_METADATA_AUTO_VALUE,
+            onSelected = { value ->
+                userTemplateEditBuildSystem = resolveUserProjectTemplateBuildSystemValue(value)
+                selectingUserTemplateBuildSystem = false
+            },
+            onDismiss = { selectingUserTemplateBuildSystem = false }
+        )
+    }
+
+    if (selectingUserTemplateLanguage) {
+        TinaSingleChoiceDialog(
+            title = stringResource(Strings.settings_user_templates_edit_primary_language),
+            options = buildUserProjectTemplateLanguageOptions()
+                .map { it.value to stringResource(it.labelRes) },
+            selectedValue = userTemplateEditLanguage?.name ?: USER_TEMPLATE_METADATA_AUTO_VALUE,
+            onSelected = { value ->
+                userTemplateEditLanguage = resolveUserProjectTemplateLanguageValue(value)
+                selectingUserTemplateLanguage = false
+            },
+            onDismiss = { selectingUserTemplateLanguage = false }
         )
     }
 
@@ -760,6 +908,7 @@ private fun resolveUserProjectTemplateFailureMessageRes(error: Throwable): Int {
         UserProjectTemplateFailure.RENAME_FAILED -> Strings.settings_user_templates_error_rename_failed
         UserProjectTemplateFailure.EXPORT_FAILED -> Strings.settings_user_templates_error_export_failed
         UserProjectTemplateFailure.UNSAFE_PATH -> Strings.settings_user_templates_error_unsafe_path
+        UserProjectTemplateFailure.METADATA_UPDATE_FAILED -> Strings.settings_user_templates_error_metadata_update_failed
         UserProjectTemplateFailure.IMPORT_FAILED,
         null -> Strings.settings_user_templates_error_import_failed
     }
@@ -782,6 +931,19 @@ private fun resolveUserProjectTemplateRenameErrorRes(
     }
 }
 
+private fun resolveUserProjectTemplateVariableErrorRes(
+    error: UserProjectTemplateVariableInputError
+): Int {
+    return when (error) {
+        UserProjectTemplateVariableInputError.MISSING_SEPARATOR ->
+            Strings.settings_user_templates_variables_error_missing_separator
+        UserProjectTemplateVariableInputError.INVALID_NAME ->
+            Strings.settings_user_templates_variables_error_invalid_name
+        UserProjectTemplateVariableInputError.EMPTY_VALUE ->
+            Strings.settings_user_templates_variables_error_empty_value
+    }
+}
+
 private fun resolveUserProjectTemplateBuildSystemLabelRes(buildSystem: ProjectBuildSystem): Int {
     return when (buildSystem) {
         ProjectBuildSystem.SINGLE_FILE -> Strings.settings_user_templates_build_system_single_file
@@ -790,6 +952,207 @@ private fun resolveUserProjectTemplateBuildSystemLabelRes(buildSystem: ProjectBu
         ProjectBuildSystem.PLUGIN -> Strings.tag_plugin
         ProjectBuildSystem.UNKNOWN -> Strings.settings_user_templates_build_system_unknown
     }
+}
+
+private fun buildUserProjectTemplateBuildSystemOptions(): List<ProjectSettingsOptionSpec<String>> = listOf(
+    ProjectSettingsOptionSpec(USER_TEMPLATE_METADATA_AUTO_VALUE, Strings.settings_user_templates_metadata_auto_detect),
+    ProjectSettingsOptionSpec(ProjectBuildSystem.SINGLE_FILE.name, Strings.settings_user_templates_build_system_single_file),
+    ProjectSettingsOptionSpec(ProjectBuildSystem.CMAKE.name, Strings.tag_cmake),
+    ProjectSettingsOptionSpec(ProjectBuildSystem.MAKE.name, Strings.tag_makefile),
+    ProjectSettingsOptionSpec(ProjectBuildSystem.PLUGIN.name, Strings.tag_plugin),
+)
+
+private fun resolveUserProjectTemplateBuildSystemValue(value: String): ProjectBuildSystem? {
+    return if (value == USER_TEMPLATE_METADATA_AUTO_VALUE) {
+        null
+    } else {
+        ProjectBuildSystem.entries.firstOrNull { it.name == value }
+    }
+}
+
+private fun buildUserProjectTemplateLanguageOptions(): List<ProjectSettingsOptionSpec<String>> = listOf(
+    ProjectSettingsOptionSpec(USER_TEMPLATE_METADATA_AUTO_VALUE, Strings.settings_user_templates_metadata_auto_detect),
+    ProjectSettingsOptionSpec(ProjectLanguage.C.name, Strings.settings_user_templates_language_c),
+    ProjectSettingsOptionSpec(ProjectLanguage.CPP.name, Strings.settings_user_templates_language_cpp),
+    ProjectSettingsOptionSpec(ProjectLanguage.JAVA.name, Strings.tag_java),
+    ProjectSettingsOptionSpec(ProjectLanguage.KOTLIN.name, Strings.tag_kotlin),
+    ProjectSettingsOptionSpec(ProjectLanguage.PYTHON.name, Strings.tag_python),
+    ProjectSettingsOptionSpec(ProjectLanguage.RUST.name, Strings.tag_rust),
+    ProjectSettingsOptionSpec(ProjectLanguage.GO.name, Strings.tag_go),
+    ProjectSettingsOptionSpec(ProjectLanguage.JAVASCRIPT.name, Strings.tag_javascript),
+    ProjectSettingsOptionSpec(ProjectLanguage.TYPESCRIPT.name, Strings.tag_typescript),
+    ProjectSettingsOptionSpec(ProjectLanguage.SHELL.name, Strings.tag_shell),
+    ProjectSettingsOptionSpec(ProjectLanguage.MIXED.name, Strings.settings_user_templates_language_mixed),
+)
+
+private fun resolveUserProjectTemplateLanguageValue(value: String): ProjectLanguage? {
+    return if (value == USER_TEMPLATE_METADATA_AUTO_VALUE) {
+        null
+    } else {
+        ProjectLanguage.entries.firstOrNull { it.name == value }
+    }
+}
+
+private fun resolveUserProjectTemplateLanguageLabelRes(language: ProjectLanguage): Int {
+    return when (language) {
+        ProjectLanguage.C -> Strings.settings_user_templates_language_c
+        ProjectLanguage.CPP -> Strings.settings_user_templates_language_cpp
+        ProjectLanguage.JAVA -> Strings.tag_java
+        ProjectLanguage.KOTLIN -> Strings.tag_kotlin
+        ProjectLanguage.PYTHON -> Strings.tag_python
+        ProjectLanguage.RUST -> Strings.tag_rust
+        ProjectLanguage.GO -> Strings.tag_go
+        ProjectLanguage.JAVASCRIPT -> Strings.tag_javascript
+        ProjectLanguage.TYPESCRIPT -> Strings.tag_typescript
+        ProjectLanguage.SHELL -> Strings.tag_shell
+        ProjectLanguage.MIXED -> Strings.settings_user_templates_language_mixed
+        ProjectLanguage.UNKNOWN -> Strings.settings_user_templates_build_system_unknown
+    }
+}
+
+@Composable
+private fun UserProjectTemplateMetadataEditorDialog(
+    templateName: String,
+    displayName: String,
+    onDisplayNameChange: (String) -> Unit,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
+    author: String,
+    onAuthorChange: (String) -> Unit,
+    variableDefaults: String,
+    onVariableDefaultsChange: (String) -> Unit,
+    variableDefaultsErrorRes: Int?,
+    buildSystemLabel: String,
+    onSelectBuildSystem: () -> Unit,
+    languageLabel: String,
+    onSelectLanguage: () -> Unit,
+    isNdkTemplate: Boolean,
+    onNdkTemplateChange: (Boolean) -> Unit,
+    metadataPreview: String,
+    canSave: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    TinaAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { TinaDialogTitleText(stringResource(Strings.settings_user_templates_edit_title)) },
+        text = {
+            TinaDialogContentColumn(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                TinaDialogCard {
+                    Text(
+                        text = stringResource(Strings.settings_user_templates_edit_file, templateName),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = onDisplayNameChange,
+                    label = { Text(stringResource(Strings.settings_user_templates_edit_name_label)) },
+                    placeholder = { Text(stringResource(Strings.settings_user_templates_edit_name_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    label = { Text(stringResource(Strings.settings_user_templates_edit_description_label)) },
+                    placeholder = { Text(stringResource(Strings.settings_user_templates_edit_description_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 3,
+                    singleLine = false
+                )
+                OutlinedTextField(
+                    value = author,
+                    onValueChange = onAuthorChange,
+                    label = { Text(stringResource(Strings.settings_user_templates_edit_author_label)) },
+                    placeholder = { Text(stringResource(Strings.settings_user_templates_edit_author_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = variableDefaults,
+                    onValueChange = onVariableDefaultsChange,
+                    label = { Text(stringResource(Strings.settings_user_templates_variables_label)) },
+                    placeholder = { Text(stringResource(Strings.settings_user_templates_variables_placeholder)) },
+                    supportingText = {
+                        Text(
+                            variableDefaultsErrorRes?.let { stringResource(it) }
+                                ?: stringResource(Strings.settings_user_templates_variables_desc)
+                        )
+                    },
+                    isError = variableDefaultsErrorRes != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4,
+                    singleLine = false
+                )
+                TinaDialogCard {
+                    TinaTextButton(
+                        text = stringResource(
+                            Strings.settings_user_templates_edit_build_system_value,
+                            buildSystemLabel
+                        ),
+                        onClick = onSelectBuildSystem,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TinaTextButton(
+                        text = stringResource(
+                            Strings.settings_user_templates_edit_primary_language_value,
+                            languageLabel
+                        ),
+                        onClick = onSelectLanguage,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Checkbox(
+                            checked = isNdkTemplate,
+                            onCheckedChange = onNdkTemplateChange
+                        )
+                        Text(
+                            text = stringResource(Strings.settings_user_templates_edit_ndk_template),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                TinaDialogCard {
+                    Text(
+                        text = stringResource(Strings.settings_user_templates_preview_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = metadataPreview,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TinaPrimaryButton(
+                text = stringResource(Strings.btn_save),
+                onClick = onConfirm,
+                enabled = canSave
+            )
+        },
+        dismissButton = {
+            TinaTextButton(
+                text = stringResource(Strings.btn_cancel),
+                onClick = onDismiss
+            )
+        }
+    )
 }
 
 @Composable

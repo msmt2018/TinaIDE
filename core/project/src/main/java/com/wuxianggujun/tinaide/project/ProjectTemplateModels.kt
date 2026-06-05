@@ -12,7 +12,8 @@ sealed interface ProjectTemplateSpec {
         val zipFile: File,
         override val buildSystem: ProjectBuildSystem,
         override val primaryLanguage: ProjectLanguage = ProjectLanguage.CPP,
-        override val isNdkTemplate: Boolean = false
+        override val isNdkTemplate: Boolean = false,
+        val variables: Map<String, String> = emptyMap(),
     ) : ProjectTemplateSpec
 }
 

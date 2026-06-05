@@ -58,7 +58,8 @@ internal object UserProjectTemplates {
                 zipFile = this,
                 buildSystem = metadata?.buildSystem ?: inspection.buildSystem,
                 primaryLanguage = metadata?.primaryLanguage ?: inspection.primaryLanguage,
-                isNdkTemplate = metadata?.isNdkTemplate ?: false
+                isNdkTemplate = metadata?.isNdkTemplate ?: false,
+                variables = metadata?.variables.orEmpty(),
             )
         )
     }
