@@ -516,6 +516,9 @@ private fun EditorPane(
             onCloseAll = {
                 showTabMenu = false
                 state.closeAllTabs()
+            },
+            onPluginToolbarAction = {
+                state.focusEditorPane(pane)
             }
         )
 

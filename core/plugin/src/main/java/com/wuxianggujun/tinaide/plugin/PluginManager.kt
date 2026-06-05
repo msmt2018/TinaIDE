@@ -459,6 +459,19 @@ class PluginManager(
         )
     }
 
+    fun resolveEditorToolbarMenuItems(
+        installedPlugins: List<InstalledPlugin>,
+        file: File,
+        isDirty: Boolean
+    ): List<ResolvedHostMenuItem> {
+        return PluginMenuResolver.resolveEditorToolbarMenuItems(
+            context = context,
+            installedPlugins = installedPlugins,
+            file = file,
+            isDirty = isDirty
+        )
+    }
+
     private fun resolveProjectTemplateOption(
         plugin: InstalledPlugin,
         template: PluginProjectTemplate

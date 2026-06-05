@@ -207,13 +207,13 @@ CMake/Make 工程。所以 `projectTemplates.buildSystem` 应声明为：
 - `contributions.commands`
 - `contributions.menus["filetree/context"]`
 - `contributions.menus["editor/context"]`
+- `contributions.menus["editor/toolbar"]`
 - `contributions.fileIcons`
 
 不建议默认塞进去的字段：
 
 - `keybindings`
 - `panels`
-- `menus["editor/toolbar"]`
 
 原因很简单：这些字段在模型里存在，但不适合作为 v1 模板的默认承诺。
 

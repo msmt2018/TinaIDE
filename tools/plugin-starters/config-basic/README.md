@@ -21,8 +21,8 @@
 
 ## 当前能力边界
 
-- `editor/context` 与 `filetree/context` 已可用
-- `editor/toolbar`、`keybindings` 不建议在第一版模板中使用
+- `editor/context`、`editor/toolbar` 与 `filetree/context` 已可用
+- `keybindings` 不建议在第一版模板中使用
 - 纯 `config` 插件没有 Lua 运行时，菜单命令通常只能绑定宿主内置命令
 - `contributions.commands` 只提供菜单标题，不会自动生成可执行逻辑
 

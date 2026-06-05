@@ -548,9 +548,6 @@ if ($contributions -is [pscustomobject]) {
             -DeclaredCommandIds $declaredCommandIds `
             -CustomMenuCommandIds $customMenuCommandIds
 
-        if ((Get-Items (Get-PropValue $menus "editor/toolbar")).Count -gt 0) {
-            Add-ValidationWarning "editor/toolbar is declared but the host does not support it yet."
-        }
     }
 
     if ((Get-Items (Get-PropValue $contributions "panels")).Count -gt 0) {

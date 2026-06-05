@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.plugin
 
 import android.app.Application
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import org.junit.After
 import org.junit.Before
@@ -111,6 +112,29 @@ class PluginDoctorTest {
         assertThat(report.entries.any { entry ->
             entry.issue.message.contains("demo.config.command.sayHello")
         }).isTrue()
+    }
+
+    @Test
+    fun `inspectDirectory should accept editor toolbar host command`() {
+        writeManifest(
+            PluginManifest(
+                id = "demo.config.toolbar",
+                name = "Demo Config Toolbar",
+                version = "1.0.0",
+                type = PluginTypes.CONFIG,
+                contributions = PluginContributions(
+                    menus = PluginMenus(
+                        editorToolbar = listOf(
+                            PluginMenuItem(command = HostCommands.EDITOR_SAVE)
+                        )
+                    )
+                )
+            )
+        )
+
+        val report = PluginDoctor.inspectDirectory(context, pluginDir)
+
+        assertThat(report.entries).isEmpty()
     }
 
     @Test

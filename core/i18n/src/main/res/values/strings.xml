@@ -1414,6 +1414,7 @@
   <!-- EditorToolBar -->
   <string name="content_desc_undo">撤销</string>
   <string name="content_desc_redo">重做</string>
+  <string name="content_desc_plugin_editor_toolbar">插件编辑器工具栏</string>
   <string name="content_desc_toggle_bookmark">切换书签</string>
   <string name="content_desc_prev_bookmark">上一个书签</string>
   <string name="content_desc_next_bookmark">下一个书签</string>
@@ -3244,8 +3245,6 @@ kept=%3$d bytes
   <string name="plugin_diagnostic_command_permission_missing_fix">在 permissions 或 optionalPermissions 中加入 command.execute，然后重新加载插件。</string>
   <string name="plugin_diagnostic_menu_unknown_when">菜单项使用了当前未支持的 when 表达式：%1$s（位置 %2$s）</string>
   <string name="plugin_diagnostic_menu_when_fix">改用当前宿主支持的 when 条件，或删除该条件。</string>
-  <string name="plugin_diagnostic_editor_toolbar_unsupported">已声明 editor/toolbar 菜单入口，但宿主当前尚未接入</string>
-  <string name="plugin_diagnostic_editor_toolbar_fix">暂时改用 editor/context，或等待宿主接入 toolbar 菜单。</string>
   <string name="plugin_diagnostic_panels_unsupported">已声明 panels 贡献，但宿主当前尚未提供面板入口</string>
   <string name="plugin_diagnostic_panels_fix">保留 manifest 声明即可，等宿主提供面板能力后再启用 UI 入口。</string>
   <string name="plugin_diagnostic_file_icon_blank_icon">文件图标规则缺少 icon（序号 %1$d）</string>

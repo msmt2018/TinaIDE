@@ -269,15 +269,6 @@ internal object PluginHealthInspector {
             issues = issues,
         )
 
-        if (!menus.editorToolbar.isNullOrEmpty()) {
-            issues += PluginDiagnosticIssue(
-                severity = PluginDiagnosticSeverity.WARNING,
-                category = PluginDiagnosticCategory.COMPATIBILITY,
-                message = Strings.plugin_diagnostic_editor_toolbar_unsupported.strOr(context),
-                fixHint = Strings.plugin_diagnostic_editor_toolbar_fix.strOr(context),
-            )
-        }
-
         return customMenuCommandIds
     }
 

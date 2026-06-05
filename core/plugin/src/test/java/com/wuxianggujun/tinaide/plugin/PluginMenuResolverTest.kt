@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.plugin
 
 import android.app.Application
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.plugin.script.api.PluginCommandRegistry
 import java.io.File
 import java.nio.file.Files
@@ -95,6 +96,50 @@ class PluginMenuResolverTest {
         )
 
         assertThat(items).isEmpty()
+    }
+
+    @Test
+    fun `resolveEditorToolbarMenuItems should include host command and respect dirty condition`() {
+        val plugin = InstalledPlugin(
+            manifest = PluginManifest(
+                id = "plugin.menu",
+                name = "Plugin Menu",
+                version = "1.0.0",
+                type = "config",
+                contributions = PluginContributions(
+                    menus = PluginMenus(
+                        editorToolbar = listOf(
+                            PluginMenuItem(
+                                command = HostCommands.EDITOR_SAVE,
+                                group = "1_editor",
+                                `when` = "isDirty"
+                            )
+                        )
+                    )
+                )
+            ),
+            directory = pluginDir,
+            enabled = true
+        )
+        val file = File(pluginDir, "main.cpp")
+
+        val dirtyItems = PluginMenuResolver.resolveEditorToolbarMenuItems(
+            context = context,
+            installedPlugins = listOf(plugin),
+            file = file,
+            isDirty = true
+        )
+        val cleanItems = PluginMenuResolver.resolveEditorToolbarMenuItems(
+            context = context,
+            installedPlugins = listOf(plugin),
+            file = file,
+            isDirty = false
+        )
+
+        assertThat(dirtyItems).hasSize(1)
+        assertThat(dirtyItems.single().commandId).isEqualTo(HostCommands.EDITOR_SAVE)
+        assertThat(dirtyItems.single().group).isEqualTo("1_editor")
+        assertThat(cleanItems).isEmpty()
     }
 
     private fun createPlugin(

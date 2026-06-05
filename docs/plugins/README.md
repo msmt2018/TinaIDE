@@ -120,6 +120,7 @@ my-plugin/
 - `contributions.themes`：主题（编辑器 `EditorColorScheme` 颜色映射）
 - `contributions.menus["filetree/context"]`：文件树右键菜单扩展（宿主命令 + 当前插件已注册命令）
 - `contributions.menus["editor/context"]`：编辑器 Tab 长按菜单扩展（宿主命令 + 当前插件已注册命令）
+- `contributions.menus["editor/toolbar"]`：编辑器标签栏右侧插件动作菜单（宿主命令 + 当前插件已注册命令）
 - `contributions.snippets`：代码片段（补全列表显示 + Snippet 插入）
 - `contributions.projectTemplates`：新建项目模板（插件携带 zip 模板资源）
 - `contributions.apkExports`：APK 导出模板扩展（插件携带模板 APK，宿主负责通用打包逻辑）
@@ -128,11 +129,10 @@ my-plugin/
 
 已定义但暂未实现（manifest 里写了也不会生效）：
 
-- `contributions.menus["editor/toolbar"]`
 - `contributions.keybindings`
 
-> 备注（与源码同步）：当前版本仅在 `PluginModels.kt` 中定义了字段、并在 `PluginManager.kt` 做了路径合法性校验；
-> 但尚未提供对应的加载/解析/执行链路，因此不会实际生效。
+> 备注（与源码同步）：`editor/toolbar` 已接入编辑器标签栏右侧插件动作菜单；
+> `keybindings` 仍只完成字段与路径校验，尚未提供对应的加载/解析/执行链路。
 
 ## 宿主内置命令总览
 
@@ -704,15 +704,16 @@ Registry 中的 `sources/plugins/**`、`plugins/index.json` 和 `packages/index.
 
 - 插件通过 `contributions.menus["filetree/context"]` 声明菜单项（`command` + `group` + `when`）
 - 插件通过 `contributions.menus["editor/context"]` 声明菜单项（当前落点：编辑器 Tab 长按菜单）
+- 插件通过 `contributions.menus["editor/toolbar"]` 声明菜单项（当前落点：编辑器标签栏右侧插件动作菜单）
 - `command` 支持宿主内置命令，或当前插件运行时已注册的插件命令
 - `contributions.commands` 会参与菜单标题解析；若未声明，则回退到运行时注册标题或命令 ID
 
 示例插件：
 
-- 直接按本文示例 `manifest.json` 声明 `filetree/context` 或 `editor/context`
+- 直接按本文示例 `manifest.json` 声明 `filetree/context`、`editor/context` 或 `editor/toolbar`
   菜单项即可。
 
 下一步建议（仍以宿主命令扩展和权限收敛为主）：
 
-- 编辑器右键菜单：`contributions.menus["editor/context"]`
-- 编辑器工具栏：`contributions.menus["editor/toolbar"]`
+- 编辑器面板扩展：`contributions.panels`
+- 快捷键扩展：`contributions.keybindings`

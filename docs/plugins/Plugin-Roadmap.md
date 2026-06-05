@@ -49,7 +49,7 @@
 |------|------|------|--------|------|
 | 宿主命令注册表（Command Registry） | ⭐⭐⭐⭐⭐ | ⭐⭐ | P0 | ✅ 已完成（宿主内置命令集合：`HostCommands.kt`；插件命令运行时注册） |
 | 文件树目录菜单扩展 | ⭐⭐⭐⭐ | ⭐⭐⭐ | P0 | ✅ 已完成（`menus["filetree/context"]` → 宿主内置命令 / 当前插件已注册命令） |
-| 编辑器菜单/工具栏扩展 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | P1 | 🚧 editor/context（Tab 长按菜单）已完成；toolbar 待实现 |
+| 编辑器菜单/工具栏扩展 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | P1 | ✅ editor/context（Tab 长按菜单）与 editor/toolbar（标签栏右侧动作菜单）已完成 |
 | SnippetManager（代码片段） | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | P1 | ✅ 已完成（`contributions.snippets`） |
 | Keybindings（快捷键绑定） | ⭐⭐⭐ | ⭐⭐⭐ | P2 | 与现有快捷键系统融合 |
 | requires（依赖声明提示） | ⭐⭐⭐ | ⭐⭐ | P2 | 仅展示与跳转，不做安装 |

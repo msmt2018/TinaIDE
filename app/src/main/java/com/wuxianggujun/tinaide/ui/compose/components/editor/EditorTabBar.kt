@@ -8,13 +8,24 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -22,11 +33,17 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
+import com.wuxianggujun.tinaide.core.commands.HostCommandInvocation
+import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.ui.compose.components.EditorTab
 import com.wuxianggujun.tinaide.ui.compose.components.TabContextMenu
+import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenu
+import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuItem
 
 /**
  * 编辑器标签栏组件
@@ -50,12 +67,25 @@ fun EditorTabBar(
     onCloseCurrent: (Int) -> Unit,
     onCloseOthers: (Int) -> Unit,
     onCloseAll: () -> Unit,
+    onPluginToolbarAction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val lazyState = rememberLazyListState()
     val indicatorColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
     val indicatorHeightPx = with(LocalDensity.current) { 2.dp.toPx() }
+    val enabledPlugins by pluginManager.enabledPluginsFlow.collectAsStateWithLifecycle()
+    val activeTab = tabs.getOrNull(selectedIndex)
+    val pluginToolbarItems = if (activeTab != null) {
+        pluginManager.resolveEditorToolbarMenuItems(
+            installedPlugins = enabledPlugins,
+            file = activeTab.file,
+            isDirty = activeTab.isDirty
+        )
+    } else {
+        emptyList()
+    }
+    var pluginToolbarExpanded by remember(activeTab?.id) { mutableStateOf(false) }
 
     // 加载态扩散动画：0 = 静态 tab 宽度，1 = 完全伸展到屏幕两端（含 overshoot）
     val transition = rememberInfiniteTransition(label = "tabIndicatorLoading")
@@ -121,38 +151,82 @@ fun EditorTabBar(
                 )
             }
     ) {
-        LazyRow(
-            state = lazyState,
+        Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items(
-                count = tabs.size,
-                key = { index -> tabs[index].id }
-            ) { index ->
-                val tab = tabs[index]
-                Box {
-                    EditorTab(
-                        fileName = tab.displayName,
-                        selected = index == selectedIndex,
-                        isDirty = tab.isDirty,
-                        onClick = { onTabClick(index) },
-                        onDoubleClick = { onTabDoubleClick(index) },
-                        onLongClick = { onTabLongPress(index) }
-                    )
+            LazyRow(
+                state = lazyState,
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items(
+                    count = tabs.size,
+                    key = { index -> tabs[index].id }
+                ) { index ->
+                    val tab = tabs[index]
+                    Box {
+                        EditorTab(
+                            fileName = tab.displayName,
+                            selected = index == selectedIndex,
+                            isDirty = tab.isDirty,
+                            onClick = { onTabClick(index) },
+                            onDoubleClick = { onTabDoubleClick(index) },
+                            onLongClick = { onTabLongPress(index) }
+                        )
 
-                    // 上下文菜单
-                    TabContextMenu(
-                        file = tab.file,
-                        isDirty = tab.isDirty,
-                        expanded = showMenuForIndex == index,
-                        onDismiss = onMenuDismiss,
-                        onCloseCurrent = { onCloseCurrent(index) },
-                        onCloseOthers = { onCloseOthers(index) },
-                        onCloseAll = onCloseAll,
-                        pluginManager = pluginManager,
-                        hostCommandExecutor = hostCommandExecutor,
-                    )
+                        // 上下文菜单
+                        TabContextMenu(
+                            file = tab.file,
+                            isDirty = tab.isDirty,
+                            expanded = showMenuForIndex == index,
+                            onDismiss = onMenuDismiss,
+                            onCloseCurrent = { onCloseCurrent(index) },
+                            onCloseOthers = { onCloseOthers(index) },
+                            onCloseAll = onCloseAll,
+                            pluginManager = pluginManager,
+                            hostCommandExecutor = hostCommandExecutor,
+                        )
+                    }
+                }
+            }
+
+            if (activeTab != null && hostCommandExecutor != null && pluginToolbarItems.isNotEmpty()) {
+                Box {
+                    IconButton(
+                        onClick = { pluginToolbarExpanded = true },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Extension,
+                            contentDescription = stringResource(Strings.content_desc_plugin_editor_toolbar),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    TinaDropdownMenu(
+                        expanded = pluginToolbarExpanded,
+                        onDismissRequest = { pluginToolbarExpanded = false }
+                    ) {
+                        pluginToolbarItems.forEach { item ->
+                            TinaDropdownMenuItem(
+                                text = { Text(item.title) },
+                                onClick = {
+                                    pluginToolbarExpanded = false
+                                    onPluginToolbarAction()
+                                    hostCommandExecutor.execute(
+                                        item.commandId,
+                                        HostCommandInvocation(
+                                            file = activeTab.file,
+                                            isDirectory = activeTab.file.isDirectory,
+                                            isDirty = activeTab.isDirty
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -494,7 +494,6 @@ tina.ui.showMessage("Plugin loaded")
 以下内容在源码中有字段或雏形，但不建议对普通用户写成“稳了”：
 
 - `hybrid` 插件作为主教程入口
-- `editor/toolbar` 菜单扩展
 - `keybindings` 扩展
 - 所有脚本事件都已完整接入
 

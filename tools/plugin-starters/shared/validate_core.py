@@ -328,9 +328,6 @@ def main() -> int:
     inspect_menu_items("editor/toolbar", menus.get("editor/toolbar"), editor_when_expressions)
     inspect_menu_items("filetree/context", menus.get("filetree/context"), filetree_when_expressions)
 
-    if as_list(menus.get("editor/toolbar")):
-        add_warning("editor/toolbar is declared but the host does not support it yet.")
-
     if supports_runtime_plugin_commands and not has_command_execute:
         custom_command_ids = sorted(declared_custom_command_ids | custom_menu_command_ids)
         if custom_command_ids:
