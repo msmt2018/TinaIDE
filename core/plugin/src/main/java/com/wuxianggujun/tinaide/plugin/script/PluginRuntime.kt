@@ -225,6 +225,8 @@ class ScriptPluginRuntime(
         return resolvePermissionAccess(permission).granted
     }
 
+    fun getManifest(): PluginManifest = manifest
+
     fun checkAnyPermission(vararg permissions: PluginPermission): Boolean {
         return resolvePermissionAccess(*permissions).granted
     }

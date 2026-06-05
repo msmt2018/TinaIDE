@@ -30,6 +30,7 @@ internal object PluginManifestValidator {
         }
         validatePermissionIds(context, manifest.permissions)
         validatePermissionIds(context, manifest.optionalPermissions)
+        validateConfiguration(context, manifest.configuration)
         validateLspContributions(context, manifest)
 
         if (manifest.type.equals(PluginTypes.SCRIPT, ignoreCase = true) ||
@@ -164,6 +165,39 @@ internal object PluginManifestValidator {
         val unknownIds = PluginPermission.findUnknownIds(permissions)
         require(unknownIds.isEmpty()) {
             Strings.plugin_error_permission_unknown.strOr(context, unknownIds.joinToString(", "))
+        }
+    }
+
+    private fun validateConfiguration(
+        context: Context,
+        configuration: PluginConfiguration?,
+    ) {
+        val issues = PluginConfigurationSchema.validateConfiguration(configuration)
+        require(issues.isEmpty()) {
+            issues.joinToString(separator = "; ") { issue ->
+                when (issue.reason) {
+                    PluginConfigurationValidationReason.INVALID_KEY ->
+                        Strings.plugin_error_configuration_key_invalid.strOr(context, issue.key)
+                    PluginConfigurationValidationReason.UNSUPPORTED_TYPE ->
+                        Strings.plugin_error_configuration_type_invalid.strOr(
+                            context,
+                            issue.key,
+                            issue.value.orEmpty(),
+                        )
+                    PluginConfigurationValidationReason.INVALID_DEFAULT ->
+                        Strings.plugin_error_configuration_default_invalid.strOr(
+                            context,
+                            issue.key,
+                            issue.value.orEmpty(),
+                        )
+                    PluginConfigurationValidationReason.INVALID_ENUM ->
+                        Strings.plugin_error_configuration_enum_invalid.strOr(
+                            context,
+                            issue.key,
+                            issue.value.orEmpty(),
+                        )
+                }
+            }
         }
     }
 

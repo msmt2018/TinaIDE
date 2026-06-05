@@ -12,6 +12,8 @@ import com.wuxianggujun.tinaide.plugin.PluginDiagnosticsReport
 import com.wuxianggujun.tinaide.plugin.PluginDiagnosticsSnapshot
 import com.wuxianggujun.tinaide.plugin.PluginLogLevel
 import com.wuxianggujun.tinaide.plugin.PluginManifest
+import com.wuxianggujun.tinaide.plugin.PluginConfigurationSchema
+import com.wuxianggujun.tinaide.plugin.ResolvedPluginConfigurationProperty
 import com.wuxianggujun.tinaide.plugin.ThemeConfig
 import com.wuxianggujun.tinaide.plugin.lsp.LspPluginInfo
 import com.wuxianggujun.tinaide.plugin.lsp.LspPluginInstallState
@@ -41,6 +43,14 @@ internal data class PluginsPackageRequirementGroup(
     val manager: String,
     val packages: List<String>,
 )
+
+internal data class PluginsConfigurationSummary(
+    val title: String?,
+    val properties: List<ResolvedPluginConfigurationProperty>,
+) {
+    val hasProperties: Boolean
+        get() = properties.isNotEmpty()
+}
 
 internal data class PluginDiagnosticsSummary(
     val totalCount: Int,
@@ -335,6 +345,13 @@ internal object PluginsSettingsSectionSupport {
                     }
                 }
                 .sortedBy { group -> group.manager },
+        )
+    }
+
+    fun resolveConfigurationSummary(manifest: PluginManifest): PluginsConfigurationSummary {
+        return PluginsConfigurationSummary(
+            title = manifest.configuration?.title?.trim()?.takeIf { title -> title.isNotBlank() },
+            properties = PluginConfigurationSchema.resolveProperties(manifest),
         )
     }
 

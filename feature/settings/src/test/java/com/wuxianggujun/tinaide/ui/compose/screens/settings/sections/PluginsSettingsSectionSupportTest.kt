@@ -3,6 +3,8 @@ package com.wuxianggujun.tinaide.ui.compose.screens.settings.sections
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.plugin.InstalledPlugin
+import com.wuxianggujun.tinaide.plugin.PluginConfiguration
+import com.wuxianggujun.tinaide.plugin.PluginConfigurationProperty
 import com.wuxianggujun.tinaide.plugin.PluginContributions
 import com.wuxianggujun.tinaide.plugin.PluginDiagnosticCategory
 import com.wuxianggujun.tinaide.plugin.PluginDiagnosticEntry
@@ -23,6 +25,7 @@ import com.wuxianggujun.tinaide.plugin.lsp.LspPluginInstallState
 import com.wuxianggujun.tinaide.plugin.lsp.LspToolchainConfig
 import com.wuxianggujun.tinaide.plugin.lsp.ToolchainInstallState
 import java.io.File
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
 
 class PluginsSettingsSectionSupportTest {
@@ -357,6 +360,46 @@ class PluginsSettingsSectionSupportTest {
                 ),
             )
         )
+    }
+
+    @Test
+    fun configurationSummary_shouldResolveValidPropertiesOnly() {
+        val manifest = PluginManifest(
+            id = "demo.plugin",
+            name = "Demo Plugin",
+            version = "1.0.0",
+            configuration = PluginConfiguration(
+                title = "  Demo Settings  ",
+                properties = mapOf(
+                    "output.format" to PluginConfigurationProperty(
+                        type = "string",
+                        default = JsonPrimitive("text"),
+                        enumValues = listOf("text", "json", "text"),
+                    ),
+                    " " to PluginConfigurationProperty(
+                        type = "boolean",
+                    ),
+                    "feature.enabled" to PluginConfigurationProperty(
+                        type = "boolean",
+                        default = JsonPrimitive(true),
+                    ),
+                    "unsupported" to PluginConfigurationProperty(
+                        type = "object",
+                    ),
+                ),
+            ),
+        )
+
+        val summary = PluginsSettingsSectionSupport.resolveConfigurationSummary(manifest)
+
+        assertThat(summary.title).isEqualTo("Demo Settings")
+        assertThat(summary.properties.map { property -> property.key }).containsExactly(
+            "feature.enabled",
+            "output.format",
+        ).inOrder()
+        assertThat(summary.properties.single { property -> property.key == "output.format" }.enumValues)
+            .containsExactly("text", "json")
+            .inOrder()
     }
 
     @Test

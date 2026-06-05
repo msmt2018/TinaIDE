@@ -210,6 +210,7 @@ class PluginManager(
                 pluginDir.deleteRecursively()
             }
             prefs.edit().remove(PREF_ENABLED_PREFIX + pluginId).apply()
+            PluginConfigurationStore.getInstance(context).clearPlugin(pluginId)
 
             refreshInstalledPlugins()
         }

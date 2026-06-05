@@ -37,6 +37,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,10 +70,15 @@ import com.wuxianggujun.tinaide.plugin.PluginDiagnosticSeverity
 import com.wuxianggujun.tinaide.plugin.PluginDiagnosticsReport
 import com.wuxianggujun.tinaide.plugin.PluginDiagnosticsSnapshotFactory
 import com.wuxianggujun.tinaide.plugin.PluginDoctor
+import com.wuxianggujun.tinaide.plugin.PluginConfigurationPropertyType
+import com.wuxianggujun.tinaide.plugin.PluginConfigurationSchema
+import com.wuxianggujun.tinaide.plugin.PluginConfigurationStore
 import com.wuxianggujun.tinaide.plugin.PluginHostLogSources
 import com.wuxianggujun.tinaide.plugin.PluginLogLevel
 import com.wuxianggujun.tinaide.plugin.PluginLogManager
 import com.wuxianggujun.tinaide.plugin.PluginManager
+import com.wuxianggujun.tinaide.plugin.PluginManifest
+import com.wuxianggujun.tinaide.plugin.ResolvedPluginConfigurationProperty
 import com.wuxianggujun.tinaide.plugin.ThemeConfig
 import com.wuxianggujun.tinaide.plugin.lsp.LspInstallProgress
 import com.wuxianggujun.tinaide.plugin.lsp.LspPluginInfo
@@ -109,6 +115,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonPrimitive
 import timber.log.Timber
 
 private const val TAG = "PluginsSettingsSection"
@@ -1773,6 +1780,7 @@ private fun InstalledPluginDetailScreen(
 
     val contributionSummary = PluginsSettingsSectionSupport.resolveContributionSummary(manifest)
     val requirementsSummary = PluginsSettingsSectionSupport.resolveRequirementsSummary(manifest)
+    val configurationSummary = PluginsSettingsSectionSupport.resolveConfigurationSummary(manifest)
     val scope = rememberCoroutineScope()
     var doctorDiagnosticsReport by remember(manifest.id) { mutableStateOf<PluginDiagnosticsReport?>(null) }
     var isDoctorRunning by remember(manifest.id) { mutableStateOf(false) }
@@ -2011,6 +2019,13 @@ private fun InstalledPluginDetailScreen(
             }
         }
 
+        if (configurationSummary.hasProperties) {
+            PluginConfigurationSettingsCard(
+                manifest = manifest,
+                configurationSummary = configurationSummary,
+            )
+        }
+
         if (isLspPlugin) {
             LspDependencyStatusCard(
                 lspPluginInfo = lspPluginInfo,
@@ -2212,6 +2227,304 @@ private fun InstalledPluginDetailScreen(
             message = permissionDialogMessage,
             onDismiss = { showPluginPermissionsDialog = false },
         )
+    }
+}
+
+@Composable
+private fun PluginConfigurationSettingsCard(
+    manifest: PluginManifest,
+    configurationSummary: PluginsConfigurationSummary,
+) {
+    val context = LocalContext.current
+    val store = remember(context) { PluginConfigurationStore.getInstance(context) }
+    DetailInfoCard(
+        title = configurationSummary.title
+            ?: stringResource(Strings.settings_plugins_configuration)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(TinaSpacing.md)) {
+            configurationSummary.properties.forEachIndexed { index, property ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                PluginConfigurationPropertyRow(
+                    manifest = manifest,
+                    property = property,
+                    store = store,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PluginConfigurationPropertyRow(
+    manifest: PluginManifest,
+    property: ResolvedPluginConfigurationProperty,
+    store: PluginConfigurationStore,
+) {
+    when {
+        property.isEnum -> PluginConfigurationEnumRow(
+            manifest = manifest,
+            property = property,
+            store = store,
+        )
+        property.type == PluginConfigurationPropertyType.BOOLEAN -> PluginConfigurationBooleanRow(
+            manifest = manifest,
+            property = property,
+            store = store,
+        )
+        property.type == PluginConfigurationPropertyType.NUMBER -> PluginConfigurationNumberRow(
+            manifest = manifest,
+            property = property,
+            store = store,
+        )
+        else -> PluginConfigurationStringRow(
+            manifest = manifest,
+            property = property,
+            store = store,
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationBooleanRow(
+    manifest: PluginManifest,
+    property: ResolvedPluginConfigurationProperty,
+    store: PluginConfigurationStore,
+) {
+    var value by remember(manifest.id, property.key) {
+        mutableStateOf(store.getValue(manifest, property.key))
+    }
+    val checked = PluginConfigurationSchema.booleanValue(value)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(TinaSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PluginConfigurationLabel(
+            property = property,
+            modifier = Modifier.weight(1f),
+        )
+        TinaTextButton(
+            text = stringResource(Strings.settings_cat_reset),
+            onClick = {
+                store.resetValue(manifest, property.key)
+                value = store.getValue(manifest, property.key)
+            },
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = { nextValue ->
+                if (store.setValue(manifest, property.key, JsonPrimitive(nextValue))) {
+                    value = JsonPrimitive(nextValue)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationStringRow(
+    manifest: PluginManifest,
+    property: ResolvedPluginConfigurationProperty,
+    store: PluginConfigurationStore,
+) {
+    var value by remember(manifest.id, property.key) {
+        mutableStateOf(store.getValue(manifest, property.key))
+    }
+    var text by remember(manifest.id, property.key) {
+        mutableStateOf(PluginConfigurationSchema.stringValue(value).orEmpty())
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(TinaSpacing.xs),
+    ) {
+        PluginConfigurationHeader(
+            property = property,
+            onReset = {
+                store.resetValue(manifest, property.key)
+                value = store.getValue(manifest, property.key)
+                text = PluginConfigurationSchema.stringValue(value).orEmpty()
+            },
+        )
+        OutlinedTextField(
+            value = text,
+            onValueChange = { nextText ->
+                text = nextText
+                val nextValue = JsonPrimitive(nextText)
+                if (store.setValue(manifest, property.key, nextValue)) {
+                    value = nextValue
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            supportingText = property.description?.let { description ->
+                { Text(text = description) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationNumberRow(
+    manifest: PluginManifest,
+    property: ResolvedPluginConfigurationProperty,
+    store: PluginConfigurationStore,
+) {
+    var value by remember(manifest.id, property.key) {
+        mutableStateOf(store.getValue(manifest, property.key))
+    }
+    var text by remember(manifest.id, property.key) {
+        mutableStateOf(PluginConfigurationSchema.numberText(value))
+    }
+    var hasError by remember(manifest.id, property.key) { mutableStateOf(false) }
+    val numberErrorText = stringResource(Strings.settings_plugins_configuration_number_error)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(TinaSpacing.xs),
+    ) {
+        PluginConfigurationHeader(
+            property = property,
+            onReset = {
+                store.resetValue(manifest, property.key)
+                value = store.getValue(manifest, property.key)
+                text = PluginConfigurationSchema.numberText(value)
+                hasError = false
+            },
+        )
+        OutlinedTextField(
+            value = text,
+            onValueChange = { nextText ->
+                text = nextText
+                val nextValue = PluginConfigurationSchema.toJsonPrimitive(property, nextText)
+                if (nextValue == null) {
+                    hasError = true
+                } else if (store.setValue(manifest, property.key, nextValue)) {
+                    value = nextValue
+                    hasError = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            isError = hasError,
+            supportingText = {
+                Text(
+                    text = if (hasError) {
+                        numberErrorText
+                    } else {
+                        property.description.orEmpty()
+                    },
+                    color = if (hasError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationEnumRow(
+    manifest: PluginManifest,
+    property: ResolvedPluginConfigurationProperty,
+    store: PluginConfigurationStore,
+) {
+    var value by remember(manifest.id, property.key) {
+        mutableStateOf(store.getValue(manifest, property.key))
+    }
+    var showChoiceDialog by remember(manifest.id, property.key) { mutableStateOf(false) }
+    val selectedValue = PluginConfigurationSchema.stringValue(value)
+    val unsetText = stringResource(Strings.settings_plugins_configuration_unset)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showChoiceDialog = true },
+        horizontalArrangement = Arrangement.spacedBy(TinaSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PluginConfigurationLabel(
+            property = property,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = selectedValue ?: unsetText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TinaTextButton(
+            text = stringResource(Strings.settings_cat_reset),
+            onClick = {
+                store.resetValue(manifest, property.key)
+                value = store.getValue(manifest, property.key)
+            },
+        )
+    }
+
+    if (showChoiceDialog) {
+        TinaSingleChoiceDialog(
+            title = property.key,
+            options = property.enumValues.map { option -> option to option },
+            selectedValue = selectedValue,
+            onSelected = { selected ->
+                val nextValue = JsonPrimitive(selected)
+                if (store.setValue(manifest, property.key, nextValue)) {
+                    value = nextValue
+                }
+                showChoiceDialog = false
+            },
+            onDismiss = { showChoiceDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationHeader(
+    property: ResolvedPluginConfigurationProperty,
+    onReset: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(TinaSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = property.key,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        TinaTextButton(
+            text = stringResource(Strings.settings_cat_reset),
+            onClick = onReset,
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigurationLabel(
+    property: ResolvedPluginConfigurationProperty,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(TinaSpacing.xxs),
+    ) {
+        Text(
+            text = property.key,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        property.description?.let { description ->
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

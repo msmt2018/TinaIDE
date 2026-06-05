@@ -86,6 +86,7 @@ class PluginApiRegistry(private val context: Context) {
             return PluginApiRegistry(context).apply {
                 registerModule(EditorApiModule())
                 registerModule(UiApiModule(context))
+                registerModule(ConfigApiModule(context))
                 registerModule(StorageApiModule(context))
                 registerModule(CommandsApiModule(projectRootProvider))
                 registerModule(EventsApiModule())

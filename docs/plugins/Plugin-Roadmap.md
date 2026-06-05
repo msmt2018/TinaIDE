@@ -221,15 +221,15 @@ interface HostCommand {
 **目标**：让插件可以声明可配置项，宿主自动生成设置 UI。
 
 **当前状态**：
-- 规范已定义（见 `docs/plugins/README.md` 中的 manifest 草案）
-- 代码侧待实现
-- 脚本 / hybrid 插件已经落地，但仍缺统一的宿主配置 UI
+- 已实现 manifest `configuration` 解析与校验
+- 已在插件详情页按 schema 自动生成配置 UI
+- 已提供按插件 ID 隔离的配置持久化
+- 已提供脚本 / hybrid 插件 `tina.config.get/set/reset`
 
-**为什么当前不急**：
-- 现有插件类型（主题、代码片段）不需要复杂配置
-- 主题插件 → 选择即可
-- 代码片段插件 → 直接使用
-- 等脚本 / hybrid 插件的宿主 API 与权限模型进一步稳定后再统一补更合理
+**当前边界**：
+- 支持 `boolean`、`string`、`number`
+- `string` + `enum` 会生成单选配置
+- 未实现配置变更监听；脚本可在需要时重新调用 `tina.config.get()`
 
 **manifest.json 示例**：
 
@@ -270,13 +270,14 @@ interface HostCommand {
 
 3. **配置存储**
    - 使用 SharedPreferences
-   - 键格式：`plugin.<pluginId>.<propertyKey>`
-   - 示例：`plugin.myPlugin.enableFeatureX` → `true`
+   - 键格式：`<pluginId>:<propertyKey>`
+   - 插件卸载时清理该插件 ID 下的配置
 
 4. **配置读取 API**（脚本插件使用）
    ```javascript
    const enabled = tina.config.get("myPlugin.enableFeatureX", true);
-   tina.config.onDidChange("myPlugin.outputFormat", (newValue) => { ... });
+   tina.config.set("myPlugin.outputFormat", "json");
+   tina.config.reset("myPlugin.outputFormat");
    ```
 
 **参考实现**：VS Code 的 `contributes.configuration`

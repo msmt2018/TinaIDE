@@ -5,6 +5,7 @@ import kotlinx.serialization.SerialName
 import com.wuxianggujun.tinaide.plugin.lsp.LspServerConfig
 import com.wuxianggujun.tinaide.plugin.lsp.LspToolchainConfig
 import com.wuxianggujun.tinaide.project.ProjectApkExportType
+import kotlinx.serialization.json.JsonElement
 import java.io.File
 
 /**
@@ -27,6 +28,7 @@ data class PluginManifest(
     val main: String? = null, // Entry script file (e.g., "main.lua")
     val contributions: PluginContributions? = null,
     val requires: PluginRequirements? = null,
+    val configuration: PluginConfiguration? = null,
     val activationEvents: List<String>? = null,
     val permissions: List<String>? = null,
     val optionalPermissions: List<String>? = null,
@@ -56,6 +58,21 @@ data class PluginRequirements(
 data class PluginToolchainRequirements(
     val recommended: List<String> = emptyList(),
     val optional: List<String> = emptyList()
+)
+
+@Serializable
+data class PluginConfiguration(
+    val title: String? = null,
+    val properties: Map<String, PluginConfigurationProperty> = emptyMap()
+)
+
+@Serializable
+data class PluginConfigurationProperty(
+    val type: String,
+    val description: String? = null,
+    val default: JsonElement? = null,
+    @SerialName("enum")
+    val enumValues: List<String>? = null
 )
 
 @Serializable

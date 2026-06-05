@@ -70,6 +70,7 @@
 - `tina.diagnostics`
 - `tina.workspace`
 - `tina.fs`（历史兼容）
+- `tina.config`
 - `tina.storage`
 - `tina.db`
 - `tina.network`
@@ -90,6 +91,7 @@
 等第一版跑通，再逐步引入：
 
 - `tina.commands`
+- `tina.config`
 - `tina.storage`
 - `tina.db`
 - `tina.network`
@@ -234,7 +236,26 @@
 - 老插件可以继续使用 `tina.fs.*`
 - 权限仍映射到 `workspace.read` / `workspace.write` 对应的底层文件权限
 
-### 4.7 `tina.storage`
+### 4.7 `tina.config`
+
+用途：读取和更新 manifest `configuration.properties` 中声明的插件配置。
+
+已提供：
+
+- `tina.config.get(key)`
+- `tina.config.get(key, fallback)`
+- `tina.config.set(key, value)`
+- `tina.config.reset(key)`
+
+说明：
+
+- 不需要 `storage.local` 权限。
+- 只能访问当前插件 manifest 声明过的配置 key。
+- 未保存值时，`get()` 会先返回 manifest `default`，再使用调用方传入的 fallback。
+- `set()` 会校验类型；`string` + `enum` 会拒绝未声明的枚举值。
+- 支持类型为 `boolean`、`string`、`number`。
+
+### 4.8 `tina.storage`
 
 用途：插件级键值存储。
 
@@ -248,7 +269,7 @@
 
 - `storage.local`
 
-### 4.8 `tina.db`
+### 4.9 `tina.db`
 
 用途：插件独立 SQLite 数据库。
 
@@ -264,7 +285,7 @@
 
 - `storage.database`
 
-### 4.9 `tina.network`
+### 4.10 `tina.network`
 
 用途：网络请求。
 
@@ -284,7 +305,7 @@
 - 使用 `network.fetch` 时，目标主机必须命中白名单
 - 若要完全放开，需要更高风险权限
 
-### 4.10 `tina.commands`
+### 4.11 `tina.commands`
 
 用途：调用宿主现有命令，或注册当前插件自己的命令回调。
 
@@ -348,7 +369,7 @@
 - 宿主内置命令
 - 当前插件已注册的插件命令
 
-### 4.11 `tina.events`
+### 4.12 `tina.events`
 
 用途：监听宿主事件。
 

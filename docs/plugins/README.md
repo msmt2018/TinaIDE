@@ -84,11 +84,42 @@
   "name": "My TinaIDE Plugin",
   "version": "1.0.0",
   "type": "config",
+  "configuration": {
+    "title": "My Plugin Settings",
+    "properties": {
+      "feature.enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable the feature"
+      },
+      "output.format": {
+        "type": "string",
+        "default": "json",
+        "enum": ["text", "json"],
+        "description": "Output format"
+      },
+      "build.jobs": {
+        "type": "number",
+        "default": 2,
+        "description": "Parallel build jobs"
+      }
+    }
+  },
   "contributions": {
     "themes": ["themes/my-theme.json"]
   }
 }
 ```
+
+`configuration.properties` 当前支持：
+
+- `type = "boolean"`：详情页渲染为开关。
+- `type = "string"`：详情页渲染为文本输入。
+- `type = "number"`：详情页渲染为数字输入。
+- `type = "string"` 且声明 `enum`：详情页渲染为单选项。
+
+配置 key 必须匹配 `^[A-Za-z0-9][A-Za-z0-9._-]*$`。宿主会按插件 ID 隔离保存配置；
+脚本 / hybrid 插件可通过 `tina.config.get/set/reset` 读取和更新自己声明过的配置项。
 
 ### 4. 运行热安装
 
@@ -125,6 +156,7 @@ my-plugin/
 - `contributions.snippets`：代码片段（补全列表显示 + Snippet 插入）
 - `contributions.projectTemplates`：新建项目模板（插件携带 zip 模板资源）
 - `contributions.apkExports`：APK 导出模板扩展（插件携带模板 APK，宿主负责通用打包逻辑）
+- `configuration`：插件配置 schema（宿主在插件详情页自动生成设置 UI）
 - `manifest.type = "script" / "hybrid"`：Lua 脚本运行时（需权限确认；不支持 DEX）
 - 插件安装/卸载/启用/禁用（本地目录）
 

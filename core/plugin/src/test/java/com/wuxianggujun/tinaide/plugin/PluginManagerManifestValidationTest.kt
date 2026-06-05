@@ -5,13 +5,14 @@ import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.plugin.lsp.LspServerConfig
 import com.wuxianggujun.tinaide.plugin.lsp.LspServerConnectionConfig
 import com.wuxianggujun.tinaide.plugin.lsp.LspToolchainConfig
+import java.io.File
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(
@@ -61,6 +62,29 @@ class PluginManagerManifestValidationTest {
     }
 
     @Test
+    fun `validateManifest should reject invalid plugin configuration defaults`() {
+        val pluginDir = createScriptPluginDir("validate_configuration")
+        val manifest = PluginManifest(
+            id = "test.plugin.configuration",
+            name = "Validate Configuration",
+            version = "1.0.0",
+            type = "script",
+            configuration = PluginConfiguration(
+                properties = mapOf(
+                    "feature.enabled" to PluginConfigurationProperty(
+                        type = "boolean",
+                        default = JsonPrimitive("true"),
+                    ),
+                ),
+            ),
+        )
+
+        val error = runValidationFailure(manifest, pluginDir)
+
+        assertThat(error.message).contains("feature.enabled")
+    }
+
+    @Test
     fun `validateManifest should require script main entry to exist`() {
         val pluginDir = File(context.cacheDir, "validate_missing_main").apply {
             deleteRecursively()
@@ -78,7 +102,6 @@ class PluginManagerManifestValidationTest {
 
         assertThat(error).isNotNull()
     }
-
 
     @Test
     fun `validateManifest should reject legacy lsp package manager toolchain type`() {
@@ -157,48 +180,41 @@ class PluginManagerManifestValidationTest {
         )
     }
 
-    private fun createScriptPluginDir(name: String): File {
-        return File(context.cacheDir, name).apply {
-            deleteRecursively()
-            mkdirs()
-            File(this, "main.lua").writeText("print('hello')")
-        }
+    private fun createScriptPluginDir(name: String): File = File(context.cacheDir, name).apply {
+        deleteRecursively()
+        mkdirs()
+        File(this, "main.lua").writeText("print('hello')")
     }
 
-
-    private fun createLspPluginDir(name: String): File {
-        return File(context.cacheDir, name).apply {
-            deleteRecursively()
-            mkdirs()
-        }
+    private fun createLspPluginDir(name: String): File = File(context.cacheDir, name).apply {
+        deleteRecursively()
+        mkdirs()
     }
 
     private fun createLspManifest(
         toolchains: List<LspToolchainConfig>,
         serverType: String = "stdio",
-    ): PluginManifest {
-        return PluginManifest(
-            id = "test.plugin.lsp",
-            name = "Validate LSP Plugin",
-            version = "1.0.0",
-            type = PluginTypes.LSP,
-            contributions = PluginContributions(
-                languageServers = listOf(
-                    LspServerConfig(
-                        id = "pylsp",
-                        name = "Python Language Server",
-                        languages = listOf("python"),
-                        fileExtensions = listOf("py"),
-                        server = LspServerConnectionConfig(
-                            type = serverType,
-                            command = "pylsp",
-                        ),
-                    )
-                ),
-                toolchains = toolchains,
+    ): PluginManifest = PluginManifest(
+        id = "test.plugin.lsp",
+        name = "Validate LSP Plugin",
+        version = "1.0.0",
+        type = PluginTypes.LSP,
+        contributions = PluginContributions(
+            languageServers = listOf(
+                LspServerConfig(
+                    id = "pylsp",
+                    name = "Python Language Server",
+                    languages = listOf("python"),
+                    fileExtensions = listOf("py"),
+                    server = LspServerConnectionConfig(
+                        type = serverType,
+                        command = "pylsp",
+                    ),
+                )
             ),
-        )
-    }
+            toolchains = toolchains,
+        ),
+    )
 
     private fun runValidationFailure(manifest: PluginManifest, pluginDir: File): Throwable {
         val thrown = runCatching {

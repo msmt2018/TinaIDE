@@ -15,6 +15,7 @@
 | `activationEvents` | 否 | 实验 | 保留字段，当前事件总线仍以运行时订阅为主。 |
 | `contributions.commands` / `menus` | 否 | 稳定 | 已用于命令与菜单贡献。 |
 | `requires` | 否 | 稳定 | 依赖声明提示字段；宿主解析并展示/诊断提示，但不检测真实安装状态，也不自动安装依赖。 |
+| `configuration` | 否 | 稳定 | 插件配置 schema；宿主在插件详情页自动生成设置 UI，并提供 `tina.config.*` 读写。 |
 
 ## `tina` 全局对象
 
@@ -28,6 +29,7 @@
 - `tina.diagnostics.*`
 - `tina.workspace.*`
 - `tina.commands.*`
+- `tina.config.*`
 - `tina.fs.*`
 - `tina.clipboard.*`
 - `tina.network.*`
@@ -167,6 +169,25 @@
 - `fileName`
 - `isDirectory`
 - `isDirty`
+
+### `tina.config.*`
+
+`config` 是 apiVersion 1 的正式插件配置 API。它只读写当前插件在 manifest `configuration.properties`
+中声明过的 key，不需要 `storage.local` 权限，也不会访问其他插件配置。
+
+| API | 权限 | 稳定性 | 返回 |
+| --- | --- | --- | --- |
+| `get(key)` | 无 | 稳定 | 返回已保存值；没有保存值时返回 manifest `default`；未知 key 返回 `nil, error`。 |
+| `get(key, fallback)` | 无 | 稳定 | 在没有保存值且没有 manifest `default` 时返回类型匹配的 fallback。 |
+| `set(key, value)` | 无 | 稳定 | 成功返回 `true`；未知 key、类型不匹配或枚举值非法时返回 `false, error`。 |
+| `reset(key)` | 无 | 稳定 | 删除已保存值并回退到 manifest `default`；未知 key 返回 `false, error`。 |
+
+当前 schema 约束：
+
+- `type` 仅支持 `boolean`、`string`、`number`。
+- `enum` 仅支持 `string` 配置项。
+- 配置 key 必须匹配 `^[A-Za-z0-9][A-Za-z0-9._-]*$`。
+- 插件卸载时宿主会清理该插件 ID 下的配置。
 
 ### `tina.fs.*`
 
