@@ -98,9 +98,12 @@ class MainActivityHostCommandExecutor(
 ) : HostCommandExecutor {
 
     override fun execute(commandId: String, invocation: HostCommandInvocation): Boolean {
+        val normalizedCommandId = normalizeHostCommandId(commandId)
+        if (normalizedCommandId.isBlank()) return false
+
         val file = invocation.file
 
-        return when (commandId) {
+        return when (normalizedCommandId) {
             // ==================== 文件操作 ====================
             HostCommands.FILE_NEW -> {
                 val targetDir = resolveTargetDirectoryForNew(file)
@@ -316,7 +319,7 @@ class MainActivityHostCommandExecutor(
                 true
             }
 
-            else -> PluginCommandRegistry.dispatch(commandId, invocation)
+            else -> PluginCommandRegistry.dispatch(normalizedCommandId, invocation)
         }
     }
 
@@ -420,4 +423,8 @@ class MainActivityHostCommandExecutor(
         val launcher = activity as? com.wuxianggujun.tinaide.ui.MainActivityExternalFileLauncher ?: return
         launcher.shareFileOrDirectory(file)
     }
+}
+
+internal fun normalizeHostCommandId(commandId: String): String {
+    return commandId.trim()
 }

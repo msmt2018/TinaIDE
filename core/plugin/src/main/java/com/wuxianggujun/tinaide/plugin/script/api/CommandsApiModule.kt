@@ -21,7 +21,7 @@ class CommandsApiModule(
 
         lua.push { L: Lua ->
             withPermission(currentRuntime, L, namespace, "register", PluginPermission.COMMAND_EXECUTE) {
-                val commandId = L.getStringArg(1)
+                val commandId = normalizeCommandId(L.getStringArg(1))
                 val callbackName = L.getStringArg(2)
                 if (commandId == null || callbackName == null) {
                     return@withPermission L.pushSuccess(false, "Command ID and callback name are required")
@@ -48,7 +48,7 @@ class CommandsApiModule(
 
         lua.push { L: Lua ->
             withPermission(currentRuntime, L, namespace, "unregister", PluginPermission.COMMAND_EXECUTE) {
-                val commandId = L.getStringArg(1)
+                val commandId = normalizeCommandId(L.getStringArg(1))
                 if (commandId == null) {
                     return@withPermission L.pushSuccess(false, "Command ID is required")
                 }
@@ -60,7 +60,7 @@ class CommandsApiModule(
 
         lua.push { L: Lua ->
             withPermission(currentRuntime, L, namespace, "execute", PluginPermission.COMMAND_EXECUTE) {
-                val commandId = L.getStringArg(1)
+                val commandId = normalizeCommandId(L.getStringArg(1))
                 if (commandId == null) {
                     return@withPermission L.pushSuccess(false, "Command ID is required")
                 }
@@ -108,6 +108,10 @@ class CommandsApiModule(
             PluginCommandRegistry.unregisterAll(currentRuntime.pluginId)
         }
         runtime = null
+    }
+
+    internal fun normalizeCommandId(commandId: String?): String? {
+        return commandId?.trim()?.takeIf { it.isNotBlank() }
     }
 
     internal fun resolveInvocationFile(path: String): File? {

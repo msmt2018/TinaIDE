@@ -144,13 +144,13 @@ object HostCommands {
     /**
      * 检查命令是否在白名单中
      */
-    fun isSupported(commandId: String): Boolean = titleResById.containsKey(commandId)
+    fun isSupported(commandId: String): Boolean = titleResById.containsKey(commandId.trim())
 
     /**
      * 获取命令的显示标题资源 ID
      */
     @StringRes
-    fun titleResOrNull(commandId: String): Int? = titleResById[commandId]
+    fun titleResOrNull(commandId: String): Int? = titleResById[commandId.trim()]
 
     /**
      * 获取所有支持的命令 ID 列表

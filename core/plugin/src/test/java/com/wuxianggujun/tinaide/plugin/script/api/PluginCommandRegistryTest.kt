@@ -109,6 +109,15 @@ class PluginCommandRegistryTest {
     }
 
     @Test
+    fun `commands module should normalize command ids`() {
+        val module = CommandsApiModule()
+
+        assertThat(module.normalizeCommandId(" plugin.sayHello ")).isEqualTo("plugin.sayHello")
+        assertThat(module.normalizeCommandId(" ")).isNull()
+        assertThat(module.normalizeCommandId(null)).isNull()
+    }
+
+    @Test
     fun `commands module should reject invocation target in sibling directory with shared prefix`() {
         val projectRoot = Files.createTempDirectory("tina-command-root").toFile()
         val siblingRoot = File(projectRoot.parentFile, "${projectRoot.name}-escape")
