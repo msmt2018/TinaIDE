@@ -7,6 +7,8 @@ import com.itsaky.androidide.treesitter.TSQuery
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -19,7 +21,10 @@ class TreeSitterHighlighter private constructor(
     private val captureTypeByIndex: Array<HighlightType>
 ) : SyntaxHighlighter {
     private val lifecycleLock = ReentrantReadWriteLock()
-    private var disposed = false
+    private val disposed = AtomicBoolean(false)
+    private val closeExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "TreeSitterHighlighterDispose").apply { isDaemon = true }
+    }
     private val state = IncrementalTreeSitterHighlightState(
         parser = parser,
         query = query,
@@ -31,8 +36,9 @@ class TreeSitterHighlighter private constructor(
     )
 
     override fun highlight(text: String, visibleRange: IntRange): List<HighlightSpan> {
+        if (disposed.get() || text.isEmpty() || visibleRange.isEmpty()) return emptyList()
         return lifecycleLock.read {
-            if (disposed || text.isEmpty() || visibleRange.isEmpty() || !query.canAccess()) {
+            if (disposed.get() || !query.canAccess()) {
                 return@read emptyList()
             }
 
@@ -82,51 +88,71 @@ class TreeSitterHighlighter private constructor(
     }
 
     override fun openDocument(text: String) {
+        if (disposed.get()) return
         lifecycleLock.read {
-            if (disposed) return
+            if (disposed.get()) return
             state.openDocument(text)
         }
     }
 
     override fun openDocumentBlocking(text: String) {
+        if (disposed.get()) return
         lifecycleLock.read {
-            if (disposed) return
+            if (disposed.get()) return
             state.openDocumentBlocking(text)
         }
     }
 
     override fun applyTextChange(change: TextChange) {
+        if (disposed.get()) return
         lifecycleLock.read {
-            if (disposed) return
+            if (disposed.get()) return
             state.applyTextChange(change)
         }
     }
 
     override fun getLineSegments(line: Int): List<HighlightLineSegment> {
+        if (disposed.get()) return emptyList()
         return lifecycleLock.read {
-            if (disposed) return@read emptyList()
+            if (disposed.get()) return@read emptyList()
             state.getLineSegments(line)
         }
     }
 
     override fun setOnStateUpdated(callback: (() -> Unit)?) {
+        if (disposed.get()) return
         lifecycleLock.read {
-            if (disposed) return
+            if (disposed.get()) return
             state.setOnStateUpdated(callback)
         }
     }
 
     override fun setViewportHint(firstVisibleLine: Int) {
+        if (disposed.get()) return
         lifecycleLock.read {
-            if (disposed) return
+            if (disposed.get()) return
             state.setViewportHint(firstVisibleLine)
         }
     }
 
     override fun dispose() {
+        if (!disposed.compareAndSet(false, true)) return
+        runCatching {
+            closeExecutor.execute {
+                try {
+                    closeState()
+                } finally {
+                    closeExecutor.shutdown()
+                }
+            }
+        }.onFailure { error ->
+            Timber.tag("TreeSitter").d(error, "Queue highlighter dispose failed")
+            Thread(::closeState, "TreeSitterHighlighterDisposeFallback").apply { isDaemon = true }.start()
+        }
+    }
+
+    private fun closeState() {
         lifecycleLock.write {
-            if (disposed) return
-            disposed = true
             state.close()
         }
     }
