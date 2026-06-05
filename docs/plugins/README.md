@@ -656,6 +656,55 @@ my-plugin.tinaplug
 - `description`
 - `contributions.themes`：主题文件相对路径列表，例如 `["themes/dracula.json"]`
 
+## manifest 多语言（推荐）
+
+插件可以把用户可见文案放进 `locales/*.json`，宿主会按当前语言自动选择：
+
+```json
+{
+  "name": "Demo Plugin",
+  "description": "Demo description",
+  "locales": {
+    "default": "en",
+    "files": {
+      "en": "locales/en.json",
+      "zh-CN": "locales/zh-CN.json",
+      "zh": "locales/zh-CN.json"
+    }
+  }
+}
+```
+
+回退顺序为 `zh-CN -> zh -> default -> manifest 原字段`。locale 文件只覆盖展示字段，不覆盖 `id`、`version`、`type`、入口路径、权限等行为字段。
+
+示例 `locales/zh-CN.json`：
+
+```json
+{
+  "name": "演示插件",
+  "description": "演示描述",
+  "configuration": {
+    "title": "演示配置",
+    "properties": {
+      "feature.enabled": { "description": "启用功能" }
+    }
+  },
+  "contributions": {
+    "commands": {
+      "demo.run": { "title": "运行演示" }
+    },
+    "projectTemplates": {
+      "cpp": {
+        "name": "C++ 模板",
+        "description": "C++ 项目模板"
+      }
+    }
+  }
+}
+```
+
+当前支持覆盖：插件 `name` / `description`、`configuration.title`、`configuration.properties.*.description`、`projectTemplates`、`apkExports`、`commands`、`panels`、`languageServers` 和 `toolchains` 的显示文案。
+
 ## 依赖声明（建议字段，已支持提示）
 
 为支持“插件需要某些工具链组件/系统包”的场景，可以在 `manifest.json` 增加 `requires` 字段。

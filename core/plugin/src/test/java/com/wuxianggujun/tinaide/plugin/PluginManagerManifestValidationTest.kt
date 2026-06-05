@@ -180,16 +180,96 @@ class PluginManagerManifestValidationTest {
         )
     }
 
+    @Test
+    fun `validateManifest should accept valid locale files`() {
+        val pluginDir = createConfigPluginDir("validate_locale_valid")
+        writeLocale(pluginDir, "zh-CN.json", """{"name":"中文插件"}""")
+        val manifest = createConfigManifest(
+            locales = PluginLocales(
+                default = "en",
+                files = mapOf(
+                    "zh-CN" to "locales/zh-CN.json",
+                    "zh" to "locales/zh-CN.json",
+                )
+            )
+        )
+
+        PluginManifestValidator.validate(
+            context = context,
+            manifest = manifest,
+            pluginDir = pluginDir,
+        )
+    }
+
+    @Test
+    fun `validateManifest should reject missing locale file`() {
+        val pluginDir = createConfigPluginDir("validate_locale_missing")
+        val manifest = createConfigManifest(
+            locales = PluginLocales(
+                files = mapOf("zh-CN" to "locales/zh-CN.json")
+            )
+        )
+
+        val error = runValidationFailure(manifest, pluginDir)
+
+        assertThat(error.message).contains("zh-CN.json")
+    }
+
+    @Test
+    fun `validateManifest should reject locale path outside locales directory`() {
+        val pluginDir = createConfigPluginDir("validate_locale_unsafe")
+        writeLocale(pluginDir, "zh-CN.json", """{"name":"中文插件"}""")
+        val manifest = createConfigManifest(
+            locales = PluginLocales(
+                files = mapOf("zh-CN" to "../zh-CN.json")
+            )
+        )
+
+        val error = runValidationFailure(manifest, pluginDir)
+
+        assertThat(error.message).contains("../zh-CN.json")
+    }
+
+    @Test
+    fun `validateManifest should reject invalid locale json`() {
+        val pluginDir = createConfigPluginDir("validate_locale_invalid_json")
+        writeLocale(pluginDir, "zh-CN.json", """{"name":""")
+        val manifest = createConfigManifest(
+            locales = PluginLocales(
+                files = mapOf("zh-CN" to "locales/zh-CN.json")
+            )
+        )
+
+        val error = runValidationFailure(manifest, pluginDir)
+
+        assertThat(error.message).contains("zh-CN.json")
+    }
+
     private fun createScriptPluginDir(name: String): File = File(context.cacheDir, name).apply {
         deleteRecursively()
         mkdirs()
         File(this, "main.lua").writeText("print('hello')")
     }
 
+    private fun createConfigPluginDir(name: String): File = File(context.cacheDir, name).apply {
+        deleteRecursively()
+        mkdirs()
+    }
+
     private fun createLspPluginDir(name: String): File = File(context.cacheDir, name).apply {
         deleteRecursively()
         mkdirs()
     }
+
+    private fun createConfigManifest(
+        locales: PluginLocales? = null,
+    ): PluginManifest = PluginManifest(
+        id = "test.plugin.config",
+        name = "Validate Config Plugin",
+        version = "1.0.0",
+        type = "config",
+        locales = locales,
+    )
 
     private fun createLspManifest(
         toolchains: List<LspToolchainConfig>,
@@ -227,5 +307,14 @@ class PluginManagerManifestValidationTest {
 
         assertThat(thrown).isNotNull()
         return thrown!!
+    }
+
+    private fun writeLocale(
+        pluginDir: File,
+        fileName: String,
+        content: String,
+    ) {
+        val localesDir = File(pluginDir, "locales").apply { mkdirs() }
+        File(localesDir, fileName).writeText(content, Charsets.UTF_8)
     }
 }

@@ -16,6 +16,52 @@
 | `contributions.commands` / `menus` | 否 | 稳定 | 已用于命令与菜单贡献。 |
 | `requires` | 否 | 稳定 | 依赖声明提示字段；宿主解析并展示/诊断提示，但不检测真实安装状态，也不自动安装依赖。 |
 | `configuration` | 否 | 稳定 | 插件配置 schema；宿主在插件详情页自动生成设置 UI，并提供 `tina.config.*` 读写。 |
+| `locales` | 否 | 稳定 | 插件用户可见元数据的多语言覆盖文件；宿主按当前 Locale 自动选择。 |
+
+## Manifest 多语言
+
+插件可在 `manifest.json` 中声明 `locales`，把展示名称、描述、配置标题、配置项说明和贡献项展示文案放入独立 JSON 文件。宿主按 `语言-地区 -> 语言 -> default -> manifest 原字段` 回退。
+
+```json
+{
+  "name": "Demo Plugin",
+  "description": "Demo description",
+  "locales": {
+    "default": "en",
+    "files": {
+      "en": "locales/en.json",
+      "zh-CN": "locales/zh-CN.json",
+      "zh": "locales/zh-CN.json"
+    }
+  }
+}
+```
+
+locale 文件只覆盖用户可见字段，不覆盖 `id`、`version`、`type`、入口路径、权限等行为字段。文件路径必须是安全相对路径，并且位于插件根目录的 `locales/` 下。
+
+```json
+{
+  "name": "演示插件",
+  "description": "演示描述",
+  "configuration": {
+    "title": "演示配置",
+    "properties": {
+      "feature.enabled": { "description": "启用功能" }
+    }
+  },
+  "contributions": {
+    "commands": {
+      "demo.run": { "title": "运行演示" }
+    },
+    "projectTemplates": {
+      "cpp": {
+        "name": "C++ 模板",
+        "description": "C++ 项目模板"
+      }
+    }
+  }
+}
+```
 
 ## `tina` 全局对象
 

@@ -3,6 +3,8 @@ package com.wuxianggujun.tinaide.ui.compose.screens.packages
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadata
 import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadataReader
 import com.wuxianggujun.tinaide.core.packages.PackageManager
@@ -41,37 +43,20 @@ class PackageManagerViewModel(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
+                val availablePackages = packageManager.getAvailablePackages()
+                    .getOrElse { throwable ->
+                        Timber.tag(TAG).w(throwable, "Failed to load available packages; falling back to installed packages")
+                        emptyList()
+                    }
                 val installedPackages = packageManager.getInstalledPackages()
                 val installedMetadata = buildInstalledMetadataMap(installedPackages)
 
                 // 将 InstalledPackageInfo 转换为 GUIPackage
-                val packages = installedPackages.map { installed ->
-                    val metadata = installedMetadata[installed.packageId]
-                    GUIPackage(
-                        id = installed.packageId,
-                        name = metadata?.name ?: installed.packageName,
-                        description = metadata?.description,
-                        category = metadata?.category,
-                        homepage = metadata?.homepage,
-                        linux = if (installed.platform == Platform.LINUX) {
-                            PlatformPackage(
-                                version = installed.version,
-                                installType = installed.installType,
-                                size = installed.size,
-                                dependencies = emptyList()
-                            )
-                        } else null,
-                        android = if (installed.platform == Platform.ANDROID) {
-                            PlatformPackage(
-                                version = installed.version,
-                                installType = installed.installType,
-                                size = installed.size,
-                                abi = metadata?.abis,
-                                dependencies = emptyList()
-                            )
-                        } else null
-                    )
-                }
+                val packages = mergeAvailableAndInstalledPackages(
+                    availablePackages = availablePackages,
+                    installedPackages = installedPackages,
+                    installedMetadata = installedMetadata
+                )
 
                 val installStates = packages.associate { pkg ->
                     pkg.id to packageManager.getInstallState(pkg.id)
@@ -88,9 +73,12 @@ class PackageManagerViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to load installed packages")
+                Timber.tag(TAG).e(e, "Failed to load packages")
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Failed to load installed packages")
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: Strings.pkg_manager_load_failed.strOr(appContext)
+                    )
                 }
             }
         }
@@ -129,22 +117,56 @@ class PackageManagerViewModel(
     }
 
     fun installPackage(packageId: String, platform: Platform) {
-        val pkg = _uiState.value.packages.find { it.id == packageId } ?: return
+        val pkg = _uiState.value.packages.find { it.id == packageId } ?: run {
+            _dialogState.value = PackageDialogState.InstallComplete(
+                packageId = packageId,
+                result = InstallResult.Failure(
+                    packageId = packageId,
+                    error = InstallError.UnknownError(
+                        Strings.pkg_manager_package_not_found.strOr(appContext, packageId)
+                    )
+                )
+            )
+            return
+        }
+        val installPlatform = PackageInstallUiStateSupport.resolveAvailableInstallPlatform(pkg, platform) ?: run {
+            _dialogState.value = PackageDialogState.InstallComplete(
+                packageId = packageId,
+                result = InstallResult.Failure(
+                    packageId = packageId,
+                    error = InstallError.UnknownError(
+                        Strings.pkg_manager_package_not_installable.strOr(appContext, packageId)
+                    )
+                )
+            )
+            return
+        }
 
         viewModelScope.launch {
             _dialogState.value = PackageDialogState.Installing(
                 packageId = packageId,
                 packageName = pkg.name,
-                platform = platform,
-                event = InstallProgressEvent.Preparing("Starting installation...")
+                platform = installPlatform,
+                event = InstallProgressEvent.Preparing(
+                    Strings.pkg_manager_progress_starting.strOr(appContext)
+                )
             )
 
-            val result = packageManager.install(packageId, platform) { event ->
-                _dialogState.update { current ->
-                    if (current is PackageDialogState.Installing && current.packageId == packageId) {
-                        current.copy(event = event)
-                    } else current
+            val result = runCatching {
+                packageManager.install(packageId, installPlatform) { event ->
+                    _dialogState.update { current ->
+                        if (current is PackageDialogState.Installing && current.packageId == packageId) {
+                            current.copy(event = event)
+                        } else current
+                    }
                 }
+            }.getOrElse { throwable ->
+                InstallResult.Failure(
+                    packageId = packageId,
+                    error = InstallError.UnknownError(
+                        throwable.message ?: Strings.pkg_manager_error_unknown.strOr(appContext)
+                    )
+                )
             }
 
             when (result) {
@@ -274,7 +296,9 @@ class PackageManagerViewModel(
             currentIndex = 0,
             totalCount = updateList.size,
             currentPackageName = updateList.first().packageName,
-            event = InstallProgressEvent.Preparing("Starting update...")
+            event = InstallProgressEvent.Preparing(
+                Strings.pkg_manager_progress_update_starting.strOr(appContext)
+            )
         )
 
         viewModelScope.launch {
@@ -284,7 +308,12 @@ class PackageManagerViewModel(
                         current.copy(
                             currentIndex = index,
                             currentPackageName = update.packageName,
-                            event = InstallProgressEvent.Preparing("Updating ${update.packageName}...")
+                            event = InstallProgressEvent.Preparing(
+                                Strings.pkg_manager_progress_updating_package.strOr(
+                                    appContext,
+                                    update.packageName
+                                )
+                            )
                         )
                     } else current
                 }
@@ -322,6 +351,47 @@ class PackageManagerViewModel(
                 InstalledPackageMetadataReader.read(appContext, installed.packageId)
             }
             .associateBy { it.id }
+    }
+
+    private fun mergeAvailableAndInstalledPackages(
+        availablePackages: List<GUIPackage>,
+        installedPackages: List<com.wuxianggujun.tinaide.core.packages.InstalledPackageInfo>,
+        installedMetadata: Map<String, InstalledPackageMetadata>
+    ): List<GUIPackage> {
+        val packagesById = availablePackages.associateByTo(linkedMapOf()) { it.id }
+        installedPackages.forEach { installed ->
+            if (packagesById.containsKey(installed.packageId)) return@forEach
+            val metadata = installedMetadata[installed.packageId]
+            packagesById[installed.packageId] = GUIPackage(
+                id = installed.packageId,
+                name = metadata?.name ?: installed.packageName,
+                description = metadata?.description,
+                category = metadata?.category,
+                homepage = metadata?.homepage,
+                linux = if (installed.platform == Platform.LINUX) {
+                    PlatformPackage(
+                        version = installed.version,
+                        installType = installed.installType,
+                        size = installed.size,
+                        dependencies = emptyList()
+                    )
+                } else {
+                    null
+                },
+                android = if (installed.platform == Platform.ANDROID) {
+                    PlatformPackage(
+                        version = installed.version,
+                        installType = installed.installType,
+                        size = installed.size,
+                        abi = metadata?.abis,
+                        dependencies = emptyList()
+                    )
+                } else {
+                    null
+                }
+            )
+        }
+        return packagesById.values.sortedBy { it.name.lowercase() }
     }
 
     private suspend fun refreshInstallState(packageId: String) {

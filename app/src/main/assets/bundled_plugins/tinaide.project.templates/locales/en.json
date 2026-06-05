@@ -1,0 +1,28 @@
+{
+  "name": "TinaIDE C/C++ Project Templates",
+  "description": "Built-in offline C/C++ project templates for TinaIDE.",
+  "contributions": {
+    "projectTemplates": {
+      "cpp-single-file": {
+        "name": "C++ Single File",
+        "description": "Suitable for simple programs, examples, and learning."
+      },
+      "cmake-executable": {
+        "name": "CMake Executable",
+        "description": "A standard CMake C++ executable project."
+      },
+      "cmake-library": {
+        "name": "CMake Library",
+        "description": "A CMake C++ library project with sample sources."
+      },
+      "make-executable": {
+        "name": "Make Executable",
+        "description": "A Make-based C++ executable project."
+      },
+      "ndk-shared-library": {
+        "name": "NDK Shared Library",
+        "description": "An Android NDK shared library project."
+      }
+    }
+  }
+}

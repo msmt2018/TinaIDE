@@ -9,7 +9,7 @@ $root = (Resolve-Path $PluginRoot).Path
 $rulesPath = Join-Path $scriptDir "validation-rules.json"
 $manifestPath = Join-Path $root "manifest.json"
 
-$rules = Get-Content $rulesPath -Raw | ConvertFrom-Json
+$rules = Get-Content $rulesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $supportedApiVersion = [int]$rules.supportedApiVersion
 
 $knownHostCommands = @{}
@@ -233,7 +233,7 @@ if (-not (Test-Path $manifestPath)) {
 }
 
 try {
-    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $manifest = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 } catch {
     Add-ValidationError "manifest.json is not valid JSON: $($_.Exception.Message)"
     foreach ($message in $errors) {
@@ -390,6 +390,47 @@ if ($duplicateHosts.Count -gt 0) {
 
 if ($networkHosts.Count -gt 0 -and -not $hasNetworkPermission) {
     Add-ValidationWarning "networkHosts is declared without network.fetch or network.unrestricted."
+}
+
+$locales = Get-PropValue $manifest "locales"
+if ($null -ne $locales) {
+    if ($locales -isnot [pscustomobject]) {
+        Add-ValidationError "manifest.locales must be an object."
+    } else {
+        $localeFiles = Get-PropValue $locales "files"
+        if ($localeFiles -isnot [pscustomobject]) {
+            Add-ValidationError "manifest.locales.files must be a non-empty object."
+        } else {
+            foreach ($property in $localeFiles.PSObject.Properties) {
+                $localeKey = Get-Text $property.Name
+                $localePath = Get-Text $property.Value
+                $normalizedLocalePath = $localePath.Replace("\", "/")
+                if ([string]::IsNullOrWhiteSpace($localeKey)) {
+                    Add-ValidationError "manifest.locales.files contains an empty locale key."
+                }
+                if (-not (Test-SafeRelativePath $localePath) -or -not $normalizedLocalePath.StartsWith("locales/")) {
+                    $displayPath = if ([string]::IsNullOrWhiteSpace($localePath)) { "<empty>" } else { $localePath }
+                    Add-ValidationError "manifest.locales.files['$localeKey'] must point to locales/*.json: $displayPath"
+                    continue
+                }
+
+                $localeFile = Join-Path $root $localePath
+                if (-not (Test-Path $localeFile)) {
+                    Add-ValidationError "Locale file does not exist: $localePath"
+                    continue
+                }
+
+                try {
+                    $localeData = Get-Content $localeFile -Raw -Encoding UTF8 | ConvertFrom-Json
+                    if ($null -eq $localeData -or $localeData -isnot [pscustomobject]) {
+                        Add-ValidationError "Locale file must contain a JSON object: $localePath"
+                    }
+                } catch {
+                    Add-ValidationError "Locale file is not valid JSON: $localePath ($($_.Exception.Message))"
+                }
+            }
+        }
+    }
 }
 
 if ($pluginType -in @("script", "hybrid")) {

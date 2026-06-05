@@ -134,8 +134,9 @@ class PluginManager(
                     val manifest = JsonSerializer.decodeFromFile<PluginManifest>(manifestFile)
                     manifestForIssue = manifest
                     validateManifest(manifest, dir)
+                    val localizedManifest = PluginLocalizationResolver.localize(manifest, dir, context)
                     InstalledPlugin(
-                        manifest = manifest,
+                        manifest = localizedManifest,
                         directory = dir,
                         enabled = resolvePluginEnabled(manifest)
                     )

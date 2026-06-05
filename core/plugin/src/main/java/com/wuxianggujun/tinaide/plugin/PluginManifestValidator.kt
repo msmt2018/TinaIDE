@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.plugin
 import android.content.Context
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import com.wuxianggujun.tinaide.plugin.script.PluginPermission
 import com.wuxianggujun.tinaide.project.ProjectBuildSystem
 import java.io.File
@@ -31,6 +32,7 @@ internal object PluginManifestValidator {
         validatePermissionIds(context, manifest.permissions)
         validatePermissionIds(context, manifest.optionalPermissions)
         validateConfiguration(context, manifest.configuration)
+        validateLocales(context, manifest.locales, pluginDir)
         validateLspContributions(context, manifest)
 
         if (manifest.type.equals(PluginTypes.SCRIPT, ignoreCase = true) ||
@@ -165,6 +167,41 @@ internal object PluginManifestValidator {
         val unknownIds = PluginPermission.findUnknownIds(permissions)
         require(unknownIds.isEmpty()) {
             Strings.plugin_error_permission_unknown.strOr(context, unknownIds.joinToString(", "))
+        }
+    }
+
+    private fun validateLocales(
+        context: Context,
+        locales: PluginLocales?,
+        pluginDir: File,
+    ) {
+        if (locales == null) return
+        locales.files.forEach { (localeKey, path) ->
+            require(localeKey.isNotBlank()) {
+                Strings.plugin_error_locale_key_invalid.strOr(context, localeKey)
+            }
+            require(isSafePluginRelativePath(path)) {
+                Strings.plugin_error_locale_path_invalid.strOr(context, path)
+            }
+            require(path.replace('\\', '/').startsWith("locales/")) {
+                Strings.plugin_error_locale_path_invalid.strOr(context, path)
+            }
+            val localeFile = File(pluginDir, path)
+            require(localeFile.isFile) {
+                Strings.plugin_error_locale_file_not_exist.strOr(context, path)
+            }
+            runCatching {
+                JsonSerializer.decodeFromFile<PluginLocalization>(localeFile)
+            }.getOrElse { throwable ->
+                throw IllegalArgumentException(
+                    Strings.plugin_error_locale_file_invalid.strOr(
+                        context,
+                        path,
+                        throwable.message.orEmpty()
+                    ),
+                    throwable
+                )
+            }
         }
     }
 

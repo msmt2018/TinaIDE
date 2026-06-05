@@ -99,19 +99,18 @@ fun MarketScreen(
         plugins = pluginState.plugins,
     )
 
-    // 显示错误提示
-    LaunchedEffect(pluginState.error) {
-        pluginState.error?.let { error ->
-            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-            viewModel.clearError()
-        }
-    }
-
     // 显示安装结果提示
     LaunchedEffect(pluginState.message) {
         pluginState.message?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            viewModel.clearMessage()
+            viewModel.clearPluginMessage()
+        }
+    }
+
+    LaunchedEffect(packageState.message) {
+        packageState.message?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearPackageMessage()
         }
     }
 
@@ -198,6 +197,7 @@ fun MarketScreen(
                     1 -> PackagesMarketContent(
                         packages = packageState.filteredPackages,
                         installStates = packageState.installStates,
+                        installingPackages = packageState.installingPackages,
                         isLoading = packageState.isLoading,
                         error = packageState.error,
                         onInstall = viewModel::installPackage,
@@ -232,6 +232,16 @@ private fun PluginsMarketContent(
         stringResource(Strings.market_category_tool),
         stringResource(Strings.market_category_language),
     )
+    val categoryKeys = listOf(null, "theme", "tool", "language")
+    val visiblePlugins = remember(plugins, searchQuery, selectedCategory, categories) {
+        filterPlugins(
+            plugins = plugins,
+            query = searchQuery,
+            selectedCategory = selectedCategory,
+            categories = categories,
+            categoryKeys = categoryKeys,
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         SearchTextField(
@@ -277,6 +287,13 @@ private fun PluginsMarketContent(
                     description = stringResource(Strings.market_empty_plugins_desc)
                 )
             }
+            visiblePlugins.isEmpty() -> {
+                MarketEmptyState(
+                    icon = Icons.Default.Search,
+                    title = stringResource(Strings.market_empty_search_title),
+                    description = stringResource(Strings.market_empty_search_desc)
+                )
+            }
             else -> {
                 TinaPullToRefreshBox(
                     isRefreshing = isLoading,
@@ -288,7 +305,7 @@ private fun PluginsMarketContent(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(plugins) { plugin ->
+                        items(visiblePlugins) { plugin ->
                             PluginCard(
                                 plugin = plugin,
                                 isInstalled = plugin.pluginId in installedPlugins,
@@ -374,12 +391,16 @@ private fun PluginCard(
 private fun PackagesMarketContent(
     packages: List<GUIPackage>,
     installStates: Map<String, com.wuxianggujun.tinaide.core.packages.model.PackageInstallState>,
+    installingPackages: Map<String, Float>,
     isLoading: Boolean,
     error: String?,
     onInstall: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    val visiblePackages = remember(packages, searchQuery) {
+        filterPackages(packages = packages, query = searchQuery)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         SearchTextField(query = searchQuery, onQueryChange = { searchQuery = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
@@ -390,13 +411,19 @@ private fun PackagesMarketContent(
             }
             error != null && packages.isEmpty() -> MarketErrorState(icon = Icons.Default.Inventory, errorMessage = error, onRetry = onRefresh)
             packages.isEmpty() -> MarketEmptyState(icon = Icons.Default.Inventory, title = stringResource(Strings.market_empty_packages_title), description = stringResource(Strings.market_empty_packages_desc))
+            visiblePackages.isEmpty() -> MarketEmptyState(icon = Icons.Default.Search, title = stringResource(Strings.market_empty_search_title), description = stringResource(Strings.market_empty_search_desc))
             else -> {
                 TinaPullToRefreshBox(isRefreshing = isLoading, onRefresh = onRefresh, enableHapticFeedback = true, modifier = Modifier.fillMaxSize()) {
                     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(packages) { pkg ->
+                        items(visiblePackages) { pkg ->
                             val installState = installStates[pkg.id]
                             val isInstalled = installState?.linux?.isInstalled == true || installState?.android?.isInstalled == true
-                            PackageCard(packageItem = pkg, isInstalled = isInstalled, onInstall = { onInstall(pkg.id) })
+                            PackageCard(
+                                packageItem = pkg,
+                                isInstalled = isInstalled,
+                                installProgress = installingPackages[pkg.id],
+                                onInstall = { onInstall(pkg.id) }
+                            )
                         }
                     }
                 }
@@ -406,7 +433,12 @@ private fun PackagesMarketContent(
 }
 
 @Composable
-private fun PackageCard(packageItem: GUIPackage, isInstalled: Boolean, onInstall: () -> Unit) {
+private fun PackageCard(
+    packageItem: GUIPackage,
+    isInstalled: Boolean,
+    installProgress: Float?,
+    onInstall: () -> Unit
+) {
     TinaCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Inventory, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
@@ -428,10 +460,19 @@ private fun PackageCard(packageItem: GUIPackage, isInstalled: Boolean, onInstall
                 }
             }
             Spacer(Modifier.width(8.dp))
-            if (isInstalled) {
-                TinaOutlinedButton(text = stringResource(Strings.market_installed), onClick = onInstall)
-            } else {
-                TinaPrimaryButton(text = stringResource(Strings.market_install), onClick = onInstall)
+            when {
+                installProgress != null -> CircularProgressIndicator(
+                    progress = { installProgress },
+                    modifier = Modifier.size(40.dp)
+                )
+                isInstalled -> TinaOutlinedButton(
+                    text = stringResource(Strings.market_installed),
+                    onClick = {},
+                    enabled = false
+                )
+                else -> {
+                    TinaPrimaryButton(text = stringResource(Strings.market_install), onClick = onInstall)
+                }
             }
         }
     }
@@ -551,7 +592,7 @@ private fun PluginDetailScreen(
                                 plugin.category?.let { cat ->
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        stringResource(Strings.plugin_marketplace_category) + ": $cat",
+                                        stringResource(Strings.plugin_marketplace_category_value, cat),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -790,6 +831,46 @@ private fun PluginSummary.toPluginDetailFallback(): PluginDetail {
         createdAt = updatedAt,
         updatedAt = updatedAt
     )
+}
+
+private fun filterPlugins(
+    plugins: List<PluginSummary>,
+    query: String,
+    selectedCategory: Int,
+    categories: List<String>,
+    categoryKeys: List<String?>,
+): List<PluginSummary> {
+    val normalizedQuery = query.trim()
+    val selectedCategoryLabel = categories.getOrNull(selectedCategory)
+    val selectedCategoryKey = categoryKeys.getOrNull(selectedCategory)
+    val allCategoryLabel = categories.firstOrNull()
+    return plugins.filter { plugin ->
+        val matchesQuery = normalizedQuery.isBlank() ||
+            plugin.name.contains(normalizedQuery, ignoreCase = true) ||
+            plugin.description?.contains(normalizedQuery, ignoreCase = true) == true ||
+            plugin.tags.any { tag -> tag.contains(normalizedQuery, ignoreCase = true) }
+        val matchesCategory = selectedCategory == 0 ||
+            selectedCategoryKey.isNullOrBlank() ||
+            plugin.category?.equals(selectedCategoryKey, ignoreCase = true) == true ||
+            selectedCategoryLabel.isNullOrBlank() ||
+            selectedCategoryLabel == allCategoryLabel ||
+            plugin.category?.equals(selectedCategoryLabel, ignoreCase = true) == true
+        matchesQuery && matchesCategory
+    }
+}
+
+private fun filterPackages(
+    packages: List<GUIPackage>,
+    query: String,
+): List<GUIPackage> {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isBlank()) return packages
+    return packages.filter { pkg ->
+        pkg.name.contains(normalizedQuery, ignoreCase = true) ||
+            pkg.description?.contains(normalizedQuery, ignoreCase = true) == true ||
+            pkg.category?.contains(normalizedQuery, ignoreCase = true) == true ||
+            pkg.id.contains(normalizedQuery, ignoreCase = true)
+    }
 }
 
 @Composable

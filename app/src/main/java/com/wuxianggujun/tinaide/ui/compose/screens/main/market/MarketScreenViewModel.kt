@@ -5,13 +5,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
+import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.network.ApiResult
 import com.wuxianggujun.tinaide.core.packages.PackageManager
 import com.wuxianggujun.tinaide.core.packages.PackageManagerImpl
 import com.wuxianggujun.tinaide.core.packages.api.PackageApiClient
 import com.wuxianggujun.tinaide.core.packages.model.GUIPackage
+import com.wuxianggujun.tinaide.core.packages.model.InstallProgressEvent
+import com.wuxianggujun.tinaide.core.packages.model.InstallResult
 import com.wuxianggujun.tinaide.core.packages.model.PackageInstallState
-import com.wuxianggujun.tinaide.core.packages.model.Platform
 import com.wuxianggujun.tinaide.core.packages.store.LocalInstallStateStore
 import com.wuxianggujun.tinaide.core.proot.PRootEnvironment
 import com.wuxianggujun.tinaide.core.user.DownloadHistoryItem
@@ -20,6 +22,7 @@ import com.wuxianggujun.tinaide.core.user.UserContentRepository
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginDetail
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginMarketplaceRepository
 import com.wuxianggujun.tinaide.plugin.marketplace.PluginSummary
+import com.wuxianggujun.tinaide.ui.compose.screens.packages.PackageInstallUiStateSupport
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +40,7 @@ class MarketScreenViewModel(
     private val userContentRepository: UserContentRepository
 ) : AndroidViewModel(application) {
 
+    private val appContext = application.applicationContext
     private val pluginRepository = PluginMarketplaceRepository(application.applicationContext)
     private val packageManager: PackageManager
 
@@ -127,7 +131,12 @@ class MarketScreenViewModel(
                     )
                 }
             }.onFailure { e ->
-                _packageState.update { it.copy(isLoading = false, error = e.message) }
+                _packageState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: Strings.pkg_manager_load_failed.strOr(appContext)
+                    )
+                }
             }
         }
     }
@@ -189,7 +198,7 @@ class MarketScreenViewModel(
                         downloadingPlugins = newDownloading,
                         installedPlugins = newInstalled,
                         updatablePlugins = newUpdatable,
-                        error = if (reason != null) {
+                        message = if (reason != null) {
                             Strings.toast_plugins_install_failed.str(reason)
                         } else {
                             Strings.plugin_marketplace_install_failed.str()
@@ -306,7 +315,7 @@ class MarketScreenViewModel(
             )
             userContentRepository.addFavorite(favorite).onFailure { error ->
                 _pluginState.update {
-                    it.copy(error = error.message ?: Strings.market_favorite_failed.str())
+                    it.copy(message = error.message ?: Strings.market_favorite_failed.str())
                 }
             }
         }
@@ -316,7 +325,7 @@ class MarketScreenViewModel(
         viewModelScope.launch {
             userContentRepository.removeFavorite(pluginId).onFailure { error ->
                 _pluginState.update {
-                    it.copy(error = error.message ?: Strings.market_unfavorite_failed.str())
+                    it.copy(message = error.message ?: Strings.market_unfavorite_failed.str())
                 }
             }
         }
@@ -324,22 +333,97 @@ class MarketScreenViewModel(
 
     fun installPackage(packageId: String) {
         viewModelScope.launch {
-            val pkg = _packageState.value.packages.find { p -> p.id == packageId } ?: return@launch
-
-            val result = packageManager.install(packageId, Platform.LINUX) { event -> }
-            when (result) {
-                is com.wuxianggujun.tinaide.core.packages.model.InstallResult.Success -> {
-                    refreshPackageState(packageId)
-                    recordPackageDownload(pkg)
+            val pkg = _packageState.value.packages.find { p -> p.id == packageId } ?: run {
+                _packageState.update {
+                    it.copy(
+                        message = Strings.market_package_install_failed.strOr(
+                            appContext,
+                            Strings.pkg_manager_package_not_found.strOr(appContext, packageId)
+                        )
+                    )
                 }
-                is com.wuxianggujun.tinaide.core.packages.model.InstallResult.Failure -> Unit
+                return@launch
+            }
+            if (packageId in _packageState.value.installingPackages) return@launch
+            val platform = PackageInstallUiStateSupport.resolvePreferredInstallPlatform(pkg) ?: run {
+                _packageState.update {
+                    it.copy(
+                        message = Strings.market_package_install_failed.strOr(
+                            appContext,
+                            Strings.pkg_manager_package_not_installable.strOr(appContext, pkg.name)
+                        )
+                    )
+                }
+                return@launch
+            }
+
+            _packageState.update {
+                it.copy(
+                    installingPackages = it.installingPackages + (packageId to 0f),
+                    message = null
+                )
+            }
+
+            val result = runCatching {
+                packageManager.install(packageId, platform) { event ->
+                    _packageState.update { state ->
+                        state.copy(
+                            installingPackages = updatePackageInstallProgress(
+                                current = state.installingPackages,
+                                packageId = packageId,
+                                event = event
+                            )
+                        )
+                    }
+                }
+            }.getOrElse { throwable ->
+                InstallResult.Failure(
+                    packageId = packageId,
+                    error = com.wuxianggujun.tinaide.core.packages.model.InstallError.UnknownError(
+                        throwable.message ?: Strings.pkg_manager_error_unknown.strOr(appContext)
+                    )
+                )
+            }
+            when (result) {
+                is InstallResult.Success -> {
+                    refreshPackageState(packageId)
+                    recordPackageDownload(pkg, result.version)
+                    _packageState.update {
+                        it.copy(
+                            installingPackages = it.installingPackages - packageId,
+                            message = Strings.market_package_install_success.strOr(appContext, pkg.name)
+                        )
+                    }
+                }
+                is InstallResult.Failure -> {
+                    _packageState.update {
+                        it.copy(
+                            installingPackages = it.installingPackages - packageId,
+                            message = Strings.market_package_install_failed.strOr(
+                                appContext,
+                                result.error.toDisplayMessage()
+                            )
+                        )
+                    }
+                }
             }
         }
     }
 
-    private fun recordPackageDownload(pkg: GUIPackage) {
+    private fun updatePackageInstallProgress(
+        current: Map<String, Float>,
+        packageId: String,
+        event: InstallProgressEvent
+    ): Map<String, Float> {
+        val progress = PackageInstallUiStateSupport.progressFromEvent(event) ?: current[packageId] ?: 0f
+        return current + (packageId to progress.coerceIn(0f, 1f))
+    }
+
+    private fun recordPackageDownload(
+        pkg: GUIPackage,
+        version: String,
+    ) {
         viewModelScope.launch {
-            val version = pkg.linux?.version ?: pkg.android?.version
             userContentRepository.addDownloadHistory(
                 DownloadHistoryItem(
                     id = java.util.UUID.randomUUID().toString(),
@@ -361,12 +445,12 @@ class MarketScreenViewModel(
         }
     }
 
-    fun clearError() {
-        _pluginState.update { it.copy(error = null) }
+    fun clearPluginMessage() {
+        _pluginState.update { it.copy(message = null) }
     }
 
-    fun clearMessage() {
-        _pluginState.update { it.copy(message = null) }
+    fun clearPackageMessage() {
+        _packageState.update { it.copy(message = null) }
     }
 
     fun selectPlugin(plugin: PluginSummary) {
@@ -421,5 +505,7 @@ data class PackageState(
     val packages: List<GUIPackage> = emptyList(),
     val filteredPackages: List<GUIPackage> = emptyList(),
     val installStates: Map<String, PackageInstallState> = emptyMap(),
-    val error: String? = null
+    val installingPackages: Map<String, Float> = emptyMap(),
+    val error: String? = null,
+    val message: String? = null
 )

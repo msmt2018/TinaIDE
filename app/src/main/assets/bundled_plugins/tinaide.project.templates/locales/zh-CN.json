@@ -1,0 +1,28 @@
+{
+  "name": "TinaIDE C/C++ 项目模板",
+  "description": "TinaIDE 内置离线 C/C++ 项目模板。",
+  "contributions": {
+    "projectTemplates": {
+      "cpp-single-file": {
+        "name": "C++ 单文件",
+        "description": "适合简单程序、示例代码和入门练习。"
+      },
+      "cmake-executable": {
+        "name": "CMake 可执行程序",
+        "description": "标准 CMake C++ 可执行项目。"
+      },
+      "cmake-library": {
+        "name": "CMake 库项目",
+        "description": "带示例源码的 CMake C++ 库项目。"
+      },
+      "make-executable": {
+        "name": "Make 可执行程序",
+        "description": "基于 Make 的 C++ 可执行项目。"
+      },
+      "ndk-shared-library": {
+        "name": "NDK 共享库",
+        "description": "Android NDK 共享库项目。"
+      }
+    }
+  }
+}

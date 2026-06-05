@@ -189,7 +189,7 @@ fun PackageManagerScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = stringResource(Strings.pkg_manager_no_installed_packages),
+                        text = stringResource(Strings.pkg_manager_no_available_packages),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

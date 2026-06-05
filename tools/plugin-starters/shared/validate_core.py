@@ -199,6 +199,38 @@ def main() -> int:
             "networkHosts is declared without network.fetch or network.unrestricted."
         )
 
+    locales = manifest.get("locales")
+    if locales is not None:
+        if not isinstance(locales, dict):
+            add_error("manifest.locales must be an object.")
+        else:
+            locale_files = locales.get("files")
+            if not isinstance(locale_files, dict) or not locale_files:
+                add_error("manifest.locales.files must be a non-empty object.")
+            else:
+                for locale_key, locale_path in locale_files.items():
+                    locale_key_text = as_text(locale_key)
+                    locale_path_text = as_text(locale_path)
+                    if not locale_key_text:
+                        add_error("manifest.locales.files contains an empty locale key.")
+                    if not is_safe_relative_path(locale_path_text) or not locale_path_text.replace("\\", "/").startswith("locales/"):
+                        add_error(f"manifest.locales.files['{locale_key_text}'] must point to locales/*.json: {locale_path_text or '<empty>'}")
+                        continue
+                    locale_file = plugin_root / locale_path_text
+                    if not locale_file.is_file():
+                        add_error(f"Locale file does not exist: {locale_path_text}")
+                        continue
+                    try:
+                        locale_data = load_json(locale_file)
+                    except json.JSONDecodeError as exc:
+                        add_error(
+                            f"Locale file is not valid JSON: {locale_path_text} "
+                            f"({exc.msg}, line {exc.lineno}, column {exc.colno})."
+                        )
+                        continue
+                    if not isinstance(locale_data, dict):
+                        add_error(f"Locale file must contain a JSON object: {locale_path_text}")
+
     def require_safe_path(path_value: object, field_name: str, *, must_exist: bool) -> None:
         text = as_text(path_value)
         if not is_safe_relative_path(text):

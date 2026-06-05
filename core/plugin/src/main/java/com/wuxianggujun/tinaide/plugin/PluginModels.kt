@@ -33,7 +33,70 @@ data class PluginManifest(
     val permissions: List<String>? = null,
     val optionalPermissions: List<String>? = null,
     val networkHosts: List<String>? = null,
+    val locales: PluginLocales? = null,
     val isBundled: Boolean = false // 是否为内置插件（从 assets/bundled_plugins 或 assets/plugins 安装）
+)
+
+@Serializable
+data class PluginLocales(
+    val default: String = "en",
+    val files: Map<String, String> = emptyMap()
+)
+
+@Serializable
+data class PluginLocalization(
+    val name: String? = null,
+    val description: String? = null,
+    val configuration: PluginConfigurationLocalization? = null,
+    val contributions: PluginContributionsLocalization? = null
+)
+
+@Serializable
+data class PluginConfigurationLocalization(
+    val title: String? = null,
+    val properties: Map<String, PluginConfigurationPropertyLocalization> = emptyMap()
+)
+
+@Serializable
+data class PluginConfigurationPropertyLocalization(
+    val description: String? = null
+)
+
+@Serializable
+data class PluginContributionsLocalization(
+    val projectTemplates: Map<String, PluginProjectTemplateLocalization> = emptyMap(),
+    val apkExports: Map<String, PluginApkExportLocalization> = emptyMap(),
+    val commands: Map<String, PluginCommandLocalization> = emptyMap(),
+    val panels: Map<String, PluginPanelLocalization> = emptyMap(),
+    val languageServers: Map<String, PluginNamedLocalization> = emptyMap(),
+    val toolchains: Map<String, PluginNamedLocalization> = emptyMap()
+)
+
+@Serializable
+data class PluginProjectTemplateLocalization(
+    val name: String? = null,
+    val description: String? = null
+)
+
+@Serializable
+data class PluginApkExportLocalization(
+    val name: String? = null,
+    val description: String? = null
+)
+
+@Serializable
+data class PluginCommandLocalization(
+    val title: String? = null
+)
+
+@Serializable
+data class PluginPanelLocalization(
+    val title: String? = null
+)
+
+@Serializable
+data class PluginNamedLocalization(
+    val name: String? = null
 )
 
 @Serializable

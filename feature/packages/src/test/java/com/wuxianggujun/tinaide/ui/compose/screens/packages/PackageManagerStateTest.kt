@@ -2,8 +2,10 @@ package com.wuxianggujun.tinaide.ui.compose.screens.packages
 
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.packages.model.GUIPackage
+import com.wuxianggujun.tinaide.core.packages.model.InstallType
 import com.wuxianggujun.tinaide.core.packages.model.InstallProgressEvent
 import com.wuxianggujun.tinaide.core.packages.model.Platform
+import com.wuxianggujun.tinaide.core.packages.model.PlatformPackage
 import org.junit.Test
 
 class PackageManagerStateTest {
@@ -39,4 +41,77 @@ class PackageManagerStateTest {
         assertThat(installing.packageName).isEqualTo("SDL3")
         assertThat(confirm.dependentPackages).containsExactly("demo")
     }
+
+    @Test
+    fun resolvePreferredInstallPlatform_shouldPreferAndroidWhenBothPlatformsAvailable() {
+        val pkg = GUIPackage(
+            id = "sdl3",
+            name = "SDL3",
+            linux = platformPackage(),
+            android = platformPackage()
+        )
+
+        val platform = PackageInstallUiStateSupport.resolvePreferredInstallPlatform(pkg)
+
+        assertThat(platform).isEqualTo(Platform.ANDROID)
+    }
+
+    @Test
+    fun resolveAvailableInstallPlatform_shouldFallbackToAvailablePlatformWhenPreferredMissing() {
+        val androidOnly = GUIPackage(
+            id = "cmake",
+            name = "CMake",
+            android = platformPackage()
+        )
+        val linuxOnly = GUIPackage(
+            id = "ninja",
+            name = "Ninja",
+            linux = platformPackage()
+        )
+
+        assertThat(
+            PackageInstallUiStateSupport.resolveAvailableInstallPlatform(androidOnly, Platform.LINUX)
+        ).isEqualTo(Platform.ANDROID)
+        assertThat(
+            PackageInstallUiStateSupport.resolveAvailableInstallPlatform(linuxOnly, Platform.ANDROID)
+        ).isEqualTo(Platform.LINUX)
+        assertThat(
+            PackageInstallUiStateSupport.resolveAvailableInstallPlatform(
+                GUIPackage(id = "empty", name = "Empty"),
+                Platform.ANDROID
+            )
+        ).isNull()
+    }
+
+    @Test
+    fun progressFromEvent_shouldMapProgressEventsAndIgnoreNonProgressEvents() {
+        assertThat(
+            PackageInstallUiStateSupport.progressFromEvent(
+                InstallProgressEvent.Downloading(downloaded = 25L, total = 100L, speed = 10L)
+            )
+        ).isEqualTo(0.25f)
+        assertThat(
+            PackageInstallUiStateSupport.progressFromEvent(InstallProgressEvent.Extracting(0.7f))
+        ).isEqualTo(0.7f)
+        assertThat(
+            PackageInstallUiStateSupport.progressFromEvent(
+                InstallProgressEvent.Completed(
+                    com.wuxianggujun.tinaide.core.packages.model.InstallResult.Success(
+                        packageId = "sdl3",
+                        version = "1.0.0",
+                        platform = Platform.ANDROID
+                    )
+                )
+            )
+        ).isEqualTo(1f)
+        assertThat(
+            PackageInstallUiStateSupport.progressFromEvent(InstallProgressEvent.Preparing("start"))
+        ).isNull()
+    }
+
+    private fun platformPackage(): PlatformPackage = PlatformPackage(
+        version = "1.0.0",
+        installType = InstallType.DOWNLOAD,
+        dependencies = emptyList()
+    )
 }
