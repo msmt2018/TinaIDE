@@ -58,42 +58,9 @@ class PluginRegistryProtocolTest {
     }
 
     @Test
-    fun v1Entry_shouldConvertToCatalogEntryWithoutVersionPayload() {
-        val entry = PluginRegistryEntry(
-            id = "tinaide.plugin.example",
-            pluginId = "tinaide.plugin.example",
-            name = "Example",
-            publisher = PluginPublisher(id = "tinaide", displayName = "TinaIDE"),
-            versions = listOf(
-                PluginVersion(
-                    version = "1.0.0",
-                    versionCode = 1,
-                    fileSize = 128,
-                    createdAt = "2026-06-01T00:00:00Z",
-                ),
-                PluginVersion(
-                    version = "1.1.0",
-                    versionCode = 2,
-                    fileSize = 256,
-                    createdAt = "2026-06-06T00:00:00Z",
-                ),
-            ),
-            createdAt = "2026-06-01T00:00:00Z",
-            updatedAt = "2026-06-06T00:00:00Z",
-        )
-
-        val catalogEntry = entry.toCatalogEntry()
-
-        assertThat(catalogEntry.latestVersion).isEqualTo("1.1.0")
-        assertThat(catalogEntry.detailUrl).isNull()
-        assertThat(catalogEntry.toSummary().updatedAt).isEqualTo("2026-06-06T00:00:00Z")
-    }
-
-    @Test
     fun api_shouldLoadV2CatalogAndFetchDetailOnDemand(): Unit = runBlocking {
         val baseUrl = "https://registry.test"
         val v2IndexUrl = registryUrl(baseUrl, "plugins/index.v2.json")
-        val v1IndexUrl = registryUrl(baseUrl, "plugins/index.json")
         val detailUrl = "$baseUrl/plugins/tinaide.plugin.example/plugin.json"
         val interceptor = FakeRegistryInterceptor(
             mapOf(
@@ -145,7 +112,7 @@ class PluginRegistryProtocolTest {
                 ),
             )
         )
-        val api = pluginApi(v2IndexUrl, v1IndexUrl, interceptor.client())
+        val api = pluginApi(v2IndexUrl, interceptor.client())
 
         val result = api.getPluginDetail("tinaide.plugin.example")
 
@@ -158,13 +125,12 @@ class PluginRegistryProtocolTest {
     }
 
     @Test
-    fun api_shouldFallbackToV1IndexWhenV2CatalogUnavailable(): Unit = runBlocking {
+    fun api_shouldFailWithoutRequestingV1IndexWhenV2CatalogUnavailable(): Unit = runBlocking {
         val baseUrl = "https://registry.test"
         val v2IndexUrl = registryUrl(baseUrl, "plugins/index.v2.json")
         val v1IndexUrl = registryUrl(baseUrl, "plugins/index.json")
         val interceptor = FakeRegistryInterceptor(
             mapOf(
-                v2IndexUrl.url to RegistryResponse(code = 404),
                 v1IndexUrl.url to RegistryResponse(
                     body = """
                     {
@@ -192,17 +158,16 @@ class PluginRegistryProtocolTest {
                     }
                     """.trimIndent()
                 ),
+                v2IndexUrl.url to RegistryResponse(code = 404),
             )
         )
-        val api = pluginApi(v2IndexUrl, v1IndexUrl, interceptor.client())
+        val api = pluginApi(v2IndexUrl, interceptor.client())
 
         val result = api.getPluginDetail("tinaide.plugin.example")
 
-        assertThat(result).isInstanceOf(ApiResult.Success::class.java)
-        val detail = (result as ApiResult.Success).data
-        assertThat(detail.latestVersionEntry()?.version).isEqualTo("1.0.0")
+        assertThat(result).isInstanceOf(ApiResult.Error::class.java)
         assertThat(interceptor.requestedUrls)
-            .containsExactly(v2IndexUrl.url, v1IndexUrl.url)
+            .containsExactly(v2IndexUrl.url)
             .inOrder()
     }
 
@@ -213,11 +178,9 @@ class PluginRegistryProtocolTest {
 
     private fun pluginApi(
         v2IndexUrl: RegistryUrl,
-        v1IndexUrl: RegistryUrl,
         client: OkHttpClient,
     ): PluginMarketplaceApi {
         val constructor = PluginMarketplaceApi::class.java.getDeclaredConstructor(
-            List::class.java,
             List::class.java,
             OkHttpClient::class.java,
             OkHttpClient::class.java,
@@ -225,7 +188,6 @@ class PluginRegistryProtocolTest {
         constructor.isAccessible = true
         return constructor.newInstance(
             listOf(v2IndexUrl),
-            listOf(v1IndexUrl),
             client,
             client,
         ) as PluginMarketplaceApi

@@ -123,7 +123,6 @@ class PackageRegistryProtocolTest {
     fun api_shouldLoadV2CatalogAndFetchPackageDetailOnDemand(): Unit = runBlocking {
         val baseUrl = "https://registry.test"
         val v2IndexUrl = registryUrl(baseUrl, "packages/index.v2.json")
-        val v1IndexUrl = registryUrl(baseUrl, "packages/index.json")
         val detailUrl = "$baseUrl/packages/sdl3/package.json"
         val interceptor = FakeRegistryInterceptor(
             mapOf(
@@ -186,7 +185,7 @@ class PackageRegistryProtocolTest {
                 ),
             )
         )
-        val api = packageApi(v2IndexUrl, v1IndexUrl, interceptor.client())
+        val api = packageApi(v2IndexUrl, interceptor.client())
 
         val versionsResult = api.getPackageVersions("sdl3")
         val downloadResult = api.getDownloadInfo("sdl3", 2)
@@ -202,13 +201,12 @@ class PackageRegistryProtocolTest {
     }
 
     @Test
-    fun api_shouldFallbackToV1IndexWhenV2CatalogUnavailable(): Unit = runBlocking {
+    fun api_shouldFailWithoutRequestingV1IndexWhenV2CatalogUnavailable(): Unit = runBlocking {
         val baseUrl = "https://registry.test"
         val v2IndexUrl = registryUrl(baseUrl, "packages/index.v2.json")
         val v1IndexUrl = registryUrl(baseUrl, "packages/index.json")
         val interceptor = FakeRegistryInterceptor(
             mapOf(
-                v2IndexUrl.url to RegistryResponse(code = 404),
                 v1IndexUrl.url to RegistryResponse(
                     body = """
                     {
@@ -232,17 +230,16 @@ class PackageRegistryProtocolTest {
                     }
                     """.trimIndent()
                 ),
+                v2IndexUrl.url to RegistryResponse(code = 404),
             )
         )
-        val api = packageApi(v2IndexUrl, v1IndexUrl, interceptor.client())
+        val api = packageApi(v2IndexUrl, interceptor.client())
 
         val result = api.getPackageDetail("sdl3")
 
-        assertThat(result).isInstanceOf(ApiResult.Success::class.java)
-        val pkg = (result as ApiResult.Success).data
-        assertThat(pkg.android?.version).isEqualTo("3.2.0")
+        assertThat(result).isInstanceOf(ApiResult.Error::class.java)
         assertThat(interceptor.requestedUrls)
-            .containsExactly(v2IndexUrl.url, v1IndexUrl.url)
+            .containsExactly(v2IndexUrl.url)
             .inOrder()
     }
 
@@ -253,11 +250,9 @@ class PackageRegistryProtocolTest {
 
     private fun packageApi(
         v2IndexUrl: RegistryUrl,
-        v1IndexUrl: RegistryUrl,
         client: OkHttpClient,
     ): PackageApiClient {
         val constructor = PackageApiClient::class.java.getDeclaredConstructor(
-            List::class.java,
             List::class.java,
             OkHttpClient::class.java,
             GitHubRegistryProxySettings::class.java,
@@ -265,7 +260,6 @@ class PackageRegistryProtocolTest {
         constructor.isAccessible = true
         return constructor.newInstance(
             listOf(v2IndexUrl),
-            listOf(v1IndexUrl),
             client,
             GitHubRegistryProxySettings(),
         ) as PackageApiClient

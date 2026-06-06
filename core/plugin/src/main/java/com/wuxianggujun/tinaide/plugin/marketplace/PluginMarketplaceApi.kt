@@ -24,15 +24,14 @@ import okhttp3.Request
 import timber.log.Timber
 
 class PluginMarketplaceApi private constructor(
-    private val v2IndexUrls: List<RegistryUrl>,
-    private val v1IndexUrls: List<RegistryUrl>,
+    private val indexUrls: List<RegistryUrl>,
     private val indexClient: OkHttpClient,
     private val downloadClient: OkHttpClient,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
     private val detailMutex = Mutex()
-    private var cachedIndex: LoadedPluginRegistryIndex? = null
+    private var cachedIndex: LoadedPluginRegistryCatalog? = null
     private val cachedDetails = mutableMapOf<String, PluginDetail>()
 
     companion object {
@@ -40,8 +39,7 @@ class PluginMarketplaceApi private constructor(
 
         fun create(context: Context): PluginMarketplaceApi {
             return PluginMarketplaceApi(
-                v2IndexUrls = GitHubRegistryConfig.pluginIndexV2Urls(),
-                v1IndexUrls = GitHubRegistryConfig.pluginIndexUrls(),
+                indexUrls = GitHubRegistryConfig.pluginIndexV2Urls(),
                 indexClient = GitHubRegistryHttpClientFactory.probe(context.applicationContext),
                 downloadClient = GitHubRegistryHttpClientFactory.download(context.applicationContext),
             )
@@ -170,7 +168,7 @@ class PluginMarketplaceApi private constructor(
         }
     }
 
-    private suspend fun <T> withIndex(block: (LoadedPluginRegistryIndex) -> T): ApiResult<T> {
+    private suspend fun <T> withIndex(block: (LoadedPluginRegistryCatalog) -> T): ApiResult<T> {
         return when (val result = loadIndex()) {
             is ApiResult.Success -> runCatching { ApiResult.Success(block(result.data)) }
                 .getOrElse { error -> ApiResult.Error(-1, error.message ?: Strings.error_unknown.str()) }
@@ -179,42 +177,29 @@ class PluginMarketplaceApi private constructor(
         }
     }
 
-    private suspend fun loadIndex(): ApiResult<LoadedPluginRegistryIndex> = withContext(Dispatchers.IO) {
+    private suspend fun loadIndex(): ApiResult<LoadedPluginRegistryCatalog> = withContext(Dispatchers.IO) {
         cachedIndex?.let { return@withContext ApiResult.Success(it) }
         indexMutex.withLock {
             cachedIndex?.let { return@withLock ApiResult.Success(it) }
-            val v2Result = loadIndexFromUrls(v2IndexUrls, "v2") { body, registryUrl ->
-                LoadedPluginRegistryIndex(
-                    v2Index = json.decodeFromString<PluginRegistryCatalog>(body),
+            val result = loadIndexFromUrls(indexUrls, "v2") { body, registryUrl ->
+                LoadedPluginRegistryCatalog(
+                    catalog = json.decodeFromString<PluginRegistryCatalog>(body),
                     baseUrl = registryUrl.endpoint.baseUrl,
                 )
             }
-            if (v2Result is ApiResult.Success) {
-                cachedIndex = v2Result.data
-                return@withLock v2Result
+            if (result is ApiResult.Success) {
+                cachedIndex = result.data
             }
-
-            val v1Result = loadIndexFromUrls(v1IndexUrls, "v1") { body, registryUrl ->
-                LoadedPluginRegistryIndex(
-                    v1Index = json.decodeFromString<PluginRegistryIndex>(body),
-                    baseUrl = registryUrl.endpoint.baseUrl,
-                )
-            }
-            if (v1Result is ApiResult.Success) {
-                cachedIndex = v1Result.data
-                return@withLock v1Result
-            }
-
-            v1Result
+            result
         }
     }
 
     private fun loadIndexFromUrls(
         urls: List<RegistryUrl>,
         schemaLabel: String,
-        decode: (body: String, registryUrl: RegistryUrl) -> LoadedPluginRegistryIndex,
-    ): ApiResult<LoadedPluginRegistryIndex> {
-        var lastError: ApiResult<LoadedPluginRegistryIndex>? = null
+        decode: (body: String, registryUrl: RegistryUrl) -> LoadedPluginRegistryCatalog,
+    ): ApiResult<LoadedPluginRegistryCatalog> {
+        var lastError: ApiResult<LoadedPluginRegistryCatalog>? = null
         for (registryUrl in urls) {
             try {
                 val response = indexClient.newCall(
@@ -256,15 +241,11 @@ class PluginMarketplaceApi private constructor(
     }
 
     private suspend fun resolvePluginDetail(
-        index: LoadedPluginRegistryIndex,
+        index: LoadedPluginRegistryCatalog,
         pluginId: String,
     ): ApiResult<PluginDetail> {
-        index.v1Index?.plugins
-            ?.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
-            ?.let { return ApiResult.Success(it.toDetail()) }
-
-        val entry = index.v2Index?.plugins
-            ?.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
+        val entry = index.catalog.plugins
+            .firstOrNull { it.pluginId == pluginId || it.id == pluginId }
             ?: return ApiResult.Error(404, Strings.plugin_marketplace_error_plugin_not_found.str(pluginId))
 
         val detailUrl = entry.detailUrl
@@ -408,11 +389,6 @@ class PluginMarketplaceApi private constructor(
 }
 
 @Serializable
-data class PluginRegistryIndex(
-    val plugins: List<PluginRegistryEntry> = emptyList(),
-)
-
-@Serializable
 data class PluginRegistryCatalog(
     @SerialName("schema_version")
     val schemaVersion: Int = 2,
@@ -421,13 +397,12 @@ data class PluginRegistryCatalog(
     val plugins: List<PluginRegistryCatalogEntry> = emptyList(),
 )
 
-data class LoadedPluginRegistryIndex(
-    val v1Index: PluginRegistryIndex? = null,
-    val v2Index: PluginRegistryCatalog? = null,
+data class LoadedPluginRegistryCatalog(
+    val catalog: PluginRegistryCatalog,
     val baseUrl: String,
 ) {
     val plugins: List<PluginRegistryCatalogEntry>
-        get() = v2Index?.plugins ?: v1Index?.plugins?.map { it.toCatalogEntry() }.orEmpty()
+        get() = catalog.plugins
 }
 
 @Serializable
@@ -462,95 +437,6 @@ data class PluginRegistryCatalogEntry(
             iconUrl = iconUrl,
             publisher = publisher,
             latestVersion = latestVersion,
-            updatedAt = updatedAt,
-        )
-    }
-}
-
-@Serializable
-data class PluginRegistryEntry(
-    val id: String,
-    @SerialName("plugin_id")
-    val pluginId: String,
-    val name: String,
-    val description: String? = null,
-    val category: String? = null,
-    val tags: List<String> = emptyList(),
-    @SerialName("icon_url")
-    val iconUrl: String? = null,
-    @SerialName("repository_url")
-    val repositoryUrl: String? = null,
-    @SerialName("homepage_url")
-    val homepageUrl: String? = null,
-    val license: String? = null,
-    val publisher: PluginPublisher,
-    val versions: List<PluginVersion> = emptyList(),
-    @SerialName("created_at")
-    val createdAt: String,
-    @SerialName("updated_at")
-    val updatedAt: String,
-) {
-    fun latestVersionEntry(): PluginVersion? {
-        return versions.maxWithOrNull(
-            compareBy<PluginVersion> { it.versionCode }.thenBy { it.version }
-        )
-    }
-
-    fun resolveVersion(version: String?): PluginVersion? {
-        return if (version.isNullOrBlank()) {
-            latestVersionEntry()
-        } else {
-            versions.firstOrNull { it.version == version }
-        }
-    }
-
-    fun toCatalogEntry(): PluginRegistryCatalogEntry {
-        return PluginRegistryCatalogEntry(
-            id = id,
-            pluginId = pluginId,
-            name = name,
-            description = description,
-            category = category,
-            tags = tags,
-            iconUrl = iconUrl,
-            publisher = publisher,
-            latestVersion = latestVersionEntry()?.version,
-            detailUrl = null,
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-        )
-    }
-
-    fun toSummary(): PluginSummary {
-        return PluginSummary(
-            id = id,
-            pluginId = pluginId,
-            name = name,
-            description = description,
-            category = category,
-            tags = tags,
-            iconUrl = iconUrl,
-            publisher = publisher,
-            latestVersion = latestVersionEntry()?.version,
-            updatedAt = updatedAt,
-        )
-    }
-
-    fun toDetail(): PluginDetail {
-        return PluginDetail(
-            id = id,
-            pluginId = pluginId,
-            name = name,
-            description = description,
-            category = category,
-            tags = tags,
-            iconUrl = iconUrl,
-            repositoryUrl = repositoryUrl,
-            homepageUrl = homepageUrl,
-            license = license,
-            publisher = publisher,
-            versions = versions.sortedWith(compareByDescending<PluginVersion> { it.versionCode }.thenByDescending { it.version }),
-            createdAt = createdAt,
             updatedAt = updatedAt,
         )
     }
