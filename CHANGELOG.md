@@ -49,7 +49,7 @@
 - 默认快捷键从宿主命令目录派生，并新增 `Ctrl + Shift + P` 打开命令面板。
 - 插件仓库读取链路切换为 Registry v2-only，移除旧版 v1 全量索引 fallback。
 - x86_64 tina-toolchain 资产更新为 `v0.2.4-patched`，用于修复模拟器链路上的工具链兼容问题。
-- 当前 App 版本收敛为 `0.18.0 / 2001`，避免从 `0.17.x` 直接跳到 `0.20.0` 造成版本节奏误解。
+- 当前 App 版本收敛为 `0.18.0 / 1801`，避免从 `0.17.x` 直接跳到 `0.20.0` 造成版本节奏误解。
 
 ### Verification
 - `.\gradlew.bat :app:compileArm64DebugKotlin --console=plain`
