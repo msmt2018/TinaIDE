@@ -56,6 +56,35 @@ class MainActivityCommandPreferenceStoreTest {
     }
 
     @Test
+    fun `movePinned should reorder pinned commands and ignore boundaries`() {
+        val store = MainActivityCommandPreferenceStore(context)
+
+        store.togglePinned("third")
+        store.togglePinned("second")
+        store.togglePinned("first")
+        store.movePinned("second", MainActivityPinnedCommandMoveDirection.UP)
+        store.movePinned("third", MainActivityPinnedCommandMoveDirection.DOWN)
+
+        assertThat(store.pinnedCommandIdsFlow.value)
+            .containsExactly("second", "first", "third")
+            .inOrder()
+    }
+
+    @Test
+    fun `movePinned should persist reordered pinned commands`() {
+        val store = MainActivityCommandPreferenceStore(context)
+
+        store.togglePinned("second")
+        store.togglePinned("first")
+        store.movePinned("second", MainActivityPinnedCommandMoveDirection.UP)
+
+        val restoredStore = MainActivityCommandPreferenceStore(context)
+        assertThat(restoredStore.pinnedCommandIdsFlow.value)
+            .containsExactly("second", "first")
+            .inOrder()
+    }
+
+    @Test
     fun `store should ignore invalid command ids`() {
         val store = MainActivityCommandPreferenceStore(context)
 

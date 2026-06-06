@@ -121,6 +121,7 @@ internal fun MainActivityTopBarHost(
             pinnedCommandIds = pinnedCommandIds,
             recentCommandIds = recentCommandIds,
             onTogglePinned = { command -> commandStore.togglePinned(command.id) },
+            onMovePinned = { command, direction -> commandStore.movePinned(command.id, direction) },
             onExecuteCommand = executeCommand,
             onDismissRequest = onDismissCommandPalette
         )

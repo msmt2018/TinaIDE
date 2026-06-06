@@ -14,6 +14,11 @@ private const val KEY_RECENT_COMMAND_IDS = "recent_command_ids"
 private const val MAX_PINNED_COMMANDS = 8
 private const val MAX_RECENT_COMMANDS = 16
 
+internal enum class MainActivityPinnedCommandMoveDirection {
+    UP,
+    DOWN
+}
+
 internal class MainActivityCommandPreferenceStore(
     context: Context
 ) {
@@ -36,6 +41,29 @@ internal class MainActivityCommandPreferenceStore(
         } else {
             listOf(normalizedCommandId) + current
         }).take(MAX_PINNED_COMMANDS)
+        writeCommandIds(KEY_PINNED_COMMAND_IDS, next)
+        pinnedState.value = next
+    }
+
+    fun movePinned(
+        commandId: String,
+        direction: MainActivityPinnedCommandMoveDirection
+    ) {
+        val normalizedCommandId = commandId.normalizedCommandIdOrNull() ?: return
+        val current = pinnedState.value
+        val index = current.indexOf(normalizedCommandId)
+        if (index < 0) return
+
+        val targetIndex = when (direction) {
+            MainActivityPinnedCommandMoveDirection.UP -> index - 1
+            MainActivityPinnedCommandMoveDirection.DOWN -> index + 1
+        }
+        if (targetIndex !in current.indices) return
+
+        val next = current.toMutableList().apply {
+            this[index] = current[targetIndex]
+            this[targetIndex] = normalizedCommandId
+        }
         writeCommandIds(KEY_PINNED_COMMAND_IDS, next)
         pinnedState.value = next
     }

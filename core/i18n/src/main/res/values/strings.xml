@@ -2104,6 +2104,8 @@
   <string name="command_palette_quick_actions">快捷操作</string>
   <string name="command_palette_pin_command">置顶命令</string>
   <string name="command_palette_unpin_command">取消置顶命令</string>
+  <string name="command_palette_move_pinned_up">上移置顶命令</string>
+  <string name="command_palette_move_pinned_down">下移置顶命令</string>
   <string name="command_palette_plugin_source">插件：%1$s</string>
   <string name="menu_section_file">文件</string>
   <string name="menu_section_code">代码</string>

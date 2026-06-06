@@ -1552,6 +1552,8 @@
   <string name="command_palette_quick_actions">Quick Actions</string>
   <string name="command_palette_pin_command">Pin command</string>
   <string name="command_palette_unpin_command">Unpin command</string>
+  <string name="command_palette_move_pinned_up">Move pinned command up</string>
+  <string name="command_palette_move_pinned_down">Move pinned command down</string>
   <string name="command_palette_plugin_source">Plugin: %1$s</string>
   <string name="menu_section_file">File</string>
   <string name="menu_section_code">Code</string>

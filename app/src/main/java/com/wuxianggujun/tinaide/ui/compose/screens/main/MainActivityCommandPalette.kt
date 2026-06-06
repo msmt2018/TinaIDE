@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -63,6 +65,7 @@ internal fun MainActivityCommandPalette(
     pinnedCommandIds: List<String>,
     recentCommandIds: List<String>,
     onTogglePinned: (MainActivityCommand) -> Unit,
+    onMovePinned: (MainActivityCommand, MainActivityPinnedCommandMoveDirection) -> Unit,
     onExecuteCommand: (MainActivityCommand) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
@@ -211,13 +214,14 @@ internal fun MainActivityCommandPalette(
                             CommandPaletteItem(
                                 command = command,
                                 selected = visibleCommands.getOrNull(selectedIndex)?.id == command.id,
-                                pinned = command.id in pinnedCommandIds,
+                                pinnedState = command.pinnedState(pinnedCommandIds),
                                 onClick = {
                                     selectedIndex = visibleCommands.indexOfFirst { it.id == command.id }
                                         .coerceAtLeast(0)
                                     executeCommand(command)
                                 },
-                                onTogglePinned = { onTogglePinned(command) }
+                                onTogglePinned = { onTogglePinned(command) },
+                                onMovePinned = { direction -> onMovePinned(command, direction) }
                             )
                         }
                     }
@@ -262,10 +266,12 @@ private fun CommandPaletteSectionHeader(
 private fun CommandPaletteItem(
     command: MainActivityCommand,
     selected: Boolean,
-    pinned: Boolean,
+    pinnedState: CommandPalettePinnedState,
     onClick: () -> Unit,
     onTogglePinned: () -> Unit,
+    onMovePinned: (MainActivityPinnedCommandMoveDirection) -> Unit,
 ) {
+    val pinned = pinnedState.pinned
     val shortcutText = command.shortcutAction
         ?.let(KeyboardShortcutManager::getShortcut)
         ?.toDisplayString()
@@ -337,6 +343,41 @@ private fun CommandPaletteItem(
                 }
             }
 
+            if (pinned) {
+                IconButton(
+                    onClick = { onMovePinned(MainActivityPinnedCommandMoveDirection.UP) },
+                    enabled = pinnedState.canMoveUp,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowUpward,
+                        contentDescription = stringResource(Strings.command_palette_move_pinned_up),
+                        tint = if (pinnedState.canMoveUp) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        },
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onMovePinned(MainActivityPinnedCommandMoveDirection.DOWN) },
+                    enabled = pinnedState.canMoveDown,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDownward,
+                        contentDescription = stringResource(Strings.command_palette_move_pinned_down),
+                        tint = if (pinnedState.canMoveDown) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        },
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
             IconButton(
                 onClick = onTogglePinned,
                 modifier = Modifier.size(36.dp)
@@ -360,6 +401,23 @@ private fun CommandPaletteItem(
             }
         }
     }
+}
+
+private data class CommandPalettePinnedState(
+    val pinned: Boolean,
+    val canMoveUp: Boolean,
+    val canMoveDown: Boolean
+)
+
+private fun MainActivityCommand.pinnedState(
+    pinnedCommandIds: List<String>
+): CommandPalettePinnedState {
+    val index = pinnedCommandIds.indexOf(id)
+    return CommandPalettePinnedState(
+        pinned = index >= 0,
+        canMoveUp = index > 0,
+        canMoveDown = index >= 0 && index < pinnedCommandIds.lastIndex
+    )
 }
 
 @Composable
