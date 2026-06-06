@@ -86,7 +86,7 @@ internal fun MainActivityTopBarHost(
         callbacks = topBarCallbacks,
         hostCommandExecutor = hostCommandExecutor,
     )
-    val quickCommands = rememberMainActivityOverflowCommands(
+    val quickCommands = rememberMainActivityQuickCommands(
         commands = commandPaletteCommands,
         pinnedCommandIds = pinnedCommandIds,
     )

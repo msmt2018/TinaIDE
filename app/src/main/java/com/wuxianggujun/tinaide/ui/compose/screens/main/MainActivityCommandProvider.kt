@@ -108,14 +108,14 @@ internal fun rememberMainActivityCommands(
 }
 
 @Composable
-internal fun rememberMainActivityOverflowCommands(
+internal fun rememberMainActivityQuickCommands(
     commands: List<MainActivityCommand>,
     pinnedCommandIds: List<String>,
 ): List<MainActivityCommand> = remember(commands, pinnedCommandIds) {
-    selectMainActivityOverflowCommands(commands, pinnedCommandIds)
+    selectMainActivityQuickCommands(commands, pinnedCommandIds)
 }
 
-internal fun selectMainActivityOverflowCommands(
+internal fun selectMainActivityQuickCommands(
     commands: List<MainActivityCommand>,
     pinnedCommandIds: List<String>,
 ): List<MainActivityCommand> {

@@ -60,13 +60,13 @@ class MainActivityCommandOrderingTest {
     }
 
     @Test
-    fun `selectMainActivityOverflowCommands should use pinned commands when present`() {
+    fun `selectMainActivityQuickCommands should use pinned commands when present`() {
         val commands = listOf(
             command("view.settings", MainActivityCommandCategory.VIEW),
             command("project.build", MainActivityCommandCategory.BUILD),
         )
 
-        val selected = selectMainActivityOverflowCommands(
+        val selected = selectMainActivityQuickCommands(
             commands = commands,
             pinnedCommandIds = listOf("project.build")
         )
@@ -76,7 +76,7 @@ class MainActivityCommandOrderingTest {
     }
 
     @Test
-    fun `selectMainActivityOverflowCommands should cap top bar commands`() {
+    fun `selectMainActivityQuickCommands should cap top bar commands`() {
         val commands = listOf(
             command("first", MainActivityCommandCategory.VIEW),
             command("second", MainActivityCommandCategory.BUILD),
@@ -84,7 +84,7 @@ class MainActivityCommandOrderingTest {
             command("fourth", MainActivityCommandCategory.FILE),
         )
 
-        val selected = selectMainActivityOverflowCommands(
+        val selected = selectMainActivityQuickCommands(
             commands = commands,
             pinnedCommandIds = listOf("first", "second", "third", "fourth")
         )
