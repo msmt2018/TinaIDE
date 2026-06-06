@@ -168,6 +168,8 @@ my-plugin/
 
 > 备注（与源码同步）：`editor/toolbar` 已接入编辑器标签栏右侧插件动作菜单，
 > 同时会进入主编辑器命令面板；`keybindings` 已接入 MainActivity 硬件键盘快捷键分发。
+> 宿主内部统一使用 `ResolvedPluginCommand` 表示已解析的插件命令，包含 `pluginId`、`pluginName`、
+> `commandId`、`group`、`surface` 与 `source`；旧 `ResolvedHostMenuItem` 仅作为菜单 UI 兼容层保留。
 
 ## 宿主内置命令总览
 
@@ -811,6 +813,9 @@ v1 兼容索引默认不再生成，只服务旧客户端。主仓库当前随 A
 - 插件通过 `contributions.keybindings` 声明 keybindings JSON 文件
 - `command` 支持宿主内置命令，或当前插件运行时已注册的插件命令
 - `contributions.commands` 会参与菜单标题解析；若未声明，则回退到运行时注册标题或命令 ID
+- 菜单解析统一输出 `ResolvedPluginCommand` 元数据，`surface` 当前包括 `EDITOR_TOOLBAR`、`EDITOR_CONTEXT`、
+  `FILE_TREE_CONTEXT`，`source` 当前包括 `HOST` 与 `PLUGIN`
+- 命令面板消费 `resolveEditorToolbarCommands()`，不要从旧菜单项临时拼接插件名、来源或搜索关键词
 - 插件快捷键会在用户自定义/内置快捷键未命中后尝试执行，避免覆盖用户设置
 
 `contributions.keybindings` 示例：
