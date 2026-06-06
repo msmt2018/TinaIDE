@@ -1,6 +1,6 @@
 # TinaIDE GitHub Registry
 
-> 更新日期：2026-06-01
+> 更新日期：2026-06-06
 
 TinaIDE 开源版的插件市场与依赖包市场不再从 TinaServer 读取索引。
 客户端默认读取公开仓库：
@@ -12,8 +12,11 @@ https://github.com/wuxianggujun/TinaIDE-Registry
 这个仓库是插件与依赖包的公开 Registry，不是 Android 主项目的源码目录。
 它现在同时承载：
 
-- `plugins/index.json` 与 `packages/index.json`
+- `plugins/index.v2.json` / `packages/index.v2.json`
+- `plugins/index.json` / `packages/index.json` 兼容索引
+- `plugins/<plugin-id>/plugin.json`
 - `plugins/<plugin-id>/<version>/*.tinaplug`
+- `packages/<package-id>/package.json`
 - `packages/<package-id>/<version>/*`
 - `sources/plugins/**`
 - `sources/plugin-starters/**`
@@ -23,7 +26,7 @@ https://github.com/wuxianggujun/TinaIDE-Registry
 发布插件或依赖包时，需要把 `.tinaplug` / 包文件放入该仓库约定目录，或在索引里填写
 可信 CDN、对象存储、自建代理的绝对下载地址，并同步更新对应索引。
 
-客户端内置两个索引入口，按顺序自动尝试：
+客户端内置两个 Registry base，按顺序自动尝试：
 
 ```text
 https://raw.githubusercontent.com/wuxianggujun/TinaIDE-Registry/main
@@ -47,9 +50,13 @@ https://raw.githubusercontent.com/wuxianggujun/TinaIDE-Registry/main
 ## 目录结构
 
 ```text
+plugins/index.v2.json
 plugins/index.json
+plugins/<plugin-id>/plugin.json
 plugins/<plugin-id>/<version>/<plugin-id>.tinaplug
+packages/index.v2.json
 packages/index.json
+packages/<package-id>/package.json
 packages/<package-id>/<version>/<file>.tar.xz
 sources/plugins/<plugin-id>/manifest.json
 sources/plugin-starters/<template>/
@@ -57,6 +64,10 @@ metadata/plugins.json
 metadata/packages.json
 scripts/build-registry.ps1
 ```
+
+客户端优先读取 v2 索引；v2 不存在、请求失败或解析失败时，自动回退旧的
+`plugins/index.json` / `packages/index.json`。Registry 可以先保留 v1 全量索引，
+再逐步新增 v2 轻量索引和详情文件。
 
 `download_url` 和 `download_sources[].url` 支持两种写法：
 
@@ -79,9 +90,108 @@ pwsh ./scripts/build-registry.ps1
 ```
 
 脚本会重新打包 `sources/plugins/**`，计算插件包和依赖包的 SHA-256，
-并重写 `plugins/index.json` 与 `packages/index.json`。
+并重写 v2 与 v1 兼容产物：
+
+- `plugins/index.v2.json`：插件轻量列表。
+- `plugins/<plugin-id>/plugin.json`：单个插件详情和版本历史。
+- `plugins/index.json`：旧客户端兼容的全量索引。
+- `packages/index.v2.json`：依赖包轻量列表。
+- `packages/<package-id>/package.json`：单个包详情、版本和下载信息。
+- `packages/index.json`：旧客户端兼容的全量索引。
+
+## v2 索引设计
+
+v2 的核心目标是避免客户端每次刷新市场都下载和解析全量详情。
+列表页只读取轻量索引；用户打开详情、安装、检查更新时，再按需读取单个详情文件。
+
+```text
+[index.v2.json] --列表/搜索/分类--> [详情页或安装] --按需--> [<id>/plugin.json 或 <id>/package.json]
+```
+
+轻量索引必须包含列表展示、分类过滤和排序需要的字段。详情文件包含版本历史、
+下载地址、hash、changelog、包下载源等较重字段。
+
+## 协议生命周期
+
+当前主协议是 v2。v1 全量索引只作为旧客户端兼容层保留，不再作为新能力入口。
+
+- `0.17.11`：Android 客户端引入 v2 优先读取，并把 v1 fallback 标记为废弃兼容层。
+- `0.18.x` / `0.19.x`：迁移窗口，Registry 必须继续生成 v2 与 v1 两套产物。
+- `0.20.0` 起：Android 客户端可以删除 v1 fallback 代码，市场读取只要求 v2。
+- `0.21.0` 起：Registry 可以停止生成 `plugins/index.json` / `packages/index.json`。
+
+移除 v1 前必须同时满足：
+
+- `plugins/index.v2.json` / `packages/index.v2.json` 已连续稳定发布。
+- 所有插件和依赖包都有有效的 `detail_url` 与详情文件。
+- 发布说明明确通知旧客户端将不再支持 v1 Registry。
+- `scripts/validate-registry.ps1` 已能阻止 v2 详情缺失和轻量索引混入重字段。
+
+删除 v1 fallback 时，Android 仓库要同步移除 `PluginRegistryIndex` /
+`PackageRegistryIndex` 的回退读取测试；Registry 仓库要同步移除 v1 生成和 v1
+校验逻辑。
 
 ## 插件索引
+
+### 插件 v2 轻量索引
+
+`plugins/index.v2.json` 的推荐结构：
+
+```json
+{
+  "schema_version": 2,
+  "generated_at": "2026-06-06T00:00:00Z",
+  "plugins": [
+    {
+      "id": "tinaide.plugin.example",
+      "plugin_id": "tinaide.plugin.example",
+      "name": "Example Plugin",
+      "description": "Example plugin",
+      "category": "tool",
+      "tags": ["tool"],
+      "publisher": {
+        "id": "tinaide",
+        "display_name": "TinaIDE"
+      },
+      "latest_version": "1.0.0",
+      "detail_url": "plugins/tinaide.plugin.example/plugin.json",
+      "created_at": "2026-05-21T00:00:00Z",
+      "updated_at": "2026-06-06T00:00:00Z"
+    }
+  ]
+}
+```
+
+`plugins/<plugin-id>/plugin.json` 使用和旧索引单个插件条目接近的详情结构：
+
+```json
+{
+  "id": "tinaide.plugin.example",
+  "plugin_id": "tinaide.plugin.example",
+  "name": "Example Plugin",
+  "description": "Example plugin",
+  "category": "tool",
+  "tags": ["tool"],
+  "publisher": {
+    "id": "tinaide",
+    "display_name": "TinaIDE"
+  },
+  "versions": [
+    {
+      "version": "1.0.0",
+      "version_code": 1,
+      "file_size": 1234,
+      "file_hash": "sha256:<sha256>",
+      "download_url": "plugins/tinaide.plugin.example/1.0.0/tinaide.plugin.example.tinaplug",
+      "created_at": "2026-05-21T00:00:00Z"
+    }
+  ],
+  "created_at": "2026-05-21T00:00:00Z",
+  "updated_at": "2026-06-06T00:00:00Z"
+}
+```
+
+### 插件 v1 兼容索引
 
 `plugins/index.json` 的最小结构：
 
@@ -123,6 +233,104 @@ pwsh ./scripts/build-registry.ps1
 不做完整性校验。
 
 ## 依赖包索引
+
+### 依赖包 v2 轻量索引
+
+`packages/index.v2.json` 的推荐结构：
+
+```json
+{
+  "schema_version": 2,
+  "generated_at": "2026-06-06T00:00:00Z",
+  "categories": [
+    {
+      "id": "runtime",
+      "name": "Runtime",
+      "sort_order": 0
+    }
+  ],
+  "packages": [
+    {
+      "id": "sdl3",
+      "name": "SDL3",
+      "description": "SDL runtime package",
+      "category": "runtime",
+      "detail_url": "packages/sdl3/package.json",
+      "android": {
+        "version": "3.2.0",
+        "artifact_type": "shared",
+        "install_type": "download",
+        "size": 1234,
+        "abi": ["arm64-v8a", "x86_64"],
+        "is_latest": true
+      }
+    }
+  ]
+}
+```
+
+`packages/<package-id>/package.json` 承载完整详情、版本和下载源：
+
+```json
+{
+  "package": {
+    "id": "sdl3",
+    "name": "SDL3",
+    "description": "SDL runtime package",
+    "category": "runtime",
+    "android": {
+      "version": "3.2.0",
+      "artifact_type": "shared",
+      "install_type": "download",
+      "size": 1234,
+      "download_url": "packages/sdl3/3.2.0/sdl3.tar.xz",
+      "checksum": "sha256:<sha256>",
+      "abi": ["arm64-v8a", "x86_64"],
+      "is_latest": true
+    }
+  },
+  "versions": {
+    "android": [
+      {
+        "id": 2,
+        "package_id": "sdl3",
+        "platform": "android",
+        "version": "3.2.0",
+        "artifact_type": "shared",
+        "install_type": "download",
+        "download_size": 1234,
+        "download_url": "packages/sdl3/3.2.0/sdl3.tar.xz",
+        "checksum": "sha256:<sha256>",
+        "abi": ["arm64-v8a", "x86_64"],
+        "is_latest": true
+      }
+    ]
+  },
+  "downloads": {
+    "sdl3:2": {
+      "package_id": "sdl3",
+      "version": "3.2.0",
+      "platform": "android",
+      "install_type": "download",
+      "size": 1234,
+      "checksum": "sha256:<sha256>",
+      "sources": [
+        {
+          "id": 1,
+          "name": "GitHub",
+          "url": "packages/sdl3/3.2.0/sdl3.tar.xz",
+          "priority": 100,
+          "supports_range": true
+        }
+      ]
+    }
+  }
+}
+```
+
+`downloads` 的 key 保持 `<package-id>:<version-id>`，与 v1 全量索引一致。
+
+### 依赖包 v1 兼容索引
 
 `packages/index.json` 支持简单结构。下载信息可以直接写在 `linux` 或
 `android` 节点里：

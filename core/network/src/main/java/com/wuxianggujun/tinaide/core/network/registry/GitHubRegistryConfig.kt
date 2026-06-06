@@ -4,6 +4,11 @@ object GitHubRegistryConfig {
     const val OWNER = "wuxianggujun"
     const val REPOSITORY = "TinaIDE-Registry"
     const val BRANCH = "main"
+    const val REGISTRY_SCHEMA_VERSION = 2
+    const val REGISTRY_V2_INTRODUCED_APP_VERSION = "0.17.11"
+    const val REGISTRY_V1_FALLBACK_DEPRECATED_APP_VERSION = "0.17.11"
+    const val REGISTRY_V1_FALLBACK_REMOVE_NOT_BEFORE_APP_VERSION = "0.20.0"
+    const val REGISTRY_V1_INDEX_GENERATION_REMOVE_NOT_BEFORE_APP_VERSION = "0.21.0"
 
     const val GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/$OWNER/$REPOSITORY/$BRANCH"
     const val JSDELIVR_BASE_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPOSITORY@$BRANCH"
@@ -13,6 +18,8 @@ object GitHubRegistryConfig {
 
     const val PLUGINS_INDEX_PATH = "plugins/index.json"
     const val PACKAGES_INDEX_PATH = "packages/index.json"
+    const val PLUGINS_INDEX_V2_PATH = "plugins/index.v2.json"
+    const val PACKAGES_INDEX_V2_PATH = "packages/index.v2.json"
     const val PLUGINS_INDEX_URL = "$PRIMARY_BASE_URL/$PLUGINS_INDEX_PATH"
     const val PACKAGES_INDEX_URL = "$PRIMARY_BASE_URL/$PACKAGES_INDEX_PATH"
 
@@ -24,6 +31,10 @@ object GitHubRegistryConfig {
     fun pluginIndexUrls(): List<RegistryUrl> = indexUrls(PLUGINS_INDEX_PATH)
 
     fun packageIndexUrls(): List<RegistryUrl> = indexUrls(PACKAGES_INDEX_PATH)
+
+    fun pluginIndexV2Urls(): List<RegistryUrl> = indexUrls(PLUGINS_INDEX_V2_PATH)
+
+    fun packageIndexV2Urls(): List<RegistryUrl> = indexUrls(PACKAGES_INDEX_V2_PATH)
 
     fun resolveRawUrl(urlOrPath: String, baseUrl: String = PRIMARY_BASE_URL): String {
         val value = urlOrPath.trim()

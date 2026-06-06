@@ -16,6 +16,7 @@ import com.wuxianggujun.tinaide.core.packages.model.GUIPackage
 import com.wuxianggujun.tinaide.core.packages.model.PackageCategory
 import com.wuxianggujun.tinaide.core.packages.model.PackageVersion
 import com.wuxianggujun.tinaide.core.packages.model.Platform
+import com.wuxianggujun.tinaide.core.packages.model.PlatformPackage
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -30,13 +31,16 @@ import okhttp3.Request
 import timber.log.Timber
 
 class PackageApiClient private constructor(
-    private val indexUrls: List<RegistryUrl>,
+    private val v2IndexUrls: List<RegistryUrl>,
+    private val v1IndexUrls: List<RegistryUrl>,
     private val indexClient: OkHttpClient,
     private val proxySettings: GitHubRegistryProxySettings,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
+    private val detailMutex = Mutex()
     private var cachedIndex: LoadedPackageRegistryIndex? = null
+    private val cachedDetails = mutableMapOf<String, PackageRegistryDetail>()
 
     companion object {
         private const val TAG = "PackageApiClient"
@@ -62,7 +66,8 @@ class PackageApiClient private constructor(
 
         private fun createInstance(): PackageApiClient {
             return PackageApiClient(
-                indexUrls = GitHubRegistryConfig.packageIndexUrls(),
+                v2IndexUrls = GitHubRegistryConfig.packageIndexV2Urls(),
+                v1IndexUrls = GitHubRegistryConfig.packageIndexUrls(),
                 indexClient = OkHttpClientProvider.probe,
                 proxySettings = GitHubRegistryProxySettings(),
             )
@@ -73,7 +78,8 @@ class PackageApiClient private constructor(
             settings: GitHubRegistryProxySettings,
         ): PackageApiClient {
             return PackageApiClient(
-                indexUrls = GitHubRegistryConfig.packageIndexUrls(),
+                v2IndexUrls = GitHubRegistryConfig.packageIndexV2Urls(),
+                v1IndexUrls = GitHubRegistryConfig.packageIndexUrls(),
                 indexClient = GitHubRegistryHttpClientFactory.probe(context),
                 proxySettings = settings,
             )
@@ -119,24 +125,79 @@ class PackageApiClient private constructor(
         index.categories.takeIf { it.isNotEmpty() } ?: deriveCategories(index.packages)
     }
 
-    suspend fun getPackageDetail(packageId: String): ApiResult<GUIPackage> = withIndex { index ->
-        index.packages.firstOrNull { it.id == packageId }
-            ?: throw NoSuchElementException(Strings.pkg_manager_error_package_not_found.str(packageId))
+    suspend fun getPackageDetail(packageId: String): ApiResult<GUIPackage> = withContext(Dispatchers.IO) {
+        when (val indexResult = loadIndex()) {
+            is ApiResult.Success -> when (val detailResult = resolvePackageDetail(indexResult.data, packageId)) {
+                is ApiResult.Success -> ApiResult.Success(detailResult.data.pkg)
+                is ApiResult.Error -> detailResult
+                is ApiResult.NetworkError -> detailResult
+            }
+            is ApiResult.Error -> indexResult
+            is ApiResult.NetworkError -> indexResult
+        }
     }
 
-    suspend fun getPackageVersions(packageId: String): ApiResult<PackageVersionsResponse> = withIndex { index ->
-        index.versions[packageId]
-            ?: index.packages.firstOrNull { it.id == packageId }?.toVersions(packageId)
-            ?: throw NoSuchElementException(Strings.pkg_manager_error_package_versions_not_found.str(packageId))
+    suspend fun getPackageVersions(packageId: String): ApiResult<PackageVersionsResponse> = withContext(Dispatchers.IO) {
+        val index = when (val indexResult = loadIndex()) {
+            is ApiResult.Success -> indexResult.data
+            is ApiResult.Error -> return@withContext indexResult
+            is ApiResult.NetworkError -> return@withContext indexResult
+        }
+        if (index.v1Index != null) {
+            return@withContext withIndex { loaded ->
+                loaded.versions[packageId]
+                    ?: loaded.packages.firstOrNull { it.id == packageId }?.toVersions(packageId)
+                    ?: throw NoSuchElementException(Strings.pkg_manager_error_package_versions_not_found.str(packageId))
+            }
+        }
+        when (val detailResult = resolvePackageDetail(index, packageId)) {
+            is ApiResult.Success -> {
+                val detail = detailResult.data
+                ApiResult.Success(detail.versions ?: detail.pkg.toVersions(packageId))
+            }
+            is ApiResult.Error -> detailResult
+            is ApiResult.NetworkError -> detailResult
+        }
     }
 
-    suspend fun getDownloadInfo(packageId: String, versionId: Int): ApiResult<DownloadInfo> = withIndex { index ->
-        index.downloads["$packageId:$versionId"]
-            ?.withResolvedSources(index.baseUrl)
-            ?: resolveDownloadInfo(packageId, versionId, index)
-            ?: throw NoSuchElementException(
-                Strings.pkg_manager_error_download_info_not_found.str(packageId, versionId),
-            )
+    suspend fun getDownloadInfo(packageId: String, versionId: Int): ApiResult<DownloadInfo> = withContext(Dispatchers.IO) {
+        val index = when (val indexResult = loadIndex()) {
+            is ApiResult.Success -> indexResult.data
+            is ApiResult.Error -> return@withContext indexResult
+            is ApiResult.NetworkError -> return@withContext indexResult
+        }
+        if (index.v1Index != null) {
+            return@withContext withIndex { loaded ->
+                loaded.downloads["$packageId:$versionId"]
+                    ?.withResolvedSources(loaded.baseUrl)
+                    ?: resolveDownloadInfo(packageId, versionId, loaded.baseUrl, loaded.versions[packageId], loaded.packages.firstOrNull { it.id == packageId })
+                    ?: throw NoSuchElementException(
+                        Strings.pkg_manager_error_download_info_not_found.str(packageId, versionId),
+                    )
+            }
+        }
+        when (val detailResult = resolvePackageDetail(index, packageId)) {
+            is ApiResult.Success -> {
+                val detail = detailResult.data
+                ApiResult.Success(
+                    detail.downloads["$packageId:$versionId"]
+                        ?.withResolvedSources(index.baseUrl)
+                        ?: resolveDownloadInfo(
+                            packageId = packageId,
+                            versionId = versionId,
+                            baseUrl = index.baseUrl,
+                            versions = detail.versions,
+                            pkg = detail.pkg,
+                        )
+                        ?: return@withContext ApiResult.Error(
+                            -1,
+                            Strings.pkg_manager_error_download_info_not_found.str(packageId, versionId),
+                        )
+                )
+            }
+            is ApiResult.Error -> detailResult
+            is ApiResult.NetworkError -> detailResult
+        }
     }
 
     private suspend fun <T> withIndex(block: (LoadedPackageRegistryIndex) -> T): ApiResult<T> {
@@ -152,57 +213,145 @@ class PackageApiClient private constructor(
         cachedIndex?.let { return@withContext ApiResult.Success(it) }
         indexMutex.withLock {
             cachedIndex?.let { return@withLock ApiResult.Success(it) }
-            var lastError: ApiResult<LoadedPackageRegistryIndex>? = null
-            for (registryUrl in indexUrls) {
-                try {
-                    val response = indexClient.newCall(
-                        Request.Builder()
-                            .url(registryUrl.url)
-                            .get()
-                            .build()
-                    ).execute()
-                    response.use { resp ->
-                        val body = resp.body?.string()
-                        if (!resp.isSuccessful) {
-                            lastError = ApiResult.Error(
-                                resp.code,
-                                "Registry request failed via ${registryUrl.endpoint.name}: HTTP ${resp.code}",
-                            )
-                            return@use
-                        }
-                        if (body.isNullOrBlank()) {
-                            lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
-                            return@use
-                        }
-                        val index = LoadedPackageRegistryIndex(
-                            index = json.decodeFromString<PackageRegistryIndex>(body),
-                            baseUrl = registryUrl.endpoint.baseUrl,
-                        )
-                        cachedIndex = index
-                        Timber.tag(TAG).i("Loaded package registry via %s", registryUrl.endpoint.name)
-                        return@withLock ApiResult.Success(index)
-                    }
-                } catch (e: IOException) {
-                    Timber.tag(TAG).w(e, "Load package registry failed via %s", registryUrl.endpoint.name)
-                    lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
-                } catch (e: Exception) {
-                    Timber.tag(TAG).w(e, "Parse package registry failed via %s", registryUrl.endpoint.name)
-                    lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
-                }
+            val v2Result = loadIndexFromUrls(v2IndexUrls, "v2") { body, registryUrl ->
+                LoadedPackageRegistryIndex(
+                    v2Index = json.decodeFromString<PackageRegistryCatalog>(body),
+                    baseUrl = registryUrl.endpoint.baseUrl,
+                )
             }
-            lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
+            if (v2Result is ApiResult.Success) {
+                cachedIndex = v2Result.data
+                return@withLock v2Result
+            }
+
+            val v1Result = loadIndexFromUrls(v1IndexUrls, "v1") { body, registryUrl ->
+                LoadedPackageRegistryIndex(
+                    v1Index = json.decodeFromString<PackageRegistryIndex>(body),
+                    baseUrl = registryUrl.endpoint.baseUrl,
+                )
+            }
+            if (v1Result is ApiResult.Success) {
+                cachedIndex = v1Result.data
+                return@withLock v1Result
+            }
+
+            v1Result
+        }
+    }
+
+    private fun loadIndexFromUrls(
+        urls: List<RegistryUrl>,
+        schemaLabel: String,
+        decode: (body: String, registryUrl: RegistryUrl) -> LoadedPackageRegistryIndex,
+    ): ApiResult<LoadedPackageRegistryIndex> {
+        var lastError: ApiResult<LoadedPackageRegistryIndex>? = null
+        for (registryUrl in urls) {
+            try {
+                val response = indexClient.newCall(
+                    Request.Builder()
+                        .url(registryUrl.url)
+                        .get()
+                        .build()
+                ).execute()
+                response.use { resp ->
+                    val body = resp.body?.string()
+                    if (!resp.isSuccessful) {
+                        lastError = ApiResult.Error(
+                            resp.code,
+                            "Registry $schemaLabel request failed via ${registryUrl.endpoint.name}: HTTP ${resp.code}",
+                        )
+                        return@use
+                    }
+                    if (body.isNullOrBlank()) {
+                        lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
+                        return@use
+                    }
+                    val index = decode(body, registryUrl)
+                    Timber.tag(TAG).i(
+                        "Loaded package registry %s via %s",
+                        schemaLabel,
+                        registryUrl.endpoint.name,
+                    )
+                    return ApiResult.Success(index)
+                }
+            } catch (e: IOException) {
+                Timber.tag(TAG).w(e, "Load package registry %s failed via %s", schemaLabel, registryUrl.endpoint.name)
+                lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Parse package registry %s failed via %s", schemaLabel, registryUrl.endpoint.name)
+                lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
+            }
+        }
+        return lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
+    }
+
+    private suspend fun resolvePackageDetail(
+        index: LoadedPackageRegistryIndex,
+        packageId: String,
+    ): ApiResult<PackageRegistryDetail> {
+        index.v1Index?.packages
+            ?.firstOrNull { it.id == packageId }
+            ?.let { pkg ->
+                return ApiResult.Success(
+                    PackageRegistryDetail(
+                        pkg = pkg,
+                        versions = index.v1Index.versions[packageId] ?: pkg.toVersions(packageId),
+                        downloads = index.v1Index.downloads,
+                    )
+                )
+            }
+
+        val entry = index.v2Index?.packages
+            ?.firstOrNull { it.id == packageId }
+            ?: return ApiResult.Error(404, Strings.pkg_manager_error_package_not_found.str(packageId))
+        val detailUrl = entry.detailUrl
+            ?: return ApiResult.Error(-1, Strings.pkg_manager_error_package_not_found.str(packageId))
+
+        cachedDetails[entry.id]?.let { return ApiResult.Success(it) }
+        return detailMutex.withLock {
+            cachedDetails[entry.id]?.let { return@withLock ApiResult.Success(it) }
+            val resolvedUrl = GitHubRegistryConfig.resolveRawUrl(detailUrl, index.baseUrl)
+            try {
+                val response = indexClient.newCall(
+                    Request.Builder()
+                        .url(resolvedUrl)
+                        .get()
+                        .build()
+                ).execute()
+                response.use { resp ->
+                    if (!resp.isSuccessful) {
+                        return@withLock ApiResult.Error(
+                            resp.code,
+                            "Package detail request failed: HTTP ${resp.code}",
+                        )
+                    }
+                    val body = resp.body?.string()
+                        ?: return@withLock ApiResult.Error(-1, Strings.error_response_empty.str())
+                    val detail = json.decodeFromString<PackageRegistryDetail>(body)
+                    cachedDetails[detail.pkg.id] = detail
+                    ApiResult.Success(detail)
+                }
+            } catch (e: IOException) {
+                Timber.tag(TAG).w(e, "Load package detail failed: %s", packageId)
+                ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Parse package detail failed: %s", packageId)
+                ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
+            }
         }
     }
 
     private fun resolveDownloadInfo(
         packageId: String,
         versionId: Int,
-        index: LoadedPackageRegistryIndex,
+        baseUrl: String,
+        versions: PackageVersionsResponse?,
+        pkg: GUIPackage?,
     ): DownloadInfo? {
-        val versions = index.versions[packageId]
-            ?: index.packages.firstOrNull { it.id == packageId }?.toVersions(packageId)
+        val resolvedVersions = versions
+            ?: pkg?.toVersions(packageId)
             ?: return null
-        val version = versions.allVersions().firstOrNull { it.id == versionId } ?: return null
+        val version = resolvedVersions.allVersions().firstOrNull { it.id == versionId } ?: return null
         val sources = when {
             !version.downloadSources.isNullOrEmpty() -> version.downloadSources
             !version.downloadUrl.isNullOrBlank() -> listOf(
@@ -216,7 +365,7 @@ class PackageApiClient private constructor(
                 )
             )
             else -> emptyList()
-        }.map { it.copy(url = GitHubRegistryConfig.resolveRawUrl(it.url, index.baseUrl)) }
+        }.map { it.copy(url = GitHubRegistryConfig.resolveRawUrl(it.url, baseUrl)) }
 
         if (sources.isEmpty()) return null
 
@@ -320,18 +469,65 @@ data class PackageRegistryIndex(
     val downloads: Map<String, DownloadInfo> = emptyMap(),
 )
 
+@Serializable
+data class PackageRegistryCatalog(
+    @SerialName("schema_version")
+    val schemaVersion: Int = 2,
+    @SerialName("generated_at")
+    val generatedAt: String? = null,
+    val packages: List<PackageRegistryCatalogEntry> = emptyList(),
+    val categories: List<PackageCategory> = emptyList(),
+)
+
+@Serializable
+data class PackageRegistryCatalogEntry(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    val category: String? = null,
+    @SerialName("icon_url")
+    val iconUrl: String? = null,
+    val homepage: String? = null,
+    val linux: PlatformPackage? = null,
+    val android: PlatformPackage? = null,
+    @SerialName("detail_url")
+    val detailUrl: String? = null,
+) {
+    fun toPackage(): GUIPackage {
+        return GUIPackage(
+            id = id,
+            name = name,
+            description = description,
+            category = category,
+            iconUrl = iconUrl,
+            homepage = homepage,
+            linux = linux,
+            android = android,
+        )
+    }
+}
+
+@Serializable
+data class PackageRegistryDetail(
+    @SerialName("package")
+    val pkg: GUIPackage,
+    val versions: PackageVersionsResponse? = null,
+    val downloads: Map<String, DownloadInfo> = emptyMap(),
+)
+
 data class LoadedPackageRegistryIndex(
-    val index: PackageRegistryIndex,
+    val v1Index: PackageRegistryIndex? = null,
+    val v2Index: PackageRegistryCatalog? = null,
     val baseUrl: String,
 ) {
     val packages: List<GUIPackage>
-        get() = index.packages
+        get() = v2Index?.packages?.map { it.toPackage() } ?: v1Index?.packages.orEmpty()
     val categories: List<PackageCategory>
-        get() = index.categories
+        get() = v2Index?.categories ?: v1Index?.categories.orEmpty()
     val versions: Map<String, PackageVersionsResponse>
-        get() = index.versions
+        get() = v1Index?.versions.orEmpty()
     val downloads: Map<String, DownloadInfo>
-        get() = index.downloads
+        get() = v1Index?.downloads.orEmpty()
 }
 
 @Serializable

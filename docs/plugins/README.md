@@ -766,7 +766,7 @@ my-plugin.tinaplug
 https://github.com/wuxianggujun/TinaIDE-Registry
 ```
 
-Registry 中的 `sources/plugins/**`、`plugins/index.json` 和 `packages/index.json`
+Registry 中的 `sources/plugins/**`、`plugins/index.v2.json`、详情文件和 v1 兼容索引
 负责市场分发。主仓库当前随 APK 分发的内置插件位于
 `app/src/main/assets/bundled_plugins/`，用于首次启动的兜底自动安装：
 
@@ -778,7 +778,7 @@ Registry 中的 `sources/plugins/**`、`plugins/index.json` 和 `packages/index.
 更新内置插件的方式：
 
 - 市场发布：在 `TinaIDE-Registry` 更新 `sources/plugins/**` 或包文件，运行
-  `scripts/build-registry.ps1`，提交生成的 `plugins/index.json` / `packages/index.json`。
+  `scripts/build-registry.ps1`，提交生成的 v2 轻量索引、详情文件和 v1 兼容索引。
 - 修改 `app/src/main/assets/bundled_plugins/<pluginId>/manifest.json` 的 `version`（例如 `1.0.1`）
 - 下次启动会自动覆盖安装到 `filesDir/plugins/<pluginId>/`
 

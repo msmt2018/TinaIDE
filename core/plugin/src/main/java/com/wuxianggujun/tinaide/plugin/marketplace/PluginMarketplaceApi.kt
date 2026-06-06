@@ -24,20 +24,24 @@ import okhttp3.Request
 import timber.log.Timber
 
 class PluginMarketplaceApi private constructor(
-    private val indexUrls: List<RegistryUrl>,
+    private val v2IndexUrls: List<RegistryUrl>,
+    private val v1IndexUrls: List<RegistryUrl>,
     private val indexClient: OkHttpClient,
     private val downloadClient: OkHttpClient,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
+    private val detailMutex = Mutex()
     private var cachedIndex: LoadedPluginRegistryIndex? = null
+    private val cachedDetails = mutableMapOf<String, PluginDetail>()
 
     companion object {
         private const val TAG = "PluginMarketplaceApi"
 
         fun create(context: Context): PluginMarketplaceApi {
             return PluginMarketplaceApi(
-                indexUrls = GitHubRegistryConfig.pluginIndexUrls(),
+                v2IndexUrls = GitHubRegistryConfig.pluginIndexV2Urls(),
+                v1IndexUrls = GitHubRegistryConfig.pluginIndexUrls(),
                 indexClient = GitHubRegistryHttpClientFactory.probe(context.applicationContext),
                 downloadClient = GitHubRegistryHttpClientFactory.download(context.applicationContext),
             )
@@ -85,17 +89,27 @@ class PluginMarketplaceApi private constructor(
         )
     }
 
-    suspend fun getPluginDetail(pluginId: String): ApiResult<PluginDetail> = withIndex { index ->
-        index.plugins.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
-            ?.toDetail()
-            ?: throw NoSuchElementException(Strings.plugin_marketplace_error_plugin_not_found.str(pluginId))
+    suspend fun getPluginDetail(pluginId: String): ApiResult<PluginDetail> = withContext(Dispatchers.IO) {
+        when (val indexResult = loadIndex()) {
+            is ApiResult.Success -> resolvePluginDetail(indexResult.data, pluginId)
+            is ApiResult.Error -> indexResult
+            is ApiResult.NetworkError -> indexResult
+        }
     }
 
     suspend fun checkUpdates(
         plugins: List<CheckUpdateItem>,
-    ): ApiResult<CheckUpdateData> = withIndex { index ->
+    ): ApiResult<CheckUpdateData> = withContext(Dispatchers.IO) {
+        val index = when (val indexResult = loadIndex()) {
+            is ApiResult.Success -> indexResult.data
+            is ApiResult.Error -> return@withContext indexResult
+            is ApiResult.NetworkError -> return@withContext indexResult
+        }
         val updates = plugins.mapNotNull { installed ->
-            val remote = index.plugins.firstOrNull { it.pluginId == installed.pluginId } ?: return@mapNotNull null
+            val remote = when (val detailResult = resolvePluginDetail(index, installed.pluginId)) {
+                is ApiResult.Success -> detailResult.data
+                else -> return@mapNotNull null
+            }
             val latest = remote.latestVersionEntry() ?: return@mapNotNull null
             if (!isNewerVersion(latest.version, installed.version)) return@mapNotNull null
             PluginUpdateInfo(
@@ -109,7 +123,7 @@ class PluginMarketplaceApi private constructor(
                 fileSize = latest.fileSize,
             )
         }
-        CheckUpdateData(updates)
+        ApiResult.Success(CheckUpdateData(updates))
     }
 
     suspend fun downloadPlugin(
@@ -124,11 +138,11 @@ class PluginMarketplaceApi private constructor(
                 is ApiResult.Error -> return@withContext indexResult
                 is ApiResult.NetworkError -> return@withContext indexResult
             }
-            val plugin = index.plugins.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
-                ?: return@withContext ApiResult.Error(
-                    404,
-                    Strings.plugin_marketplace_error_plugin_not_found.str(pluginId),
-                )
+            val plugin = when (val detailResult = resolvePluginDetail(index, pluginId)) {
+                is ApiResult.Success -> detailResult.data
+                is ApiResult.Error -> return@withContext detailResult
+                is ApiResult.NetworkError -> return@withContext detailResult
+            }
             val pluginVersion = plugin.resolveVersion(version)
                 ?: return@withContext ApiResult.Error(
                     404,
@@ -169,45 +183,128 @@ class PluginMarketplaceApi private constructor(
         cachedIndex?.let { return@withContext ApiResult.Success(it) }
         indexMutex.withLock {
             cachedIndex?.let { return@withLock ApiResult.Success(it) }
-            var lastError: ApiResult<LoadedPluginRegistryIndex>? = null
-            for (registryUrl in indexUrls) {
-                try {
-                    val response = indexClient.newCall(
-                        Request.Builder()
-                            .url(registryUrl.url)
-                            .get()
-                            .build()
-                    ).execute()
-                    response.use { resp ->
-                        val body = resp.body?.string()
-                        if (!resp.isSuccessful) {
-                            lastError = ApiResult.Error(
-                                resp.code,
-                                "Registry request failed via ${registryUrl.endpoint.name}: HTTP ${resp.code}",
-                            )
-                            return@use
-                        }
-                        if (body.isNullOrBlank()) {
-                            lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
-                            return@use
-                        }
-                        val index = LoadedPluginRegistryIndex(
-                            index = json.decodeFromString<PluginRegistryIndex>(body),
-                            baseUrl = registryUrl.endpoint.baseUrl,
-                        )
-                        cachedIndex = index
-                        Timber.tag(TAG).i("Loaded plugin registry via %s", registryUrl.endpoint.name)
-                        return@withLock ApiResult.Success(index)
-                    }
-                } catch (e: IOException) {
-                    Timber.tag(TAG).w(e, "Load plugin registry failed via %s", registryUrl.endpoint.name)
-                    lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
-                } catch (e: Exception) {
-                    Timber.tag(TAG).w(e, "Parse plugin registry failed via %s", registryUrl.endpoint.name)
-                    lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
-                }
+            val v2Result = loadIndexFromUrls(v2IndexUrls, "v2") { body, registryUrl ->
+                LoadedPluginRegistryIndex(
+                    v2Index = json.decodeFromString<PluginRegistryCatalog>(body),
+                    baseUrl = registryUrl.endpoint.baseUrl,
+                )
             }
-            lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
+            if (v2Result is ApiResult.Success) {
+                cachedIndex = v2Result.data
+                return@withLock v2Result
+            }
+
+            val v1Result = loadIndexFromUrls(v1IndexUrls, "v1") { body, registryUrl ->
+                LoadedPluginRegistryIndex(
+                    v1Index = json.decodeFromString<PluginRegistryIndex>(body),
+                    baseUrl = registryUrl.endpoint.baseUrl,
+                )
+            }
+            if (v1Result is ApiResult.Success) {
+                cachedIndex = v1Result.data
+                return@withLock v1Result
+            }
+
+            v1Result
+        }
+    }
+
+    private fun loadIndexFromUrls(
+        urls: List<RegistryUrl>,
+        schemaLabel: String,
+        decode: (body: String, registryUrl: RegistryUrl) -> LoadedPluginRegistryIndex,
+    ): ApiResult<LoadedPluginRegistryIndex> {
+        var lastError: ApiResult<LoadedPluginRegistryIndex>? = null
+        for (registryUrl in urls) {
+            try {
+                val response = indexClient.newCall(
+                    Request.Builder()
+                        .url(registryUrl.url)
+                        .get()
+                        .build()
+                ).execute()
+                response.use { resp ->
+                    val body = resp.body?.string()
+                    if (!resp.isSuccessful) {
+                        lastError = ApiResult.Error(
+                            resp.code,
+                            "Registry $schemaLabel request failed via ${registryUrl.endpoint.name}: HTTP ${resp.code}",
+                        )
+                        return@use
+                    }
+                    if (body.isNullOrBlank()) {
+                        lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
+                        return@use
+                    }
+                    val index = decode(body, registryUrl)
+                    Timber.tag(TAG).i(
+                        "Loaded plugin registry %s via %s",
+                        schemaLabel,
+                        registryUrl.endpoint.name,
+                    )
+                    return ApiResult.Success(index)
+                }
+            } catch (e: IOException) {
+                Timber.tag(TAG).w(e, "Load plugin registry %s failed via %s", schemaLabel, registryUrl.endpoint.name)
+                lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Parse plugin registry %s failed via %s", schemaLabel, registryUrl.endpoint.name)
+                lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
+            }
+        }
+        return lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
+    }
+
+    private suspend fun resolvePluginDetail(
+        index: LoadedPluginRegistryIndex,
+        pluginId: String,
+    ): ApiResult<PluginDetail> {
+        index.v1Index?.plugins
+            ?.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
+            ?.let { return ApiResult.Success(it.toDetail()) }
+
+        val entry = index.v2Index?.plugins
+            ?.firstOrNull { it.pluginId == pluginId || it.id == pluginId }
+            ?: return ApiResult.Error(404, Strings.plugin_marketplace_error_plugin_not_found.str(pluginId))
+
+        val detailUrl = entry.detailUrl
+            ?: return ApiResult.Error(-1, Strings.plugin_marketplace_error_download_url_missing.str(pluginId))
+
+        cachedDetails[entry.pluginId]?.let { return ApiResult.Success(it) }
+        cachedDetails[entry.id]?.let { return ApiResult.Success(it) }
+
+        return detailMutex.withLock {
+            cachedDetails[entry.pluginId]?.let { return@withLock ApiResult.Success(it) }
+            cachedDetails[entry.id]?.let { return@withLock ApiResult.Success(it) }
+            val resolvedUrl = GitHubRegistryConfig.resolveRawUrl(detailUrl, index.baseUrl)
+            try {
+                val response = indexClient.newCall(
+                    Request.Builder()
+                        .url(resolvedUrl)
+                        .get()
+                        .build()
+                ).execute()
+                response.use { resp ->
+                    if (!resp.isSuccessful) {
+                        return@withLock ApiResult.Error(
+                            resp.code,
+                            "Plugin detail request failed: HTTP ${resp.code}",
+                        )
+                    }
+                    val body = resp.body?.string()
+                        ?: return@withLock ApiResult.Error(-1, Strings.error_response_empty.str())
+                    val detail = json.decodeFromString<PluginDetail>(body)
+                    cachedDetails[detail.pluginId] = detail
+                    cachedDetails[detail.id] = detail
+                    ApiResult.Success(detail)
+                }
+            } catch (e: IOException) {
+                Timber.tag(TAG).w(e, "Load plugin detail failed: %s", pluginId)
+                ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Parse plugin detail failed: %s", pluginId)
+                ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
+            }
         }
     }
 
@@ -277,7 +374,7 @@ class PluginMarketplaceApi private constructor(
         }
     }
 
-    private fun pluginSortComparator(sort: String?): Comparator<PluginRegistryEntry> {
+    private fun pluginSortComparator(sort: String?): Comparator<PluginRegistryCatalogEntry> {
         return when (sort) {
             PluginSortType.NEWEST.value -> compareByDescending { it.createdAt }
             PluginSortType.UPDATED.value -> compareByDescending { it.updatedAt }
@@ -315,12 +412,59 @@ data class PluginRegistryIndex(
     val plugins: List<PluginRegistryEntry> = emptyList(),
 )
 
+@Serializable
+data class PluginRegistryCatalog(
+    @SerialName("schema_version")
+    val schemaVersion: Int = 2,
+    @SerialName("generated_at")
+    val generatedAt: String? = null,
+    val plugins: List<PluginRegistryCatalogEntry> = emptyList(),
+)
+
 data class LoadedPluginRegistryIndex(
-    val index: PluginRegistryIndex,
+    val v1Index: PluginRegistryIndex? = null,
+    val v2Index: PluginRegistryCatalog? = null,
     val baseUrl: String,
 ) {
-    val plugins: List<PluginRegistryEntry>
-        get() = index.plugins
+    val plugins: List<PluginRegistryCatalogEntry>
+        get() = v2Index?.plugins ?: v1Index?.plugins?.map { it.toCatalogEntry() }.orEmpty()
+}
+
+@Serializable
+data class PluginRegistryCatalogEntry(
+    val id: String,
+    @SerialName("plugin_id")
+    val pluginId: String,
+    val name: String,
+    val description: String? = null,
+    val category: String? = null,
+    val tags: List<String> = emptyList(),
+    @SerialName("icon_url")
+    val iconUrl: String? = null,
+    val publisher: PluginPublisher,
+    @SerialName("latest_version")
+    val latestVersion: String? = null,
+    @SerialName("detail_url")
+    val detailUrl: String? = null,
+    @SerialName("created_at")
+    val createdAt: String = "",
+    @SerialName("updated_at")
+    val updatedAt: String = "",
+) {
+    fun toSummary(): PluginSummary {
+        return PluginSummary(
+            id = id,
+            pluginId = pluginId,
+            name = name,
+            description = description,
+            category = category,
+            tags = tags,
+            iconUrl = iconUrl,
+            publisher = publisher,
+            latestVersion = latestVersion,
+            updatedAt = updatedAt,
+        )
+    }
 }
 
 @Serializable
@@ -360,6 +504,23 @@ data class PluginRegistryEntry(
         }
     }
 
+    fun toCatalogEntry(): PluginRegistryCatalogEntry {
+        return PluginRegistryCatalogEntry(
+            id = id,
+            pluginId = pluginId,
+            name = name,
+            description = description,
+            category = category,
+            tags = tags,
+            iconUrl = iconUrl,
+            publisher = publisher,
+            latestVersion = latestVersionEntry()?.version,
+            detailUrl = null,
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+        )
+    }
+
     fun toSummary(): PluginSummary {
         return PluginSummary(
             id = id,
@@ -392,5 +553,13 @@ data class PluginRegistryEntry(
             createdAt = createdAt,
             updatedAt = updatedAt,
         )
+    }
+}
+
+private fun PluginDetail.resolveVersion(version: String?): PluginVersion? {
+    return if (version.isNullOrBlank()) {
+        latestVersionEntry()
+    } else {
+        versions.firstOrNull { it.version == version }
     }
 }
