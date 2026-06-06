@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
-import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.ui.DebugViewModel
 import com.wuxianggujun.tinaide.ui.MainActivityActionsDelegate
 import com.wuxianggujun.tinaide.ui.MainActivityCompileDelegate
@@ -87,15 +86,10 @@ internal fun MainActivityTopBarHost(
         callbacks = topBarCallbacks,
         hostCommandExecutor = hostCommandExecutor,
     )
-    val overflowCommands = rememberMainActivityOverflowCommands(
+    val quickCommands = rememberMainActivityOverflowCommands(
         commands = commandPaletteCommands,
         pinnedCommandIds = pinnedCommandIds,
     )
-    val overflowCommandSectionTitleRes = if (pinnedCommandIds.isEmpty()) {
-        Strings.command_palette_quick_actions
-    } else {
-        Strings.command_palette_pinned
-    }
     val executeCommand: (MainActivityCommand) -> Unit = remember(commandStore) {
         { command ->
             commandStore.recordExecuted(command.id)
@@ -117,8 +111,7 @@ internal fun MainActivityTopBarHost(
         onShowRunConfigDialog = buildUiState::openRunConfigDialog,
         callbacks = topBarCallbacks,
         debugViewModel = debugViewModel,
-        overflowCommandSectionTitleRes = overflowCommandSectionTitleRes,
-        overflowCommands = overflowCommands,
+        quickCommands = quickCommands,
         onExecuteCommand = executeCommand,
     )
 

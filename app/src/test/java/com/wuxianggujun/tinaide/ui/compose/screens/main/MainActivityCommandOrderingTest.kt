@@ -74,6 +74,25 @@ class MainActivityCommandOrderingTest {
             .containsExactly("project.build")
     }
 
+    @Test
+    fun `selectMainActivityOverflowCommands should cap top bar commands`() {
+        val commands = listOf(
+            command("first", MainActivityCommandCategory.VIEW),
+            command("second", MainActivityCommandCategory.BUILD),
+            command("third", MainActivityCommandCategory.CODE),
+            command("fourth", MainActivityCommandCategory.FILE),
+        )
+
+        val selected = selectMainActivityOverflowCommands(
+            commands = commands,
+            pinnedCommandIds = listOf("first", "second", "third", "fourth")
+        )
+
+        assertThat(selected.map(MainActivityCommand::id))
+            .containsExactly("first", "second", "third")
+            .inOrder()
+    }
+
     private fun command(
         id: String,
         category: MainActivityCommandCategory,

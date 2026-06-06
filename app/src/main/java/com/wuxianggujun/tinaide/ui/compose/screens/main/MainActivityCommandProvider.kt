@@ -124,7 +124,7 @@ internal fun selectMainActivityOverflowCommands(
     return preferredIds.mapNotNull(commandById::get).take(MAX_TOP_BAR_COMMANDS)
 }
 
-private const val MAX_TOP_BAR_COMMANDS = 6
+private const val MAX_TOP_BAR_COMMANDS = 3
 
 private fun buildMainActivityCommands(
     availability: MainActivityCommandAvailability,

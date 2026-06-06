@@ -1,36 +1,37 @@
 package com.wuxianggujun.tinaide.ui.compose.screens.main
 
-import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.core.compile.RunConfiguration
 import com.wuxianggujun.tinaide.core.compile.RunConfigurationManager
 import com.wuxianggujun.tinaide.core.config.DebugToolbarPosition
@@ -41,11 +42,6 @@ import com.wuxianggujun.tinaide.ui.DebugViewModel
 import com.wuxianggujun.tinaide.ui.compose.components.DebugBar
 import com.wuxianggujun.tinaide.ui.compose.components.DebugStatus
 import com.wuxianggujun.tinaide.ui.compose.components.RunConfigSelector
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenu
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuDivider
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuItem
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionHeader
-import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionTitle
 import com.wuxianggujun.tinaide.ui.compose.icons.rememberTinaPainter
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState.SplitEditorLayout
 
@@ -106,65 +102,41 @@ internal fun MainActivityTopBar(
     onShowRunConfigDialog: () -> Unit,
     callbacks: TopBarCallbacks,
     debugViewModel: DebugViewModel,
-    @StringRes overflowCommandSectionTitleRes: Int,
-    overflowCommands: List<MainActivityCommand>,
+    quickCommands: List<MainActivityCommand>,
     onExecuteCommand: (MainActivityCommand) -> Unit,
 ) {
-    var showMenu by remember { mutableStateOf(false) }
     val debugToolbarPosition by Prefs.debugToolbarPositionFlow.collectAsStateWithLifecycle()
     val showDebugBarInTop =
         isDebugActive && debugToolbarPosition != DebugToolbarPosition.BOTTOM
 
     @Composable
-    fun OverflowMenuButton() {
-        Box {
-            IconButton(onClick = { showMenu = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(Strings.content_desc_more),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+    fun CommandPaletteButton() {
+        IconButton(onClick = callbacks.onOpenCommandPalette) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = stringResource(Strings.command_palette_title),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 
-            TinaDropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.command_palette_title)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onOpenCommandPalette()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                if (overflowCommands.isNotEmpty()) {
-                    TinaDropdownMenuDivider()
-                    TinaDropdownMenuSectionHeader {
-                        TinaDropdownMenuSectionTitle(
-                            text = stringResource(overflowCommandSectionTitleRes),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    overflowCommands.forEach { command ->
-                        TinaDropdownMenuItem(
-                            text = { Text(command.titleText()) },
-                            enabled = command.enabled,
-                            onClick = {
-                                showMenu = false
-                                onExecuteCommand(command)
-                            }
-                        )
-                    }
-                }
-            }
+    @Composable
+    fun QuickCommandButton(command: MainActivityCommand) {
+        val title = command.titleText()
+        IconButton(
+            onClick = { onExecuteCommand(command) },
+            enabled = command.enabled
+        ) {
+            Icon(
+                imageVector = command.iconVector(),
+                contentDescription = title,
+                tint = if (command.enabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                },
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 
@@ -244,8 +216,11 @@ internal fun MainActivityTopBar(
                         isDirty = isDirty,
                         onSave = callbacks.onSave
                     )
+                    quickCommands.forEach { command ->
+                        QuickCommandButton(command)
+                    }
                 }
-                OverflowMenuButton()
+                CommandPaletteButton()
             }
         },
         scrollBehavior = scrollBehavior
@@ -268,6 +243,41 @@ private fun SaveActionButton(
             },
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+private fun MainActivityCommand.iconVector(): ImageVector {
+    return when (id) {
+        HostCommands.PROJECT_BUILD,
+        "project.rebuildRun",
+        "project.packageApk",
+        "project.cmake.reconfigure",
+        "project.cmake.cleanReconfigure",
+        "project.cmake.clearBuildDir",
+        "project.cmake.openArtifacts" -> Icons.Default.Build
+
+        HostCommands.PROJECT_RUN,
+        "project.runTerminal",
+        "project.debug" -> Icons.Default.PlayArrow
+
+        "view.globalSearch" -> Icons.Default.Search
+        HostCommands.VIEW_TOGGLE_TERMINAL -> Icons.Default.Terminal
+        HostCommands.VIEW_SETTINGS -> Icons.Default.Settings
+        HostCommands.VIEW_TOGGLE_FILE_TREE -> Icons.Default.Folder
+        HostCommands.PROJECT_CLOSE -> Icons.AutoMirrored.Filled.ExitToApp
+        HostCommands.EDITOR_FORMAT,
+        HostCommands.EDITOR_GOTO_LINE,
+        HostCommands.EDITOR_CODE_ACTIONS,
+        HostCommands.EDITOR_RENAME_SYMBOL -> Icons.Default.Code
+
+        else -> when (category) {
+            MainActivityCommandCategory.BUILD -> Icons.Default.Build
+            MainActivityCommandCategory.CODE -> Icons.Default.Code
+            MainActivityCommandCategory.FILE -> Icons.Default.Folder
+            MainActivityCommandCategory.TERMINAL -> Icons.Default.Terminal
+            MainActivityCommandCategory.VIEW -> Icons.Default.Search
+            MainActivityCommandCategory.PLUGIN -> Icons.Default.Code
+        }
     }
 }
 
