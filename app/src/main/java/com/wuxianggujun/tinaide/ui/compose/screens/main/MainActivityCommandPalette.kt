@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.ui.compose.screens.main
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -79,6 +80,13 @@ internal fun MainActivityCommandPalette(
             query = query
         )
     }
+    val visibleRows = remember(visibleCommands, pinnedCommandIds, recentCommandIds) {
+        groupMainActivityCommands(
+            commands = visibleCommands,
+            pinnedCommandIds = pinnedCommandIds,
+            recentCommandIds = recentCommandIds
+        ).toCommandPaletteRows()
+    }
 
     fun executeCommand(command: MainActivityCommand) {
         onDismissRequest()
@@ -93,9 +101,15 @@ internal fun MainActivityCommandPalette(
         selectedIndex = selectedIndex.coerceIn(0, visibleCommands.lastIndex.coerceAtLeast(0))
     }
 
-    LaunchedEffect(selectedIndex, visibleCommands.size) {
+    LaunchedEffect(selectedIndex, visibleRows) {
         if (visibleCommands.isNotEmpty()) {
-            listState.animateScrollToItem(selectedIndex)
+            val selectedCommandId = visibleCommands.getOrNull(selectedIndex)?.id
+            val selectedRowIndex = visibleRows.indexOfFirst { row ->
+                row is CommandPaletteRow.Command && row.command.id == selectedCommandId
+            }
+            if (selectedRowIndex >= 0) {
+                listState.animateScrollToItem(selectedRowIndex)
+            }
         }
     }
 
@@ -183,20 +197,30 @@ internal fun MainActivityCommandPalette(
                     .heightIn(max = 400.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                itemsIndexed(
-                    items = visibleCommands,
-                    key = { _, command -> command.id }
-                ) { index, command ->
-                    CommandPaletteItem(
-                        command = command,
-                        selected = index == selectedIndex,
-                        pinned = command.id in pinnedCommandIds,
-                        onClick = {
-                            selectedIndex = index
-                            executeCommand(command)
-                        },
-                        onTogglePinned = { onTogglePinned(command) }
-                    )
+                items(
+                    items = visibleRows,
+                    key = CommandPaletteRow::key
+                ) { row ->
+                    when (row) {
+                        is CommandPaletteRow.Section -> {
+                            CommandPaletteSectionHeader(titleRes = row.titleRes)
+                        }
+
+                        is CommandPaletteRow.Command -> {
+                            val command = row.command
+                            CommandPaletteItem(
+                                command = command,
+                                selected = visibleCommands.getOrNull(selectedIndex)?.id == command.id,
+                                pinned = command.id in pinnedCommandIds,
+                                onClick = {
+                                    selectedIndex = visibleCommands.indexOfFirst { it.id == command.id }
+                                        .coerceAtLeast(0)
+                                    executeCommand(command)
+                                },
+                                onTogglePinned = { onTogglePinned(command) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -217,6 +241,21 @@ private fun CommandPaletteEmptyState() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun CommandPaletteSectionHeader(
+    @StringRes titleRes: Int
+) {
+    Text(
+        text = stringResource(titleRes),
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -328,5 +367,38 @@ private fun MainActivityCommandText.asString(): String {
     return when (this) {
         is MainActivityCommandText.Literal -> value
         is MainActivityCommandText.Resource -> stringResource(resId)
+    }
+}
+
+private sealed interface CommandPaletteRow {
+    val key: String
+
+    data class Section(
+        @param:StringRes @get:StringRes val titleRes: Int,
+        val index: Int
+    ) : CommandPaletteRow {
+        override val key: String = "section:$index:$titleRes"
+    }
+
+    data class Command(
+        val command: MainActivityCommand
+    ) : CommandPaletteRow {
+        override val key: String = "command:${command.id}"
+    }
+}
+
+private fun List<MainActivityCommandGroup>.toCommandPaletteRows(): List<CommandPaletteRow> {
+    return buildList {
+        this@toCommandPaletteRows.forEachIndexed { index, group ->
+            add(
+                CommandPaletteRow.Section(
+                    titleRes = group.titleRes,
+                    index = index
+                )
+            )
+            group.commands.forEach { command ->
+                add(CommandPaletteRow.Command(command))
+            }
+        }
     }
 }

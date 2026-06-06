@@ -49,6 +49,11 @@ internal enum class MainActivityCommandSource {
     PLUGIN
 }
 
+internal data class MainActivityCommandGroup(
+    @param:StringRes @get:StringRes val titleRes: Int,
+    val commands: List<MainActivityCommand>
+)
+
 internal data class MainActivityCommand(
     val id: String,
     val title: MainActivityCommandText,
@@ -94,6 +99,55 @@ internal fun orderMainActivityCommands(
         )
         .toList()
 }
+
+internal fun groupMainActivityCommands(
+    commands: List<MainActivityCommand>,
+    pinnedCommandIds: List<String>,
+    recentCommandIds: List<String>,
+): List<MainActivityCommandGroup> {
+    val pinnedCommandIdSet = pinnedCommandIds.toSet()
+    val recentCommandIdSet = recentCommandIds.toSet()
+    val groups = mutableListOf<MainActivityCommandGroupBuilder>()
+
+    commands.forEach { command ->
+        val titleRes = command.groupTitleRes(
+            pinnedCommandIdSet = pinnedCommandIdSet,
+            recentCommandIdSet = recentCommandIdSet
+        )
+        val currentGroup = groups.lastOrNull()
+        if (currentGroup?.titleRes == titleRes) {
+            currentGroup.commands += command
+        } else {
+            groups += MainActivityCommandGroupBuilder(
+                titleRes = titleRes,
+                commands = mutableListOf(command)
+            )
+        }
+    }
+
+    return groups.map { group ->
+        MainActivityCommandGroup(
+            titleRes = group.titleRes,
+            commands = group.commands.toList()
+        )
+    }
+}
+
+private fun MainActivityCommand.groupTitleRes(
+    pinnedCommandIdSet: Set<String>,
+    recentCommandIdSet: Set<String>,
+): Int {
+    return when (id) {
+        in pinnedCommandIdSet -> Strings.command_palette_pinned
+        in recentCommandIdSet -> Strings.command_palette_quick_actions
+        else -> category.titleRes
+    }
+}
+
+private data class MainActivityCommandGroupBuilder(
+    @param:StringRes @get:StringRes val titleRes: Int,
+    val commands: MutableList<MainActivityCommand>
+)
 
 private fun List<String>.rankByCommandId(): Map<String, Int> {
     return distinct().mapIndexed { index, commandId -> commandId to index }.toMap()

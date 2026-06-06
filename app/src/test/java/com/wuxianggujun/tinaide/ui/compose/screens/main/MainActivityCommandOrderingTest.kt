@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.ui.compose.screens.main
 
 import android.app.Application
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.i18n.Strings
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -90,6 +91,39 @@ class MainActivityCommandOrderingTest {
 
         assertThat(selected.map(MainActivityCommand::id))
             .containsExactly("first", "second", "third")
+            .inOrder()
+    }
+
+    @Test
+    fun `groupMainActivityCommands should split pinned recent and category commands`() {
+        val commands = listOf(
+            command("pinned", MainActivityCommandCategory.VIEW),
+            command("recent", MainActivityCommandCategory.BUILD),
+            command("code", MainActivityCommandCategory.CODE),
+            command("build", MainActivityCommandCategory.BUILD),
+        )
+
+        val groups = groupMainActivityCommands(
+            commands = commands,
+            pinnedCommandIds = listOf("pinned"),
+            recentCommandIds = listOf("recent")
+        )
+
+        assertThat(groups.map(MainActivityCommandGroup::titleRes))
+            .containsExactly(
+                Strings.command_palette_pinned,
+                Strings.command_palette_quick_actions,
+                Strings.menu_section_code,
+                Strings.menu_section_build
+            )
+            .inOrder()
+        assertThat(groups.map { group -> group.commands.map(MainActivityCommand::id) })
+            .containsExactly(
+                listOf("pinned"),
+                listOf("recent"),
+                listOf("code"),
+                listOf("build")
+            )
             .inOrder()
     }
 
