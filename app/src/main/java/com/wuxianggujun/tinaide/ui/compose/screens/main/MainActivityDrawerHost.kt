@@ -10,6 +10,9 @@ import com.wuxianggujun.tinaide.ui.compose.components.SwipeableDrawer
 internal fun MainActivityDrawerHost(
     uiState: MainActivityScreenUiState,
     dependencies: MainActivityDrawerDependencies,
+    showCommandPalette: Boolean,
+    onOpenCommandPalette: () -> Unit,
+    onDismissCommandPalette: () -> Unit,
     callbacks: MainActivityScreenCallbacks,
 ) {
     BackHandler(enabled = dependencies.drawerState.isOpen || dependencies.editorContainerState.hasUnsavedChanges()) {
@@ -55,7 +58,11 @@ internal fun MainActivityDrawerHost(
                     compileDelegate = dependencies.compileDelegate,
                     actionsDelegate = dependencies.actionsDelegate,
                     navigationDelegate = dependencies.navigationDelegate,
+                    hostCommandExecutor = dependencies.hostCommandExecutor,
                     debugViewModel = dependencies.debugViewModel,
+                    showCommandPalette = showCommandPalette,
+                    onOpenCommandPalette = onOpenCommandPalette,
+                    onDismissCommandPalette = onDismissCommandPalette,
                     callbacks = callbacks,
                 )
             }

@@ -144,6 +144,31 @@ class PluginKeyBindingResolverTest {
         assertThat(PluginKeyBindingResolver.isCommandSupported(binding)).isFalse()
     }
 
+    @Test
+    fun `isCommandSupported should return false after plugin commands are cleaned`() {
+        val commandId = "plugin.keybinding.sayHello"
+        val binding = ResolvedPluginKeyBinding(
+            key = "Ctrl+K",
+            shortcut = PluginKeyBindingResolver.parseShortcut("Ctrl+K")!!,
+            commandId = commandId,
+            pluginId = "plugin.keybinding",
+            whenExpression = null
+        )
+        PluginCommandRegistry.register(
+            pluginId = "plugin.keybinding",
+            pluginName = "Plugin Keybinding",
+            commandId = commandId,
+            callbackName = "sayHello",
+            title = "Say Hello"
+        ).getOrThrow()
+
+        assertThat(PluginKeyBindingResolver.isCommandSupported(binding)).isTrue()
+
+        PluginCommandRegistry.unregisterAll("plugin.keybinding")
+
+        assertThat(PluginKeyBindingResolver.isCommandSupported(binding)).isFalse()
+    }
+
     private fun createPlugin(
         keybindingPaths: List<String>
     ): InstalledPlugin {

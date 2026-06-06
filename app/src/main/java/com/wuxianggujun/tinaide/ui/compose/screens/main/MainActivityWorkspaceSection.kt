@@ -2,6 +2,10 @@ package com.wuxianggujun.tinaide.ui.compose.screens.main
 
 import android.app.Activity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.wuxianggujun.tinaide.core.compile.ProcessManager
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
@@ -64,6 +68,9 @@ internal fun MainActivityWorkspaceSection(
     val screenUiState = mainScreenState.screenUiState
     val uiScope = mainScreenState.scope
     val editorContainerState = editorHostState.editorContainerState
+    var showCommandPalette by remember { mutableStateOf(false) }
+    val openCommandPalette = { showCommandPalette = true }
+    val dismissCommandPalette = { showCommandPalette = false }
 
     val currentAiChatViewModel = mainActivityHostEffects(
         context = activity,
@@ -94,14 +101,15 @@ internal fun MainActivityWorkspaceSection(
         compileActionsHelper = compileActionsHelper,
         hostScope = lifecycleScope,
         onOpenRunConfig = { buildUiState.openRunConfigDialog() },
+        onOpenCommandPalette = openCommandPalette,
         callbacks = callbacks,
     )
 
     BindMainActivityEditorHost(
         editorContainerState = editorContainerState,
         editorActionBridge = editorActionBridge,
-        actionsDelegate = actionsDelegate,
         shortcutDispatcher = shortcutDispatcher,
+        hostCommandExecutor = workspaceUi.hostCommandExecutor,
         editorActionsState = editorActionsState,
         locationDialogState = locationDialogState,
         scope = uiScope,
@@ -149,6 +157,9 @@ internal fun MainActivityWorkspaceSection(
         actionsDelegate = actionsDelegate,
         compileDelegate = compileDelegate,
         navigationDelegate = navigationDelegate,
+        showCommandPalette = showCommandPalette,
+        onOpenCommandPalette = openCommandPalette,
+        onDismissCommandPalette = dismissCommandPalette,
         callbacks = workspaceUi.screenCallbacks,
     )
 

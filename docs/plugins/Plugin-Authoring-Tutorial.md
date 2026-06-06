@@ -170,11 +170,13 @@ my-config-plugin/
 这里要特别区分三件事：
 
 - `contributions.commands`：声明命令标题，用于菜单显示，不等于已经有可执行逻辑
-- 宿主内置命令：由 `HostCommands` 提供，配置插件可以直接引用
+- 宿主内置命令：稳定 ID 由 `HostCommands` 暴露，元数据以 `HostCommandCatalog` 为单一来源，配置插件可以直接引用白名单命令
 - 插件运行时命令：由脚本在加载时调用 `tina.commands.register(...)` 注册
 
 菜单项最终会按“宿主内置命令 → 当前插件已注册命令”的顺序判断能否显示。
 如果两个都不命中，菜单项会被忽略。
+`editor/toolbar` 菜单项除了显示在编辑器标签栏右侧插件动作菜单，也会进入主编辑器命令面板。
+主界面内部命令不是插件 API，例如 `project.rebuildRun`、`project.debug`、`project.packageApk`、`project.cmake.*`、`view.split.*`、`view.globalSearch`。这些命令只服务当前 Activity 的 UI 编排，插件不要直接依赖。
 
 文件树菜单常用的 `when`：
 

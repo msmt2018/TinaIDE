@@ -57,6 +57,22 @@ internal fun KeyboardSettingsSection() {
 
     Spacer(modifier = Modifier.height(8.dp))
 
+    // 命令入口
+    SettingsCategoryTitle(stringResource(Strings.settings_cat_command_access))
+
+    SettingsCard {
+        ShortcutItem(
+            action = ShortcutAction.COMMAND_PALETTE,
+            shortcut = shortcuts[ShortcutAction.COMMAND_PALETTE]!!,
+            isModified = KeyboardSettingsSectionSupport.isShortcutModified(
+                currentShortcut = shortcuts[ShortcutAction.COMMAND_PALETTE]!!,
+                defaultShortcut = KeyboardShortcutManager.getDefaultShortcut(ShortcutAction.COMMAND_PALETTE)
+            ),
+            onClick = { editingAction = ShortcutAction.COMMAND_PALETTE },
+            showDivider = false
+        )
+    }
+
     // 文件操作
     SettingsCategoryTitle(stringResource(Strings.settings_cat_file_operations))
 

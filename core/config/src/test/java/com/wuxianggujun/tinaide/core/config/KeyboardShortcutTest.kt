@@ -2,6 +2,9 @@ package com.wuxianggujun.tinaide.core.config
 
 import android.view.KeyEvent
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import com.wuxianggujun.tinaide.core.commands.HostCommandCatalog
+import com.wuxianggujun.tinaide.core.commands.HostCommands
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -13,6 +16,28 @@ import org.robolectric.RobolectricTestRunner
  */
 @RunWith(RobolectricTestRunner::class)
 class KeyboardShortcutTest {
+
+    @Test
+    fun `shortcut actions should map to supported host commands`() {
+        ShortcutAction.entries.forEach { action ->
+            assertWithMessage(action.name)
+                .that(HostCommands.isSupported(action.commandId))
+                .isTrue()
+            assertWithMessage(action.name)
+                .that(HostCommandCatalog.requireDescriptor(action.commandId).defaultShortcut)
+                .isNotNull()
+        }
+    }
+
+    @Test
+    fun `catalog shortcuts should have shortcut actions`() {
+        val actionCommandIds = ShortcutAction.entries.map(ShortcutAction::commandId)
+        val catalogShortcutCommandIds = HostCommandCatalog.descriptors
+            .filter { descriptor -> descriptor.defaultShortcut != null }
+            .map { descriptor -> descriptor.id }
+
+        assertThat(actionCommandIds).containsExactlyElementsIn(catalogShortcutCommandIds)
+    }
 
     // ==================== toJson / fromJson 往返测试 ====================
 

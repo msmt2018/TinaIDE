@@ -3,6 +3,8 @@ package com.wuxianggujun.tinaide.core.config
 import android.content.SharedPreferences
 import android.view.KeyEvent
 import androidx.annotation.StringRes
+import com.wuxianggujun.tinaide.core.commands.HostCommandCatalog
+import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import org.json.JSONObject
 
@@ -10,30 +12,102 @@ import org.json.JSONObject
  * 快捷键动作枚举
  */
 enum class ShortcutAction(
-    @param:StringRes @get:StringRes val displayNameRes: Int,
-    @param:StringRes @get:StringRes val descriptionRes: Int
+    @param:StringRes @get:StringRes val descriptionRes: Int,
+    val commandId: String
 ) {
-    SAVE(Strings.cmd_editor_save, Strings.shortcut_desc_save_current_file),
-    SAVE_ALL(Strings.cmd_editor_save_all, Strings.shortcut_desc_save_all_files),
-    CLOSE_TAB(Strings.action_close_current_tab, Strings.shortcut_desc_close_current_tab),
-    CLOSE_ALL_TABS(Strings.action_close_all_tabs, Strings.shortcut_desc_close_all_tabs),
-    UNDO(Strings.cmd_editor_undo, Strings.shortcut_desc_undo),
-    REDO(Strings.cmd_editor_redo, Strings.shortcut_desc_redo),
-    NEXT_TAB(Strings.shortcut_action_next_tab, Strings.shortcut_desc_next_tab),
-    PREV_TAB(Strings.shortcut_action_prev_tab, Strings.shortcut_desc_prev_tab),
-    TOGGLE_BOOKMARK(Strings.content_desc_toggle_bookmark, Strings.shortcut_desc_toggle_bookmark),
-    NEXT_BOOKMARK(Strings.content_desc_next_bookmark, Strings.shortcut_desc_next_bookmark),
-    PREV_BOOKMARK(Strings.content_desc_prev_bookmark, Strings.shortcut_desc_prev_bookmark),
-    NAVIGATE_BACK(Strings.cmd_editor_navigate_back, Strings.shortcut_desc_navigate_back),
-    NAVIGATE_FORWARD(Strings.cmd_editor_navigate_forward, Strings.shortcut_desc_navigate_forward),
-    PEEK_DEFINITION(Strings.lsp_peek_definition, Strings.shortcut_desc_peek_definition),
-    GOTO_DEFINITION(Strings.lsp_goto_definition, Strings.shortcut_desc_goto_definition),
-    FIND_REFERENCES(Strings.lsp_find_references, Strings.shortcut_desc_find_references),
-    GOTO_TYPE_DEFINITION(Strings.lsp_goto_type_definition, Strings.shortcut_desc_goto_type_definition),
-    GOTO_IMPLEMENTATION(Strings.lsp_goto_implementation, Strings.shortcut_desc_goto_implementation),
-    CODE_ACTIONS(Strings.code_actions_title, Strings.shortcut_desc_code_actions),
-    RENAME_SYMBOL(Strings.lsp_template_rename, Strings.shortcut_desc_rename_symbol),
-    SWITCH_HEADER_SOURCE(Strings.cmd_editor_switch_header_source, Strings.shortcut_desc_switch_header_source)
+    COMMAND_PALETTE(
+        Strings.shortcut_desc_command_palette,
+        HostCommands.VIEW_COMMAND_PALETTE
+    ),
+    SAVE(
+        Strings.shortcut_desc_save_current_file,
+        HostCommands.EDITOR_SAVE
+    ),
+    SAVE_ALL(
+        Strings.shortcut_desc_save_all_files,
+        HostCommands.EDITOR_SAVE_ALL
+    ),
+    CLOSE_TAB(
+        Strings.shortcut_desc_close_current_tab,
+        HostCommands.EDITOR_CLOSE
+    ),
+    CLOSE_ALL_TABS(
+        Strings.shortcut_desc_close_all_tabs,
+        HostCommands.EDITOR_CLOSE_ALL
+    ),
+    UNDO(Strings.shortcut_desc_undo, HostCommands.EDITOR_UNDO),
+    REDO(Strings.shortcut_desc_redo, HostCommands.EDITOR_REDO),
+    NEXT_TAB(
+        Strings.shortcut_desc_next_tab,
+        HostCommands.EDITOR_NEXT_TAB
+    ),
+    PREV_TAB(
+        Strings.shortcut_desc_prev_tab,
+        HostCommands.EDITOR_PREVIOUS_TAB
+    ),
+    TOGGLE_BOOKMARK(
+        Strings.shortcut_desc_toggle_bookmark,
+        HostCommands.EDITOR_TOGGLE_BOOKMARK
+    ),
+    NEXT_BOOKMARK(
+        Strings.shortcut_desc_next_bookmark,
+        HostCommands.EDITOR_NEXT_BOOKMARK
+    ),
+    PREV_BOOKMARK(
+        Strings.shortcut_desc_prev_bookmark,
+        HostCommands.EDITOR_PREVIOUS_BOOKMARK
+    ),
+    NAVIGATE_BACK(
+        Strings.shortcut_desc_navigate_back,
+        HostCommands.EDITOR_NAVIGATE_BACK
+    ),
+    NAVIGATE_FORWARD(
+        Strings.shortcut_desc_navigate_forward,
+        HostCommands.EDITOR_NAVIGATE_FORWARD
+    ),
+    PEEK_DEFINITION(
+        Strings.shortcut_desc_peek_definition,
+        HostCommands.EDITOR_PEEK_DEFINITION
+    ),
+    GOTO_DEFINITION(
+        Strings.shortcut_desc_goto_definition,
+        HostCommands.EDITOR_GOTO_DEFINITION
+    ),
+    FIND_REFERENCES(
+        Strings.shortcut_desc_find_references,
+        HostCommands.EDITOR_FIND_REFERENCES
+    ),
+    GOTO_TYPE_DEFINITION(
+        Strings.shortcut_desc_goto_type_definition,
+        HostCommands.EDITOR_GOTO_TYPE_DEFINITION
+    ),
+    GOTO_IMPLEMENTATION(
+        Strings.shortcut_desc_goto_implementation,
+        HostCommands.EDITOR_GOTO_IMPLEMENTATION
+    ),
+    CODE_ACTIONS(
+        Strings.shortcut_desc_code_actions,
+        HostCommands.EDITOR_CODE_ACTIONS
+    ),
+    RENAME_SYMBOL(
+        Strings.shortcut_desc_rename_symbol,
+        HostCommands.EDITOR_RENAME_SYMBOL
+    ),
+    SWITCH_HEADER_SOURCE(
+        Strings.shortcut_desc_switch_header_source,
+        HostCommands.EDITOR_SWITCH_HEADER_SOURCE
+    );
+
+    @get:StringRes
+    val displayNameRes: Int
+        get() = HostCommandCatalog.requireDescriptor(commandId).titleRes
+
+    companion object {
+        fun forCommandId(commandId: String): ShortcutAction? {
+            val normalizedCommandId = commandId.trim()
+            return entries.firstOrNull { it.commandId == normalizedCommandId }
+        }
+    }
 }
 
 /**
@@ -191,29 +265,18 @@ object KeyboardShortcutManager {
     /**
      * 默认快捷键配置
      */
-    private val defaultShortcuts: Map<ShortcutAction, KeyboardShortcut> = mapOf(
-        ShortcutAction.SAVE to KeyboardShortcut(KeyEvent.KEYCODE_S, ctrl = true),
-        ShortcutAction.SAVE_ALL to KeyboardShortcut(KeyEvent.KEYCODE_S, ctrl = true, shift = true),
-        ShortcutAction.CLOSE_TAB to KeyboardShortcut(KeyEvent.KEYCODE_W, ctrl = true),
-        ShortcutAction.CLOSE_ALL_TABS to KeyboardShortcut(KeyEvent.KEYCODE_W, ctrl = true, shift = true),
-        ShortcutAction.UNDO to KeyboardShortcut(KeyEvent.KEYCODE_Z, ctrl = true),
-        ShortcutAction.REDO to KeyboardShortcut(KeyEvent.KEYCODE_Z, ctrl = true, shift = true),
-        ShortcutAction.NEXT_TAB to KeyboardShortcut(KeyEvent.KEYCODE_TAB, ctrl = true),
-        ShortcutAction.PREV_TAB to KeyboardShortcut(KeyEvent.KEYCODE_TAB, ctrl = true, shift = true),
-        ShortcutAction.TOGGLE_BOOKMARK to KeyboardShortcut(KeyEvent.KEYCODE_F2, ctrl = true),
-        ShortcutAction.NEXT_BOOKMARK to KeyboardShortcut(KeyEvent.KEYCODE_F2),
-        ShortcutAction.PREV_BOOKMARK to KeyboardShortcut(KeyEvent.KEYCODE_F2, shift = true),
-        ShortcutAction.NAVIGATE_BACK to KeyboardShortcut(KeyEvent.KEYCODE_DPAD_LEFT, alt = true),
-        ShortcutAction.NAVIGATE_FORWARD to KeyboardShortcut(KeyEvent.KEYCODE_DPAD_RIGHT, alt = true),
-        ShortcutAction.PEEK_DEFINITION to KeyboardShortcut(KeyEvent.KEYCODE_F12, alt = true),
-        ShortcutAction.GOTO_DEFINITION to KeyboardShortcut(KeyEvent.KEYCODE_F12),
-        ShortcutAction.FIND_REFERENCES to KeyboardShortcut(KeyEvent.KEYCODE_F12, shift = true),
-        ShortcutAction.GOTO_TYPE_DEFINITION to KeyboardShortcut(KeyEvent.KEYCODE_F12, ctrl = true, shift = true),
-        ShortcutAction.GOTO_IMPLEMENTATION to KeyboardShortcut(KeyEvent.KEYCODE_F12, ctrl = true),
-        ShortcutAction.CODE_ACTIONS to KeyboardShortcut(KeyEvent.KEYCODE_ENTER, alt = true),
-        ShortcutAction.RENAME_SYMBOL to KeyboardShortcut(KeyEvent.KEYCODE_F6, shift = true),
-        ShortcutAction.SWITCH_HEADER_SOURCE to KeyboardShortcut(KeyEvent.KEYCODE_O, alt = true)
-    )
+    private val defaultShortcuts: Map<ShortcutAction, KeyboardShortcut> by lazy {
+        ShortcutAction.entries.associateWith { action ->
+            val shortcut = HostCommandCatalog.requireDescriptor(action.commandId).defaultShortcut
+                ?: error("Missing default shortcut for ${action.commandId}")
+            KeyboardShortcut(
+                keyCode = shortcut.keyCode,
+                ctrl = shortcut.ctrl,
+                shift = shortcut.shift,
+                alt = shortcut.alt
+            )
+        }
+    }
 
     /**
      * 获取指定动作的快捷键配置

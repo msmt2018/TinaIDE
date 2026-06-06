@@ -88,6 +88,24 @@ class PluginCommandRegistryTest {
     }
 
     @Test
+    fun `dispatch should return false when runtime provider has no runtime`() {
+        PluginCommandRegistry.register(
+            pluginId = "plugin.one",
+            pluginName = "Plugin One",
+            commandId = "plugin.sayHello",
+            callbackName = "handleHello",
+            title = "Say hello"
+        ).getOrThrow()
+
+        val dispatched = PluginCommandRegistry.dispatch(
+            commandId = "plugin.sayHello",
+            invocation = HostCommandInvocation()
+        )
+
+        assertThat(dispatched).isFalse()
+    }
+
+    @Test
     fun `unregisterAll should remove all commands from plugin`() {
         PluginCommandRegistry.register(
             pluginId = "plugin.one",

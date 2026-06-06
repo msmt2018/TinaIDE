@@ -785,6 +785,7 @@
   <string name="settings_cat_file_operations">File Operations</string>
   <string name="settings_cat_tabs">Tabs</string>
   <string name="settings_cat_edit">Edit</string>
+  <string name="settings_cat_command_access">Command Access</string>
   <string name="settings_cat_reset">Reset</string>
   <string name="settings_restore_shortcuts">Restore Default Shortcuts</string>
   <string name="settings_restore_shortcuts_desc">Reset all shortcuts to default values</string>
@@ -823,6 +824,7 @@
   <string name="shortcut_desc_code_actions">Show code actions for the current cursor or selection</string>
   <string name="shortcut_desc_rename_symbol">Rename the current symbol</string>
   <string name="shortcut_desc_switch_header_source">Switch between C/C++ header and source files</string>
+  <string name="shortcut_desc_command_palette">Open the command palette</string>
 
   <!-- Editor Settings -->
   <string name="settings_custom_font">Custom Font</string>
@@ -1543,8 +1545,20 @@
   <string name="content_desc_open_file_tree">Open file tree</string>
   <string name="content_desc_debug">Debug</string>
   <string name="content_desc_more">More</string>
+  <string name="command_palette_title">Command Palette</string>
+  <string name="command_palette_search_hint">Search commands</string>
+  <string name="command_palette_empty">No matching commands</string>
+  <string name="command_palette_pinned">Pinned</string>
+  <string name="command_palette_quick_actions">Quick Actions</string>
+  <string name="command_palette_pin_command">Pin command</string>
+  <string name="command_palette_unpin_command">Unpin command</string>
+  <string name="command_palette_plugin_source">Plugin: %1$s</string>
   <string name="menu_section_file">File</string>
   <string name="menu_section_code">Code</string>
+  <string name="menu_section_plugin">Plugin</string>
+  <string name="menu_code_history">History</string>
+  <string name="menu_code_navigation">Go To and Find</string>
+  <string name="menu_code_refactor">Refactor and Actions</string>
 <string name="menu_save_all">Save All</string>
   <string name="menu_format_code">Format Code</string>
   <string name="menu_goto_line">Go to Line</string>
@@ -1918,6 +1932,7 @@ kept=%3$d bytes
   <string name="run_config_title">Run Configuration</string>
   <string name="run_config_name_label">Configuration Name</string>
   <string name="run_config_name_placeholder">Debug</string>
+  <string name="run_config_default_name">New Config</string>
   <string name="run_config_name_copy_suffix"> (Copy)</string>
   <string name="run_config_compiler_label">Compiler</string>
   <string name="run_config_compiler_status">Status: %1$s</string>

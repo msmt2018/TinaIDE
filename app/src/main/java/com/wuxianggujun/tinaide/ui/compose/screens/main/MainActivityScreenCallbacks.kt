@@ -202,6 +202,7 @@ internal fun rememberMainActivityWorkspaceUi(
     compileActionsHelper: CompileActionsHelper,
     hostScope: CoroutineScope,
     onOpenRunConfig: () -> Unit,
+    onOpenCommandPalette: () -> Unit,
     callbacks: MainActivityWorkspaceCallbacks,
 ): MainActivityWorkspaceUi {
     val hostCommandExecutor = rememberMainActivityHostCommandExecutor(
@@ -218,6 +219,7 @@ internal fun rememberMainActivityWorkspaceUi(
         scope = hostScope,
         openSettings = callbacks.onOpenSettings,
         openRunConfig = onOpenRunConfig,
+        openCommandPalette = onOpenCommandPalette,
         toastInfo = callbacks.toastInfo,
     )
 

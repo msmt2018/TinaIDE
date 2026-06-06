@@ -7,6 +7,7 @@ import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.plugin.PluginManifest
 import com.wuxianggujun.tinaide.plugin.PluginStateSnapshot
 import com.wuxianggujun.tinaide.plugin.script.api.EventListener
+import com.wuxianggujun.tinaide.plugin.script.api.PluginCommandRegistry
 import com.wuxianggujun.tinaide.plugin.script.api.PluginEventBus
 import io.mockk.every
 import io.mockk.just
@@ -41,6 +42,8 @@ class ScriptPluginManagerTest {
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         PluginEventBus.clear()
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
         pluginManager = mockk(relaxed = true)
         every { pluginManager.pluginStateFlow } returns MutableStateFlow(PluginStateSnapshot())
         manager = createManager(context, pluginManager)
@@ -51,6 +54,8 @@ class ScriptPluginManagerTest {
         runtimesOf(manager).clear()
         manager.shutdown()
         PluginEventBus.clear()
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
     }
 
     @Test
@@ -61,6 +66,12 @@ class ScriptPluginManagerTest {
 
         runtimesOf(manager)[pluginId] = runtime
         PluginEventBus.subscribe(pluginId, "project.opened", "onProjectOpened")
+        PluginCommandRegistry.register(
+            pluginId = pluginId,
+            pluginName = "Plugin $pluginId",
+            commandId = "plugin.disabled.command",
+            callbackName = "onDisabledCommand"
+        ).getOrThrow()
 
         invokeSyncWithInstalledPlugins(
             manager,
@@ -76,6 +87,7 @@ class ScriptPluginManagerTest {
         assertThat(manager.getRuntime(pluginId)).isNull()
         assertThat(manager.pluginStates.value[pluginId]?.state).isEqualTo(ScriptPluginState.DISABLED)
         assertThat(listenersOfEventBus().values.flatten().any { it.pluginId == pluginId }).isFalse()
+        assertThat(PluginCommandRegistry.isRegistered("plugin.disabled.command", pluginId)).isFalse()
         verify(exactly = 1) { runtime.destroy() }
     }
 
@@ -91,12 +103,19 @@ class ScriptPluginManagerTest {
             state = ScriptPluginState.ACTIVE
         )
         PluginEventBus.subscribe(pluginId, "project.closed", "onProjectClosed")
+        PluginCommandRegistry.register(
+            pluginId = pluginId,
+            pluginName = "Plugin $pluginId",
+            commandId = "plugin.uninstalled.command",
+            callbackName = "onUninstalledCommand"
+        ).getOrThrow()
 
         invokeSyncWithInstalledPlugins(manager, emptyList())
 
         assertThat(manager.getRuntime(pluginId)).isNull()
         assertThat(manager.pluginStates.value).doesNotContainKey(pluginId)
         assertThat(listenersOfEventBus().values.flatten().any { it.pluginId == pluginId }).isFalse()
+        assertThat(PluginCommandRegistry.isRegistered("plugin.uninstalled.command", pluginId)).isFalse()
         verify(exactly = 1) { runtime.destroy() }
     }
 

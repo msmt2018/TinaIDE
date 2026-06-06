@@ -983,6 +983,7 @@
   <string name="settings_cat_file_operations">文件操作</string>
   <string name="settings_cat_tabs">标签页</string>
   <string name="settings_cat_edit">编辑</string>
+  <string name="settings_cat_command_access">命令入口</string>
   <string name="settings_cat_bookmarks">书签</string>
   <string name="settings_cat_reset">重置</string>
   <string name="settings_restore_shortcuts">恢复默认快捷键</string>
@@ -1022,6 +1023,7 @@
   <string name="shortcut_desc_code_actions">显示当前光标或选区可用的代码操作</string>
   <string name="shortcut_desc_rename_symbol">重命名当前符号</string>
   <string name="shortcut_desc_switch_header_source">在 C/C++ 头文件与源文件之间切换</string>
+  <string name="shortcut_desc_command_palette">打开命令面板</string>
 
   <!-- Editor Settings -->
   <string name="settings_custom_font">自定义字体</string>
@@ -2095,8 +2097,20 @@
   <string name="content_desc_open_file_tree">打开文件树</string>
   <string name="content_desc_debug">调试</string>
   <string name="content_desc_more">更多</string>
+  <string name="command_palette_title">命令面板</string>
+  <string name="command_palette_search_hint">搜索命令</string>
+  <string name="command_palette_empty">没有匹配的命令</string>
+  <string name="command_palette_pinned">置顶命令</string>
+  <string name="command_palette_quick_actions">快捷操作</string>
+  <string name="command_palette_pin_command">置顶命令</string>
+  <string name="command_palette_unpin_command">取消置顶命令</string>
+  <string name="command_palette_plugin_source">插件：%1$s</string>
   <string name="menu_section_file">文件</string>
   <string name="menu_section_code">代码</string>
+  <string name="menu_section_plugin">插件</string>
+  <string name="menu_code_history">历史位置</string>
+  <string name="menu_code_navigation">跳转与查找</string>
+  <string name="menu_code_refactor">重构与操作</string>
 <string name="menu_save_all">全部保存</string>
   <string name="menu_format_code">格式化代码</string>
   <string name="menu_goto_line">跳转到行</string>
@@ -2986,6 +3000,7 @@ kept=%3$d bytes
   <string name="run_config_title">运行配置</string>
   <string name="run_config_name_label">配置名称</string>
   <string name="run_config_name_placeholder">Debug</string>
+  <string name="run_config_default_name">新配置</string>
   <string name="run_config_name_copy_suffix"> (副本)</string>
   <string name="run_config_compiler_label">编译器</string>
   <string name="run_config_compiler_status">状态: %1$s</string>

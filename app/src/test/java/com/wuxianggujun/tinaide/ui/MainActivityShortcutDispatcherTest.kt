@@ -9,8 +9,11 @@ import com.wuxianggujun.tinaide.core.commands.HostCommandInvocation
 import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.core.config.KeyboardShortcut
 import com.wuxianggujun.tinaide.core.config.KeyboardShortcutManager
+import com.wuxianggujun.tinaide.core.config.ShortcutAction
 import com.wuxianggujun.tinaide.plugin.ResolvedPluginKeyBinding
+import com.wuxianggujun.tinaide.plugin.script.api.PluginCommandRegistry
 import java.io.File
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +37,44 @@ class MainActivityShortcutDispatcherTest {
         val prefs = context.getSharedPreferences("shortcut-dispatcher-test", Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
         KeyboardShortcutManager.initialize(prefs)
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
+    }
+
+    @After
+    fun tearDown() {
+        PluginCommandRegistry.clear()
+        PluginCommandRegistry.setRuntimeProvider { null }
+    }
+
+    @Test
+    fun `dispatch should open command palette for matching shortcut`() {
+        val dispatcher = MainActivityShortcutDispatcher()
+        val calls = mutableListOf<Pair<String, HostCommandInvocation>>()
+        dispatcher.bind(
+            hostCommandExecutor = object : HostCommandExecutor {
+                override fun execute(commandId: String, invocation: HostCommandInvocation): Boolean {
+                    calls += commandId to invocation
+                    return true
+                }
+            },
+            invocationProvider = { HostCommandInvocation(isDirty = true) }
+        )
+
+        val handled = dispatcher.dispatch(
+            keyEvent(
+                keyCode = KeyEvent.KEYCODE_P,
+                ctrl = true,
+                shift = true
+            )
+        )
+
+        assertThat(handled).isTrue()
+        assertThat(calls.single().first).isEqualTo(HostCommands.VIEW_COMMAND_PALETTE)
+        assertThat(calls.single().second.isDirty).isTrue()
+        assertThat(
+            KeyboardShortcutManager.getDefaultShortcut(ShortcutAction.COMMAND_PALETTE).toDisplayString()
+        ).isEqualTo("Ctrl + Shift + P")
     }
 
     @Test
@@ -95,6 +136,38 @@ class MainActivityShortcutDispatcherTest {
             },
             invocationProvider = { HostCommandInvocation(isDirty = false) },
             editorFocusProvider = { false },
+            hostCommandExecutor = object : HostCommandExecutor {
+                override fun execute(commandId: String, invocation: HostCommandInvocation): Boolean {
+                    executed = true
+                    return true
+                }
+            }
+        )
+
+        val handled = dispatcher.dispatch(keyEvent(KeyEvent.KEYCODE_K, ctrl = true))
+
+        assertThat(handled).isFalse()
+        assertThat(executed).isFalse()
+    }
+
+    @Test
+    fun `dispatch should ignore cached plugin keybinding after command is cleaned`() {
+        val dispatcher = MainActivityShortcutDispatcher()
+        var executed = false
+        dispatcher.bindPluginKeyBindings(
+            keyBindingsProvider = {
+                listOf(
+                    ResolvedPluginKeyBinding(
+                        key = "Ctrl+K",
+                        shortcut = ctrlKShortcut(),
+                        commandId = "plugin.keybinding.sayHello",
+                        pluginId = "plugin.keybinding",
+                        whenExpression = "editorFocus == true"
+                    )
+                )
+            },
+            invocationProvider = { HostCommandInvocation(isDirty = false) },
+            editorFocusProvider = { true },
             hostCommandExecutor = object : HostCommandExecutor {
                 override fun execute(commandId: String, invocation: HostCommandInvocation): Boolean {
                     executed = true

@@ -166,12 +166,15 @@ my-plugin/
 
 - `contributions.panels`
 
-> 备注（与源码同步）：`editor/toolbar` 已接入编辑器标签栏右侧插件动作菜单；
-> `keybindings` 已接入 MainActivity 硬件键盘快捷键分发。
+> 备注（与源码同步）：`editor/toolbar` 已接入编辑器标签栏右侧插件动作菜单，
+> 同时会进入主编辑器命令面板；`keybindings` 已接入 MainActivity 硬件键盘快捷键分发。
 
 ## 宿主内置命令总览
 
 > 以下命令可被配置插件直接引用；宿主会在对应场景下执行，未知命令会被忽略。
+> 源码事实：`HostCommandCatalog` 是宿主命令元数据单一来源，`HostCommands` 只保留稳定 ID 与查询代理。
+> 插件校验、命令面板和内置快捷键都应从该目录派生；主界面内部命令不进入插件白名单。
+> 不要在插件中依赖 `project.rebuildRun`、`project.debug`、`project.packageApk`、`project.cmake.*`、`view.split.*`、`view.globalSearch` 等 app-local 命令。
 
 ### 文件操作（11 个）
 
@@ -187,13 +190,15 @@ my-plugin/
 - `file.share`：分享（文件/目录；目录会先导出 zip）
 - `file.revealInFileManager`：在文件管理器中显示（定位到文件树并展开）
 
-### 编辑器操作（17 个）
+### 编辑器操作（32 个）
 
 - `editor.save`：保存
 - `editor.saveAll`：保存全部
 - `editor.close`：关闭当前标签
 - `editor.closeAll`：关闭全部标签
 - `editor.closeOthers`：关闭其他标签
+- `editor.nextTab`：切换到下一个标签
+- `editor.previousTab`：切换到上一个标签
 - `editor.undo`：撤销
 - `editor.redo`：重做
 - `editor.selectAll`：全选
@@ -206,6 +211,17 @@ my-plugin/
 - `editor.toggleWordWrap`：切换自动换行
 - `editor.format`：格式化代码
 - `editor.toggleComment`：切换注释（行注释）
+- `editor.peekDefinition`：预览定义
+- `editor.gotoDefinition`：跳转到定义
+- `editor.findReferences`：查找引用
+- `editor.gotoTypeDefinition`：跳转到类型定义
+- `editor.gotoImplementation`：跳转到实现
+- `editor.codeActions`：代码操作/快速修复
+- `editor.renameSymbol`：重命名符号
+- `editor.switchHeaderSource`：切换头文件/源文件
+- `editor.toggleBookmark`：切换书签
+- `editor.nextBookmark`：跳转到下一个书签
+- `editor.previousBookmark`：跳转到上一个书签
 
 ### 终端操作（4 个）
 
@@ -222,11 +238,13 @@ my-plugin/
 - `project.settings`：项目设置（运行配置）
 - `project.close`：关闭项目
 
-### 视图切换（4 个）
+### 视图切换（6 个）
 
 - `view.toggleFileTree`：显示/隐藏文件树
 - `view.toggleSymbols`：显示/隐藏符号面板
 - `view.toggleTerminal`：显示/隐藏终端（同 `terminal.toggle`）
+- `view.commandPalette`：打开命令面板
+- `view.bookmarks`：打开书签面板
 - `view.settings`：打开设置
 
 ## 内置插件（assets）放置位置

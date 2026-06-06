@@ -44,6 +44,9 @@ internal fun MainActivityDrawerSection(
     actionsDelegate: MainActivityActionsDelegate,
     compileDelegate: MainActivityCompileDelegate,
     navigationDelegate: MainActivityNavigationDelegate,
+    showCommandPalette: Boolean,
+    onOpenCommandPalette: () -> Unit,
+    onDismissCommandPalette: () -> Unit,
     callbacks: MainActivityScreenCallbacks,
 ) {
     val dependencies = rememberMainActivityDrawerDependencies(
@@ -72,6 +75,9 @@ internal fun MainActivityDrawerSection(
     MainActivityDrawerHost(
         uiState = uiState,
         dependencies = dependencies,
+        showCommandPalette = showCommandPalette,
+        onOpenCommandPalette = onOpenCommandPalette,
+        onDismissCommandPalette = onDismissCommandPalette,
         callbacks = callbacks,
     )
 }

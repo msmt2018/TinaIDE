@@ -1,18 +1,16 @@
 package com.wuxianggujun.tinaide.ui.compose.screens.main
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,36 +29,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.wuxianggujun.tinaide.core.compile.BuildSystem
 import com.wuxianggujun.tinaide.core.compile.RunConfiguration
 import com.wuxianggujun.tinaide.core.compile.RunConfigurationManager
-import com.wuxianggujun.tinaide.core.compile.TargetInfo
 import com.wuxianggujun.tinaide.core.config.DebugToolbarPosition
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.i18n.Drawables
 import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.ui.DebugViewModel
 import com.wuxianggujun.tinaide.ui.compose.components.DebugBar
 import com.wuxianggujun.tinaide.ui.compose.components.DebugStatus
 import com.wuxianggujun.tinaide.ui.compose.components.RunConfigSelector
-import com.wuxianggujun.tinaide.ui.compose.components.SubMenuDropdownItem
-import com.wuxianggujun.tinaide.ui.compose.components.SubMenuItem
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenu
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuDivider
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuItem
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionHeader
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionTitle
-import com.wuxianggujun.tinaide.ui.compose.components.TinaPanelSegmentButton
 import com.wuxianggujun.tinaide.ui.compose.icons.rememberTinaPainter
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState.SplitEditorLayout
 
-/**
- * TopAppBar 回调接口，减少参数传递。
- */
 internal class TopBarCallbacks(
     val onOpenDrawer: () -> Unit,
+    val onOpenCommandPalette: () -> Unit,
     val onBuild: () -> Unit,
     val onCompile: () -> Unit,
     val onRebuildAndRun: () -> Unit,
@@ -109,26 +100,15 @@ internal fun MainActivityTopBar(
     isDirty: Boolean,
     isDebugActive: Boolean,
     debugStatus: DebugStatus,
-    canPackageApk: Boolean,
-    isBasicLspNavigationAvailable: Boolean,
-    isAdvancedLspNavigationAvailable: Boolean,
-    isCallHierarchyIncomingAvailable: Boolean,
-    isLspRefactorAvailable: Boolean,
-    isHeaderSourceSwitchAvailable: Boolean,
-    canNavigateBack: Boolean,
-    canNavigateForward: Boolean,
-    isSplitEditorEnabled: Boolean,
-    splitEditorLayout: SplitEditorLayout,
-    canMoveTabToSecondaryPane: Boolean,
-    canCopyTabToSecondaryPane: Boolean,
-    currentBuildSystem: BuildSystem,
-    availableTargets: List<TargetInfo>,
     runConfigManager: RunConfigurationManager,
     onRunConfigManagerChange: (RunConfigurationManager) -> Unit,
     onEditConfig: (RunConfiguration?) -> Unit,
     onShowRunConfigDialog: () -> Unit,
     callbacks: TopBarCallbacks,
-    debugViewModel: com.wuxianggujun.tinaide.ui.DebugViewModel,
+    debugViewModel: DebugViewModel,
+    @StringRes overflowCommandSectionTitleRes: Int,
+    overflowCommands: List<MainActivityCommand>,
+    onExecuteCommand: (MainActivityCommand) -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val debugToolbarPosition by Prefs.debugToolbarPositionFlow.collectAsStateWithLifecycle()
@@ -150,443 +130,40 @@ internal fun MainActivityTopBar(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false }
             ) {
-                TinaDropdownMenuSectionHeader {
-                    TinaDropdownMenuSectionTitle(
-                        text = stringResource(Strings.menu_section_file),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
                 TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_save_all)) },
+                    text = { Text(stringResource(Strings.command_palette_title)) },
                     onClick = {
                         showMenu = false
-                        callbacks.onSaveAll()
+                        callbacks.onOpenCommandPalette()
                     },
                     leadingIcon = {
                         Icon(
-                            painter = rememberTinaPainter(Drawables.ic_save),
+                            imageVector = Icons.Default.Search,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 )
 
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_format_code)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onFormatCode()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_format),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_goto_line)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onGotoLine()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_goto_line),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                if (
-                    canNavigateBack ||
-                    canNavigateForward ||
-                    isBasicLspNavigationAvailable ||
-                    isAdvancedLspNavigationAvailable ||
-                    isCallHierarchyIncomingAvailable ||
-                    isLspRefactorAvailable ||
-                    isHeaderSourceSwitchAvailable
-                ) {
+                if (overflowCommands.isNotEmpty()) {
                     TinaDropdownMenuDivider()
-
                     TinaDropdownMenuSectionHeader {
                         TinaDropdownMenuSectionTitle(
-                            text = stringResource(Strings.menu_section_code),
+                            text = stringResource(overflowCommandSectionTitleRes),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-
-                    TinaDropdownMenuItem(
-                        text = { Text(stringResource(Strings.cmd_editor_navigate_back)) },
-                        enabled = canNavigateBack,
-                        onClick = {
-                            showMenu = false
-                            callbacks.onNavigateBack()
-                        }
-                    )
-
-                    TinaDropdownMenuItem(
-                        text = { Text(stringResource(Strings.cmd_editor_navigate_forward)) },
-                        enabled = canNavigateForward,
-                        onClick = {
-                            showMenu = false
-                            callbacks.onNavigateForward()
-                        }
-                    )
-
-                    if (isBasicLspNavigationAvailable) {
+                    overflowCommands.forEach { command ->
                         TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_peek_definition)) },
+                            text = { Text(command.titleText()) },
+                            enabled = command.enabled,
                             onClick = {
                                 showMenu = false
-                                callbacks.onPeekDefinition()
-                            }
-                        )
-
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_goto_definition)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onGotoDefinition()
-                            }
-                        )
-
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_find_references)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onFindReferences()
-                            }
-                        )
-                    }
-
-                    if (isAdvancedLspNavigationAvailable) {
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_goto_type_definition)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onGotoTypeDefinition()
-                            }
-                        )
-
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_goto_implementation)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onGotoImplementation()
-                            }
-                        )
-                    }
-
-                    if (isCallHierarchyIncomingAvailable) {
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_call_hierarchy_incoming)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onCallHierarchyIncoming()
-                            }
-                        )
-                    }
-
-                    if (isLspRefactorAvailable) {
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.code_actions_title)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onCodeActions()
-                            }
-                        )
-
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.lsp_template_rename)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onRenameSymbol()
-                            }
-                        )
-                    }
-
-                    if (isHeaderSourceSwitchAvailable) {
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.cmd_editor_switch_header_source)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onSwitchHeaderSource()
+                                onExecuteCommand(command)
                             }
                         )
                     }
                 }
-
-                if (canPackageApk || currentBuildSystem == BuildSystem.CMAKE) {
-                    TinaDropdownMenuDivider()
-
-                    TinaDropdownMenuSectionHeader {
-                        TinaDropdownMenuSectionTitle(
-                            text = stringResource(Strings.menu_section_build),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    TinaDropdownMenuItem(
-                        text = { Text(stringResource(Strings.cmd_project_build)) },
-                        onClick = {
-                            showMenu = false
-                            callbacks.onBuild()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painter = rememberTinaPainter(Drawables.ic_build),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    )
-
-                    if (currentBuildSystem == BuildSystem.CMAKE) {
-                        SubMenuItem(
-                            text = stringResource(Strings.menu_cmake_tools),
-                            leadingIcon = rememberTinaPainter(Drawables.ic_file_cmake),
-                            onParentDismiss = { showMenu = false }
-                        ) {
-                            SubMenuDropdownItem(
-                                text = stringResource(Strings.menu_cmake_open_artifacts_dir),
-                                onClick = { callbacks.onCmakeOpenArtifactsDir() }
-                            )
-                            SubMenuDropdownItem(
-                                text = stringResource(Strings.menu_cmake_reconfigure),
-                                onClick = { callbacks.onCmakeReconfigure() }
-                            )
-                            SubMenuDropdownItem(
-                                text = stringResource(Strings.menu_cmake_clean_and_reconfigure),
-                                onClick = { callbacks.onCmakeCleanAndReconfigure() }
-                            )
-                            SubMenuDropdownItem(
-                                text = stringResource(Strings.menu_cmake_clear_build_dir),
-                                onClick = { callbacks.onCmakeClearBuildDir() }
-                            )
-                        }
-                    }
-
-                    if (canPackageApk) {
-                        TinaDropdownMenuItem(
-                            text = { Text(stringResource(Strings.menu_package_apk)) },
-                            onClick = {
-                                showMenu = false
-                                callbacks.onPackageApk()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    painter = rememberTinaPainter(Drawables.ic_package),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        )
-                    }
-                }
-
-                TinaDropdownMenuDivider()
-
-                TinaDropdownMenuSectionHeader {
-                    TinaDropdownMenuSectionTitle(
-                        text = stringResource(Strings.menu_section_view),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                TinaDropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(
-                                if (isSplitEditorEnabled) {
-                                    Strings.menu_disable_split_editor
-                                } else {
-                                    Strings.menu_enable_split_editor
-                                }
-                            )
-                        )
-                    },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onToggleSplitEditor()
-                    }
-                )
-
-                if (isSplitEditorEnabled) {
-                    TinaDropdownMenuItem(
-                        text = { Text(stringResource(Strings.menu_split_editor_horizontal)) },
-                        onClick = {
-                            showMenu = false
-                            callbacks.onSetSplitEditorLayout(SplitEditorLayout.HORIZONTAL)
-                        },
-                        leadingIcon = {
-                            if (splitEditorLayout == SplitEditorLayout.HORIZONTAL) {
-                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    )
-
-                    TinaDropdownMenuItem(
-                        text = { Text(stringResource(Strings.menu_split_editor_vertical)) },
-                        onClick = {
-                            showMenu = false
-                            callbacks.onSetSplitEditorLayout(SplitEditorLayout.VERTICAL)
-                        },
-                        leadingIcon = {
-                            if (splitEditorLayout == SplitEditorLayout.VERTICAL) {
-                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    )
-                }
-
-                TinaDropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(
-                                if (splitEditorLayout == SplitEditorLayout.VERTICAL) {
-                                    Strings.menu_move_tab_to_lower_pane
-                                } else {
-                                    Strings.menu_move_tab_to_secondary_pane
-                                }
-                            )
-                        )
-                    },
-                    enabled = canMoveTabToSecondaryPane,
-                    onClick = {
-                        showMenu = false
-                        callbacks.onMoveTabToSecondaryPane()
-                    }
-                )
-
-                TinaDropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(
-                                if (splitEditorLayout == SplitEditorLayout.VERTICAL) {
-                                    Strings.menu_copy_tab_to_lower_pane
-                                } else {
-                                    Strings.menu_copy_tab_to_secondary_pane
-                                }
-                            )
-                        )
-                    },
-                    enabled = canCopyTabToSecondaryPane,
-                    onClick = {
-                        showMenu = false
-                        callbacks.onCopyTabToSecondaryPane()
-                    }
-                )
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_explorer)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onOpenExplorer()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_explorer),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_global_search)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onOpenGlobalSearch()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_search),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                SubMenuItem(
-                    text = stringResource(Strings.menu_bookmarks),
-                    leadingIcon = rememberTinaPainter(Drawables.ic_bookmark),
-                    onParentDismiss = { showMenu = false }
-                ) {
-                    SubMenuDropdownItem(
-                        text = stringResource(Strings.menu_bookmark_toggle),
-                        onClick = { callbacks.onToggleBookmark() },
-                        leadingIcon = rememberTinaPainter(Drawables.ic_bookmark)
-                    )
-                    SubMenuDropdownItem(
-                        text = stringResource(Strings.menu_bookmark_prev),
-                        onClick = { callbacks.onPrevBookmark() },
-                        leadingIcon = rememberTinaPainter(Drawables.ic_arrow_back)
-                    )
-                    SubMenuDropdownItem(
-                        text = stringResource(Strings.menu_bookmark_next),
-                        onClick = { callbacks.onNextBookmark() },
-                        leadingIcon = rememberTinaPainter(Drawables.ic_arrow_forward)
-                    )
-                    SubMenuDropdownItem(
-                        text = stringResource(Strings.menu_bookmark_list),
-                        onClick = { callbacks.onOpenBookmarks() },
-                        leadingIcon = rememberTinaPainter(Drawables.ic_menu_explorer)
-                    )
-                }
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_terminal)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onOpenTerminal()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_terminal),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                TinaDropdownMenuDivider()
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_settings)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onOpenSettings()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_settings),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-
-                TinaDropdownMenuDivider()
-
-                TinaDropdownMenuItem(
-                    text = { Text(stringResource(Strings.menu_exit_workspace)) },
-                    onClick = {
-                        showMenu = false
-                        callbacks.onExitWorkspace()
-                    },
-                    leadingIcon = {
-                        Icon(
-                            painter = rememberTinaPainter(Drawables.ic_menu_exit),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
             }
         }
     }
@@ -594,8 +171,6 @@ internal fun MainActivityTopBar(
     TopAppBar(
         expandedHeight = 48.dp,
         title = {
-            // title 槽位按内容宽度布局；用 Row + Arrangement.End 把胶囊推到靠近 actions 的一侧，
-            // 避免 Material3 TopAppBar 默认让 title 左贴 nav、在右侧留出大片空白。
             val screenWidthPx = LocalWindowInfo.current.containerSize.width
             val compactTitleWidthPx = with(LocalDensity.current) { 360.dp.toPx() }
             val useCompactTitleLayout = screenWidthPx < compactTitleWidthPx
@@ -616,13 +191,14 @@ internal fun MainActivityTopBar(
                         modifier = if (useCompactTitleLayout) Modifier.fillMaxWidth() else Modifier
                     )
                 } else if (!isDebugActive) {
+                    val defaultRunConfigName = stringResource(Strings.run_config_default_name)
                     RunConfigSelector(
                         configManager = runConfigManager,
                         onSelectConfig = { id ->
                             onRunConfigManagerChange(runConfigManager.selectConfig(id))
                         },
                         onAddConfig = {
-                            onEditConfig(RunConfiguration(name = "New Config"))
+                            onEditConfig(RunConfiguration(name = defaultRunConfigName))
                             onShowRunConfigDialog()
                         },
                         onEditConfig = {
@@ -681,8 +257,6 @@ private fun SaveActionButton(
     isDirty: Boolean,
     onSave: () -> Unit
 ) {
-    // 用图标颜色直接表达脏状态：脏时用 onSurface，非脏时用淡化色；不再叠加鲜艳小圆点，
-    // 避免与主题的 primary 产生视觉冲突。
     IconButton(onClick = onSave, enabled = isDirty) {
         Icon(
             painter = rememberTinaPainter(Drawables.ic_save),
@@ -698,22 +272,9 @@ private fun SaveActionButton(
 }
 
 @Composable
-private fun TopBarActionButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    width: Dp = 30.dp,
-    height: Dp = 36.dp,
-    content: @Composable BoxScope.() -> Unit
-) {
-    TinaPanelSegmentButton(
-        onClick = onClick,
-        modifier = modifier.size(width = width, height = height),
-        enabled = enabled,
-        minHeight = height,
-        color = Color.Transparent,
-        contentPadding = PaddingValues(0.dp),
-        contentAlignment = Alignment.Center,
-        content = content
-    )
+private fun MainActivityCommand.titleText(): String {
+    return when (val commandTitle = title) {
+        is MainActivityCommandText.Literal -> commandTitle.value
+        is MainActivityCommandText.Resource -> stringResource(commandTitle.resId)
+    }
 }

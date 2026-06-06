@@ -42,10 +42,12 @@ fun rememberMainActivityHostCommandExecutor(
     scope: CoroutineScope,
     openSettings: () -> Unit,
     openRunConfig: () -> Unit,
+    openCommandPalette: () -> Unit,
     toastInfo: (String) -> Unit,
 ): HostCommandExecutor {
     val latestOpenSettings = rememberUpdatedState(openSettings)
     val latestOpenRunConfig = rememberUpdatedState(openRunConfig)
+    val latestOpenCommandPalette = rememberUpdatedState(openCommandPalette)
     val latestToastInfo = rememberUpdatedState(toastInfo)
 
     return remember(
@@ -75,6 +77,7 @@ fun rememberMainActivityHostCommandExecutor(
             scope = scope,
             openSettings = { latestOpenSettings.value() },
             openRunConfig = { latestOpenRunConfig.value() },
+            openCommandPalette = { latestOpenCommandPalette.value() },
             toastInfo = { latestToastInfo.value(it) }
         )
     }
@@ -94,6 +97,7 @@ class MainActivityHostCommandExecutor(
     private val scope: CoroutineScope,
     private val openSettings: () -> Unit,
     private val openRunConfig: () -> Unit,
+    private val openCommandPalette: () -> Unit,
     private val toastInfo: (String) -> Unit
 ) : HostCommandExecutor {
 
@@ -192,6 +196,8 @@ class MainActivityHostCommandExecutor(
             HostCommands.EDITOR_CLOSE -> editorContainerState.requestCloseActiveTab()
             HostCommands.EDITOR_CLOSE_ALL -> editorContainerState.closeAllTabs()
             HostCommands.EDITOR_CLOSE_OTHERS -> editorContainerState.closeOtherTabsForActiveTab()
+            HostCommands.EDITOR_NEXT_TAB -> editorContainerState.selectNextTab()
+            HostCommands.EDITOR_PREVIOUS_TAB -> editorContainerState.selectPreviousTab()
             HostCommands.EDITOR_UNDO -> {
                 actionsViewModel.performUndo(editorContainerState)
                 true
@@ -260,6 +266,18 @@ class MainActivityHostCommandExecutor(
             HostCommands.EDITOR_SWITCH_HEADER_SOURCE -> executeActiveLspCommand {
                 editorContainerState.requestActiveLspNavigation("switchHeaderSource")
             }
+            HostCommands.EDITOR_TOGGLE_BOOKMARK -> {
+                actionsViewModel.toggleBookmark(editorContainerState)
+                true
+            }
+            HostCommands.EDITOR_NEXT_BOOKMARK -> {
+                actionsViewModel.goToNextBookmark(editorContainerState)
+                true
+            }
+            HostCommands.EDITOR_PREVIOUS_BOOKMARK -> {
+                actionsViewModel.goToPreviousBookmark(editorContainerState)
+                true
+            }
 
             // ==================== 终端操作 ====================
             HostCommands.TERMINAL_TOGGLE,
@@ -309,6 +327,14 @@ class MainActivityHostCommandExecutor(
             }
             HostCommands.VIEW_TOGGLE_SYMBOLS -> {
                 toggleBottomPanelSymbols()
+                true
+            }
+            HostCommands.VIEW_COMMAND_PALETTE -> {
+                openCommandPalette()
+                true
+            }
+            HostCommands.VIEW_BOOKMARKS -> {
+                openBottomPanelBookmarks()
                 true
             }
             HostCommands.VIEW_SETTINGS -> {
@@ -384,6 +410,13 @@ class MainActivityHostCommandExecutor(
                 bottomPanelViewModel.setSelectedTab(BottomPanelTab.SYMBOLS)
                 bottomPanelController.expandToDefault()
             }
+        }
+    }
+
+    private fun openBottomPanelBookmarks() {
+        scope.launch {
+            bottomPanelViewModel.setSelectedTab(BottomPanelTab.BOOKMARKS)
+            bottomPanelController.expandToDefault()
         }
     }
 

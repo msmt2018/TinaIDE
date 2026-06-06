@@ -173,6 +173,49 @@ class PluginMenuResolverTest {
         assertThat(items.single().commandId).isEqualTo(HostCommands.EDITOR_SAVE)
     }
 
+    @Test
+    fun `resolveEditorToolbarMenuItems should include registered plugin command`() {
+        PluginCommandRegistry.register(
+            pluginId = "plugin.menu",
+            pluginName = "Plugin Menu",
+            commandId = "plugin.menu.formatSelection",
+            callbackName = "formatSelection",
+            title = "Format Selection"
+        ).getOrThrow()
+        val plugin = InstalledPlugin(
+            manifest = PluginManifest(
+                id = "plugin.menu",
+                name = "Plugin Menu",
+                version = "1.0.0",
+                type = "script",
+                contributions = PluginContributions(
+                    menus = PluginMenus(
+                        editorToolbar = listOf(
+                            PluginMenuItem(
+                                command = "plugin.menu.formatSelection",
+                                group = "2_plugin"
+                            )
+                        )
+                    )
+                )
+            ),
+            directory = pluginDir,
+            enabled = true
+        )
+
+        val items = PluginMenuResolver.resolveEditorToolbarMenuItems(
+            context = context,
+            installedPlugins = listOf(plugin),
+            file = File(pluginDir, "main.cpp"),
+            isDirty = false
+        )
+
+        assertThat(items).hasSize(1)
+        assertThat(items.single().commandId).isEqualTo("plugin.menu.formatSelection")
+        assertThat(items.single().title).isEqualTo("Format Selection")
+        assertThat(items.single().pluginId).isEqualTo("plugin.menu")
+    }
+
     private fun createPlugin(
         commands: List<PluginCommand>,
         menuItems: List<PluginMenuItem>

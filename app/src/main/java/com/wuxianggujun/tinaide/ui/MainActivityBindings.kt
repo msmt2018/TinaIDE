@@ -152,8 +152,8 @@ internal fun BindMainActivityBottomPanelState(
 internal fun BindMainActivityEditorState(
     editorContainerState: EditorContainerState,
     editorActionBridge: MainActivityEditorActionBridge,
-    actionsDelegate: MainActivityActionsDelegate,
     shortcutDispatcher: MainActivityShortcutDispatcher,
+    hostCommandExecutor: HostCommandExecutor,
     lspNavigationDelegate: LspNavigationDelegate,
     lspEditorActionsDelegate: LspEditorActionsDelegate,
     editorActionsState: EditorActionsState,
@@ -165,8 +165,8 @@ internal fun BindMainActivityEditorState(
     LaunchedEffect(
         editorContainerState,
         editorActionBridge,
-        actionsDelegate,
         shortcutDispatcher,
+        hostCommandExecutor,
         lspNavigationDelegate,
         lspEditorActionsDelegate,
         editorActionsState,
@@ -177,8 +177,15 @@ internal fun BindMainActivityEditorState(
             onFileNotExist = onFileNotExist,
         )
         shortcutDispatcher.bind(
-            editorContainerState = editorContainerState,
-            actionsDelegate = actionsDelegate,
+            hostCommandExecutor = hostCommandExecutor,
+            invocationProvider = {
+                val activeFile = editorContainerState.getActiveFileOrNull()
+                HostCommandInvocation(
+                    file = activeFile,
+                    isDirectory = activeFile?.isDirectory,
+                    isDirty = editorContainerState.isActiveTabDirty()
+                )
+            }
         )
         lspNavigationDelegate.bind(
             editorContainerState = editorContainerState,
@@ -199,8 +206,8 @@ internal fun BindMainActivityEditorState(
 internal fun BindMainActivityEditorHost(
     editorContainerState: EditorContainerState,
     editorActionBridge: MainActivityEditorActionBridge,
-    actionsDelegate: MainActivityActionsDelegate,
     shortcutDispatcher: MainActivityShortcutDispatcher,
+    hostCommandExecutor: HostCommandExecutor,
     editorActionsState: EditorActionsState,
     locationDialogState: MainActivityLocationDialogState,
     scope: CoroutineScope,
@@ -225,8 +232,8 @@ internal fun BindMainActivityEditorHost(
     BindMainActivityEditorState(
         editorContainerState = editorContainerState,
         editorActionBridge = editorActionBridge,
-        actionsDelegate = actionsDelegate,
         shortcutDispatcher = shortcutDispatcher,
+        hostCommandExecutor = hostCommandExecutor,
         lspNavigationDelegate = lspNavigationDelegate,
         lspEditorActionsDelegate = lspEditorActionsDelegate,
         editorActionsState = editorActionsState,

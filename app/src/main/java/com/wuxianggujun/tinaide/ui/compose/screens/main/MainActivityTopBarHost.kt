@@ -2,8 +2,11 @@ package com.wuxianggujun.tinaide.ui.compose.screens.main
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.wuxianggujun.tinaide.project.ProjectApkExportType
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
+import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.ui.DebugViewModel
 import com.wuxianggujun.tinaide.ui.MainActivityActionsDelegate
 import com.wuxianggujun.tinaide.ui.MainActivityCompileDelegate
@@ -27,16 +30,17 @@ internal fun MainActivityTopBarHost(
     compileDelegate: MainActivityCompileDelegate,
     actionsDelegate: MainActivityActionsDelegate,
     navigationDelegate: MainActivityNavigationDelegate,
+    hostCommandExecutor: HostCommandExecutor?,
     debugViewModel: DebugViewModel,
+    showCommandPalette: Boolean,
+    onOpenCommandPalette: () -> Unit,
+    onDismissCommandPalette: () -> Unit,
     callbacks: MainActivityScreenCallbacks,
 ) {
-    val canPackageApk = when (buildUiState.apkExportType) {
-        null,
-        ProjectApkExportType.DISABLED -> false
-
-        ProjectApkExportType.TERMINAL -> buildUiState.hasTerminalApkExportOptions
-        else -> true
-    }
+    val commandStore = rememberMainActivityCommandPreferenceStore()
+    val pinnedCommandIds by commandStore.pinnedCommandIdsFlow.collectAsStateWithLifecycle()
+    val recentCommandIds by commandStore.recentCommandIdsFlow.collectAsStateWithLifecycle()
+    val canPackageApk = resolveCanPackageApk(buildUiState)
     val activeFile = editorContainerState.getActiveFileOrNull()
     val isBasicLspNavigationAvailable = activeFile?.let(editorContainerState::supportsBasicLspNavigation) == true
     val isAdvancedLspNavigationAvailable = activeFile?.let(editorContainerState::supportsAdvancedLspNavigation) == true
@@ -57,27 +61,53 @@ internal fun MainActivityTopBarHost(
         navigationDelegate = navigationDelegate,
         screenCallbacks = callbacks,
         onPackageApk = buildUiState::openApkPackageDialog,
+        onOpenCommandPalette = onOpenCommandPalette,
     )
+    val commandPaletteCommands = rememberMainActivityCommands(
+        availability = MainActivityCommandAvailability(
+            hasActiveFile = activeFile != null,
+            isCompiling = isCompiling,
+            isDirty = isDirty,
+            canPackageApk = canPackageApk,
+            isBasicLspNavigationAvailable = isBasicLspNavigationAvailable,
+            isAdvancedLspNavigationAvailable = isAdvancedLspNavigationAvailable,
+            isCallHierarchyIncomingAvailable = isCallHierarchyIncomingAvailable,
+            isLspRefactorAvailable = isLspRefactorAvailable,
+            isHeaderSourceSwitchAvailable = isHeaderSourceSwitchAvailable,
+            canNavigateBack = canNavigateBack,
+            canNavigateForward = canNavigateForward,
+            isSplitEditorEnabled = editorContainerState.isSplitEditorEnabled,
+            splitEditorLayout = editorContainerState.splitEditorLayout,
+            canMoveTabToSecondaryPane = canMoveTabToSecondaryPane,
+            canCopyTabToSecondaryPane = canCopyTabToSecondaryPane,
+            currentBuildSystem = buildUiState.currentBuildSystem,
+        ),
+        activeFile = activeFile,
+        isActiveTabDirty = editorContainerState.isActiveTabDirty(),
+        callbacks = topBarCallbacks,
+        hostCommandExecutor = hostCommandExecutor,
+    )
+    val overflowCommands = rememberMainActivityOverflowCommands(
+        commands = commandPaletteCommands,
+        pinnedCommandIds = pinnedCommandIds,
+    )
+    val overflowCommandSectionTitleRes = if (pinnedCommandIds.isEmpty()) {
+        Strings.command_palette_quick_actions
+    } else {
+        Strings.command_palette_pinned
+    }
+    val executeCommand: (MainActivityCommand) -> Unit = remember(commandStore) {
+        { command ->
+            commandStore.recordExecuted(command.id)
+            command.execute()
+        }
+    }
 
     MainActivityTopBar(
         isCompiling = isCompiling,
         isDirty = isDirty,
         isDebugActive = isDebugActive,
         debugStatus = debugStatus,
-        canPackageApk = canPackageApk,
-        isBasicLspNavigationAvailable = isBasicLspNavigationAvailable,
-        isAdvancedLspNavigationAvailable = isAdvancedLspNavigationAvailable,
-        isCallHierarchyIncomingAvailable = isCallHierarchyIncomingAvailable,
-        isLspRefactorAvailable = isLspRefactorAvailable,
-        isHeaderSourceSwitchAvailable = isHeaderSourceSwitchAvailable,
-        canNavigateBack = canNavigateBack,
-        canNavigateForward = canNavigateForward,
-        isSplitEditorEnabled = editorContainerState.isSplitEditorEnabled,
-        splitEditorLayout = editorContainerState.splitEditorLayout,
-        canMoveTabToSecondaryPane = canMoveTabToSecondaryPane,
-        canCopyTabToSecondaryPane = canCopyTabToSecondaryPane,
-        currentBuildSystem = buildUiState.currentBuildSystem,
-        availableTargets = buildUiState.availableTargets,
         runConfigManager = buildUiState.runConfigManager,
         onRunConfigManagerChange = { updated ->
             buildUiState.updateRunConfigManager(updated)
@@ -87,7 +117,21 @@ internal fun MainActivityTopBarHost(
         onShowRunConfigDialog = buildUiState::openRunConfigDialog,
         callbacks = topBarCallbacks,
         debugViewModel = debugViewModel,
+        overflowCommandSectionTitleRes = overflowCommandSectionTitleRes,
+        overflowCommands = overflowCommands,
+        onExecuteCommand = executeCommand,
     )
+
+    if (showCommandPalette) {
+        MainActivityCommandPalette(
+            commands = commandPaletteCommands,
+            pinnedCommandIds = pinnedCommandIds,
+            recentCommandIds = recentCommandIds,
+            onTogglePinned = { command -> commandStore.togglePinned(command.id) },
+            onExecuteCommand = executeCommand,
+            onDismissRequest = onDismissCommandPalette
+        )
+    }
 }
 
 @Composable
@@ -100,6 +144,7 @@ private fun rememberMainActivityTopBarCallbacks(
     navigationDelegate: MainActivityNavigationDelegate,
     screenCallbacks: MainActivityScreenCallbacks,
     onPackageApk: () -> Unit,
+    onOpenCommandPalette: () -> Unit,
 ): TopBarCallbacks = remember(
     drawerState,
     editorContainerState,
@@ -109,9 +154,11 @@ private fun rememberMainActivityTopBarCallbacks(
     navigationDelegate,
     screenCallbacks,
     onPackageApk,
+    onOpenCommandPalette,
 ) {
     TopBarCallbacks(
         onOpenDrawer = { drawerState.open() },
+        onOpenCommandPalette = onOpenCommandPalette,
         onBuild = { compileDelegate.onBuildProject() },
         onCompile = { compileDelegate.onCompileProject() },
         onRebuildAndRun = { compileDelegate.onRebuildAndRunProject() },
