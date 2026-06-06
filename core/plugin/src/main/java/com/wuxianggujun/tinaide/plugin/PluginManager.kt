@@ -442,6 +442,19 @@ class PluginManager(
         )
     }
 
+    fun resolveFileTreeContextCommands(
+        installedPlugins: List<InstalledPlugin>,
+        file: File,
+        isDirectory: Boolean
+    ): List<ResolvedPluginCommand> {
+        return PluginMenuResolver.resolveFileTreeContextCommands(
+            context = context,
+            installedPlugins = installedPlugins,
+            file = file,
+            isDirectory = isDirectory
+        )
+    }
+
     fun resolveFileTreeIcons(
         installedPlugins: List<InstalledPlugin>
     ): List<ResolvedPluginFileIcon> {
@@ -461,12 +474,38 @@ class PluginManager(
         )
     }
 
+    fun resolveEditorContextCommands(
+        installedPlugins: List<InstalledPlugin>,
+        file: File,
+        isDirty: Boolean
+    ): List<ResolvedPluginCommand> {
+        return PluginMenuResolver.resolveEditorContextCommands(
+            context = context,
+            installedPlugins = installedPlugins,
+            file = file,
+            isDirty = isDirty
+        )
+    }
+
     fun resolveEditorToolbarMenuItems(
         installedPlugins: List<InstalledPlugin>,
         file: File,
         isDirty: Boolean
     ): List<ResolvedHostMenuItem> {
         return PluginMenuResolver.resolveEditorToolbarMenuItems(
+            context = context,
+            installedPlugins = installedPlugins,
+            file = file,
+            isDirty = isDirty
+        )
+    }
+
+    fun resolveEditorToolbarCommands(
+        installedPlugins: List<InstalledPlugin>,
+        file: File,
+        isDirty: Boolean
+    ): List<ResolvedPluginCommand> {
+        return PluginMenuResolver.resolveEditorToolbarCommands(
             context = context,
             installedPlugins = installedPlugins,
             file = file,

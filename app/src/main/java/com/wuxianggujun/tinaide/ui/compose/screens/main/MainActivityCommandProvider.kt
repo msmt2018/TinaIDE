@@ -17,7 +17,7 @@ import com.wuxianggujun.tinaide.core.config.ShortcutAction
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.plugin.InstalledPlugin
 import com.wuxianggujun.tinaide.plugin.PluginManager
-import com.wuxianggujun.tinaide.plugin.ResolvedHostMenuItem
+import com.wuxianggujun.tinaide.plugin.ResolvedPluginCommand
 import com.wuxianggujun.tinaide.project.ProjectApkExportType
 import com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerState
 import java.io.File
@@ -401,10 +401,7 @@ private fun resolvePluginEditorToolbarCommands(
 ): List<MainActivityCommand> {
     if (activeFile == null || hostCommandExecutor == null) return emptyList()
 
-    val pluginNameById = enabledPlugins.associate { plugin ->
-        plugin.manifest.id to plugin.manifest.name
-    }
-    return pluginManager.resolveEditorToolbarMenuItems(
+    return pluginManager.resolveEditorToolbarCommands(
         installedPlugins = enabledPlugins,
         file = activeFile,
         isDirty = isDirty
@@ -412,16 +409,14 @@ private fun resolvePluginEditorToolbarCommands(
         item.toCommand(
             activeFile = activeFile,
             isDirty = isDirty,
-            pluginName = pluginNameById[item.pluginId] ?: item.pluginId,
             hostCommandExecutor = hostCommandExecutor
         )
     }
 }
 
-private fun ResolvedHostMenuItem.toCommand(
+private fun ResolvedPluginCommand.toCommand(
     activeFile: File,
     isDirty: Boolean,
-    pluginName: String,
     hostCommandExecutor: HostCommandExecutor,
 ): MainActivityCommand {
     val commandId = commandId.trim()

@@ -115,4 +115,12 @@ class MainActivityCommandPreferenceStoreTest {
             .containsExactly("pluginToolbar:enabledPlugin:editor:format", "project.build")
             .inOrder()
     }
+
+    @Test
+    fun `pluginToolbarPluginIdOrNull should parse plugin toolbar command ids`() {
+        assertThat("pluginToolbar:plugin.menu:editor:format".pluginToolbarPluginIdOrNull())
+            .isEqualTo("plugin.menu")
+        assertThat("view.settings".pluginToolbarPluginIdOrNull()).isNull()
+        assertThat("pluginToolbar::editor:format".pluginToolbarPluginIdOrNull()).isNull()
+    }
 }
