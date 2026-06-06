@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.plugin.script.api
 import com.wuxianggujun.tinaide.core.commands.HostCommandInvocation
 import com.wuxianggujun.tinaide.core.commands.HostCommands
 import com.wuxianggujun.tinaide.plugin.script.PluginExecutionResult
+import com.wuxianggujun.tinaide.plugin.script.PluginPermission
 import com.wuxianggujun.tinaide.plugin.script.ScriptPluginRuntime
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,8 @@ data class RegisteredPluginCommand(
 
 object PluginCommandRegistry {
     private const val TAG = "PluginCommandRegistry"
+    private const val COMMANDS_API_NAMESPACE = "commands"
+    private const val COMMANDS_EXECUTE_METHOD = "execute"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val commandsById = ConcurrentHashMap<String, RegisteredPluginCommand>()
@@ -116,6 +119,20 @@ object PluginCommandRegistry {
     ): Boolean {
         val command = commandsById[commandId.trim()] ?: return false
         val runtime = runtimeProvider?.invoke(command.pluginId) ?: return false
+        if (!runtime.checkPermission(PluginPermission.COMMAND_EXECUTE)) {
+            runtime.reportPermissionDenied(
+                COMMANDS_API_NAMESPACE,
+                COMMANDS_EXECUTE_METHOD,
+                PluginPermission.COMMAND_EXECUTE
+            )
+            Timber.tag(TAG).w(
+                "Plugin command permission denied before dispatch: commandId=%s pluginId=%s",
+                command.commandId,
+                command.pluginId
+            )
+            return false
+        }
+
         val payload = buildInvocationPayload(command.commandId, invocation)
 
         scope.launch {

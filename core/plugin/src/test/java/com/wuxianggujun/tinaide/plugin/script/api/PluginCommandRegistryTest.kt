@@ -3,10 +3,13 @@ package com.wuxianggujun.tinaide.plugin.script.api
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.commands.HostCommandInvocation
 import com.wuxianggujun.tinaide.plugin.script.PluginExecutionResult
+import com.wuxianggujun.tinaide.plugin.script.PluginPermission
 import com.wuxianggujun.tinaide.plugin.script.ScriptPluginRuntime
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import java.io.File
 import java.nio.file.Files
 import org.junit.After
@@ -50,6 +53,7 @@ class PluginCommandRegistryTest {
     @Test
     fun `dispatch should invoke runtime callback with invocation payload`() {
         val runtime = mockk<ScriptPluginRuntime>()
+        every { runtime.checkPermission(PluginPermission.COMMAND_EXECUTE) } returns true
         coEvery { runtime.callFunction("handleHello", any()) } returns PluginExecutionResult.Success(Unit)
         PluginCommandRegistry.setRuntimeProvider { pluginId ->
             if (pluginId == "plugin.one") runtime else null
@@ -84,6 +88,46 @@ class PluginCommandRegistryTest {
                         payload["isDirty"] == true
                 }
             )
+        }
+    }
+
+    @Test
+    fun `dispatch should reject command when command permission is denied`() {
+        val runtime = mockk<ScriptPluginRuntime>()
+        every { runtime.checkPermission(PluginPermission.COMMAND_EXECUTE) } returns false
+        every {
+            runtime.reportPermissionDenied(
+                "commands",
+                "execute",
+                PluginPermission.COMMAND_EXECUTE
+            )
+        } returns "Permission denied"
+        PluginCommandRegistry.setRuntimeProvider { pluginId ->
+            if (pluginId == "plugin.one") runtime else null
+        }
+        PluginCommandRegistry.register(
+            pluginId = "plugin.one",
+            pluginName = "Plugin One",
+            commandId = "plugin.sayHello",
+            callbackName = "handleHello",
+            title = "Say hello"
+        ).getOrThrow()
+
+        val dispatched = PluginCommandRegistry.dispatch(
+            commandId = "plugin.sayHello",
+            invocation = HostCommandInvocation()
+        )
+
+        assertThat(dispatched).isFalse()
+        verify(exactly = 1) {
+            runtime.reportPermissionDenied(
+                "commands",
+                "execute",
+                PluginPermission.COMMAND_EXECUTE
+            )
+        }
+        coVerify(exactly = 0) {
+            runtime.callFunction(any(), any())
         }
     }
 
