@@ -161,6 +161,31 @@ class PackageManagerImpl(
         return installStateStore.getInstallState(packageId)
     }
 
+    override suspend fun previewInstallPlan(
+        packageId: String,
+        platform: Platform
+    ): Result<PackageInstallPlan> {
+        return resolveInstallPlan(packageId, platform).map { descriptors ->
+            PackageInstallPlan(
+                packageId = packageId,
+                packageName = descriptors.firstOrNull { it.packageId == packageId }?.packageName ?: packageId,
+                platform = platform,
+                packages = descriptors.map { descriptor ->
+                    PackageInstallPlanItem(
+                        packageId = descriptor.packageId,
+                        packageName = descriptor.packageName,
+                        version = descriptor.platformPackage.version,
+                        isRoot = descriptor.packageId == packageId,
+                        isAlreadyInstalled = installStateStore.isInstalled(
+                            descriptor.packageId,
+                            descriptor.platform
+                        )
+                    )
+                }
+            )
+        }
+    }
+
     override suspend fun install(
         packageId: String,
         platform: Platform,
@@ -168,12 +193,7 @@ class PackageManagerImpl(
     ): InstallResult {
         progress(InstallProgressEvent.Preparing("Resolving package dependencies..."))
 
-        val plan = PackageDependencyResolver.resolveInstallPlan(
-            rootPackageId = packageId,
-            platform = platform,
-            loadPackage = { dependencyId -> resolveInstallDescriptor(dependencyId, platform) },
-            isInstalled = installStateStore::isInstalled
-        ).getOrElse { error ->
+        val plan = resolveInstallPlan(packageId, platform).getOrElse { error ->
             val installError = InstallError.UnknownError(error.message ?: "Failed to resolve package dependencies")
             progress(InstallProgressEvent.Failed(installError))
             return InstallResult.Failure(packageId, installError)
@@ -204,6 +224,18 @@ class PackageManagerImpl(
             packageId = packageId,
             version = plan.lastOrNull { it.packageId == packageId }?.platformPackage?.version.orEmpty(),
             platform = platform
+        )
+    }
+
+    private suspend fun resolveInstallPlan(
+        packageId: String,
+        platform: Platform
+    ): Result<List<PackageInstallDescriptor>> {
+        return PackageDependencyResolver.resolveInstallPlan(
+            rootPackageId = packageId,
+            platform = platform,
+            loadPackage = { dependencyId -> resolveInstallDescriptor(dependencyId, platform) },
+            isInstalled = installStateStore::isInstalled
         )
     }
 

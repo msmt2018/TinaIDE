@@ -65,6 +65,7 @@ import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.storage.ExternalFileIntents
 import com.wuxianggujun.tinaide.storage.ProjectDirStructure
 import com.wuxianggujun.tinaide.ui.apk.ApkExportTemplateOption
+import com.wuxianggujun.tinaide.ui.runtime.NativeLibraryDependencyHints
 import java.io.File
 import java.security.SignatureException
 import java.security.UnrecoverableKeyException
@@ -97,6 +98,7 @@ private data class RememberedCustomSigning(
  * @param templateOptions Available APK template choices
  * @param sdlLibraryPath Optional SDL3 library path
  * @param preloadLibraries Additional libraries to include
+ * @param missingLibraries Runtime libraries that could not be auto-resolved
  * @param onDismiss Called when dialog is dismissed
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +112,7 @@ fun ApkPackageDialog(
     initialTemplateOptionId: String? = null,
     sdlLibraryPath: File? = null,
     preloadLibraries: List<File> = emptyList(),
+    missingLibraries: List<String> = emptyList(),
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -219,6 +222,19 @@ fun ApkPackageDialog(
     var buildError by remember { mutableStateOf<String?>(null) }
 
     val effectiveSoFiles = mergeNamedLibraries(soFiles, selectedAdditionalRuntimeLibraries)
+    val remainingMissingLibraries = NativeLibraryDependencyHints.filterUnresolvedLibraries(
+        missingLibraries = missingLibraries,
+        providedLibraries = effectiveSoFiles
+    )
+    val missingLibrariesMessage = if (remainingMissingLibraries.isNotEmpty()) {
+        NativeLibraryDependencyHints.buildMissingLibrariesMessage(
+            context = context,
+            missingLibraries = remainingMissingLibraries,
+            includeApkImportHint = true
+        )
+    } else {
+        null
+    }
     val hasNativeEntryLibrary = effectiveSoFiles.any { it.name == "libmain.so" }
     val selectedTemplateOption = templateOptions.firstOrNull {
         it.id == selectedTemplateOptionId
@@ -789,6 +805,26 @@ fun ApkPackageDialog(
                                     }
                                 }
                             }
+                        }
+                    }
+                    if (missingLibrariesMessage != null) {
+                        TinaDialogCard(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                            )
+                        ) {
+                            Text(
+                                text = stringResource(Strings.native_library_missing_libraries_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = missingLibrariesMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 

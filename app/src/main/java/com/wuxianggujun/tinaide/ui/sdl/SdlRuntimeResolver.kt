@@ -7,6 +7,7 @@ import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.core.packages.model.Platform
 import com.wuxianggujun.tinaide.core.packages.store.LocalInstallStateStore
+import com.wuxianggujun.tinaide.ui.runtime.NativeLibraryDependencyHints
 import java.io.File
 import java.io.IOException
 import timber.log.Timber
@@ -69,6 +70,11 @@ object SdlRuntimeResolver {
         val runtimeLibDirs: List<File>,
         val packageId: String? = null,
         val packageVersion: String? = null,
+    )
+
+    internal data class PreloadResolution(
+        val libraryPaths: List<String>,
+        val missingLibraries: List<String>
     )
 
     fun resolve(context: Context, mainLibraryPath: String): ResolveResult {
@@ -137,12 +143,21 @@ object SdlRuntimeResolver {
         }.toList()
 
         val runtimeIndex = buildRuntimeLibraryIndex(runtimeDirs)
-        val preloadLibraries = resolvePreloadLibraries(
+        val preloadResolution = resolvePreloadLibraries(
             runtimeIndex = runtimeIndex,
             neededLibraries = neededLibraries,
             mainLibrary = mainLibrary,
             sdlLibrary = selectedSdlLibrary.libraryFile
         )
+        if (preloadResolution.missingLibraries.isNotEmpty()) {
+            return ResolveResult.Error(
+                NativeLibraryDependencyHints.buildMissingLibrariesMessage(
+                    context = context,
+                    missingLibraries = preloadResolution.missingLibraries
+                )
+            )
+        }
+        val preloadLibraries = preloadResolution.libraryPaths
 
         val packageTag = if (selectedSdlLibrary.packageId.isNullOrBlank()) {
             "external-runtime-scan"
@@ -400,13 +415,14 @@ object SdlRuntimeResolver {
         return index
     }
 
-    private fun resolvePreloadLibraries(
+    internal fun resolvePreloadLibraries(
         runtimeIndex: Map<String, File>,
         neededLibraries: Set<String>,
         mainLibrary: File,
         sdlLibrary: File,
-    ): List<String> {
+    ): PreloadResolution {
         val resolved = linkedSetOf<String>()
+        val missing = linkedSetOf<String>()
         neededLibraries.sorted().forEach { needed ->
             if (needed == mainLibrary.name || needed == sdlLibrary.name) return@forEach
 
@@ -417,7 +433,10 @@ object SdlRuntimeResolver {
 
             val resolvedFile = runtimeIndex[needed]
                 ?: canonical?.let { runtimeIndex[it] }
-                ?: return@forEach
+                ?: run {
+                    missing += needed
+                    return@forEach
+                }
 
             val absolutePath = resolvedFile.absolutePath
             if (absolutePath == mainLibrary.absolutePath || absolutePath == sdlLibrary.absolutePath) {
@@ -425,7 +444,10 @@ object SdlRuntimeResolver {
             }
             resolved += absolutePath
         }
-        return resolved.toList()
+        return PreloadResolution(
+            libraryPaths = resolved.toList(),
+            missingLibraries = missing.toList()
+        )
     }
 
     @Throws(IOException::class)

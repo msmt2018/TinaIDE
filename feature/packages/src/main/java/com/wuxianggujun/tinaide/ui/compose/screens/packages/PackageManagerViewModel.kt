@@ -7,6 +7,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadata
 import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadataReader
+import com.wuxianggujun.tinaide.core.packages.PackageInstallPlan
 import com.wuxianggujun.tinaide.core.packages.PackageManager
 import com.wuxianggujun.tinaide.core.packages.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -143,42 +144,78 @@ class PackageManagerViewModel(
         }
 
         viewModelScope.launch {
-            _dialogState.value = PackageDialogState.Installing(
-                packageId = packageId,
-                packageName = pkg.name,
-                platform = installPlatform,
-                event = InstallProgressEvent.Preparing(
-                    Strings.pkg_manager_progress_starting.strOr(appContext)
-                )
-            )
-
-            val result = runCatching {
-                packageManager.install(packageId, installPlatform) { event ->
-                    _dialogState.update { current ->
-                        if (current is PackageDialogState.Installing && current.packageId == packageId) {
-                            current.copy(event = event)
-                        } else current
-                    }
-                }
-            }.getOrElse { throwable ->
-                InstallResult.Failure(
+            val plan = packageManager.previewInstallPlan(packageId, installPlatform).getOrElse { error ->
+                _dialogState.value = PackageDialogState.InstallComplete(
                     packageId = packageId,
-                    error = InstallError.UnknownError(
-                        throwable.message ?: Strings.pkg_manager_error_unknown.strOr(appContext)
+                    result = InstallResult.Failure(
+                        packageId = packageId,
+                        error = InstallError.UnknownError(
+                            error.message ?: Strings.pkg_manager_error_unknown.strOr(appContext)
+                        )
                     )
                 )
+                return@launch
+            }
+            val dependenciesToInstall = plan.packages.filterNot { it.isRoot }
+            if (dependenciesToInstall.isNotEmpty()) {
+                _dialogState.value = PackageDialogState.InstallConfirm(
+                    packageId = packageId,
+                    packageInfo = pkg,
+                    platform = installPlatform,
+                    plan = plan
+                )
+                return@launch
             }
 
-            when (result) {
-                is InstallResult.Success -> {
-                    refreshInstallState(packageId)
-                    refreshInstalledMetadata(packageId)
-                    _dialogState.value = PackageDialogState.InstallComplete(packageId, result)
-                    loadPackages()
+            startInstall(pkg, installPlatform)
+        }
+    }
+
+    fun confirmInstall(packageId: String, platform: Platform) {
+        val pkg = _uiState.value.packages.find { it.id == packageId } ?: return
+        val installPlatform = PackageInstallUiStateSupport.resolveAvailableInstallPlatform(pkg, platform) ?: return
+        viewModelScope.launch {
+            startInstall(pkg, installPlatform)
+        }
+    }
+
+    private suspend fun startInstall(pkg: GUIPackage, installPlatform: Platform) {
+        val packageId = pkg.id
+        _dialogState.value = PackageDialogState.Installing(
+            packageId = packageId,
+            packageName = pkg.name,
+            platform = installPlatform,
+            event = InstallProgressEvent.Preparing(
+                Strings.pkg_manager_progress_starting.strOr(appContext)
+            )
+        )
+
+        val result = runCatching {
+            packageManager.install(packageId, installPlatform) { event ->
+                _dialogState.update { current ->
+                    if (current is PackageDialogState.Installing && current.packageId == packageId) {
+                        current.copy(event = event)
+                    } else current
                 }
-                is InstallResult.Failure -> {
-                    _dialogState.value = PackageDialogState.InstallComplete(packageId, result)
-                }
+            }
+        }.getOrElse { throwable ->
+            InstallResult.Failure(
+                packageId = packageId,
+                error = InstallError.UnknownError(
+                    throwable.message ?: Strings.pkg_manager_error_unknown.strOr(appContext)
+                )
+            )
+        }
+
+        when (result) {
+            is InstallResult.Success -> {
+                refreshInstallState(packageId)
+                refreshInstalledMetadata(packageId)
+                _dialogState.value = PackageDialogState.InstallComplete(packageId, result)
+                loadPackages()
+            }
+            is InstallResult.Failure -> {
+                _dialogState.value = PackageDialogState.InstallComplete(packageId, result)
             }
         }
     }
@@ -435,6 +472,13 @@ data class PackageFilterState(
 )
 
 sealed class PackageDialogState {
+    data class InstallConfirm(
+        val packageId: String,
+        val packageInfo: GUIPackage,
+        val platform: Platform,
+        val plan: PackageInstallPlan
+    ) : PackageDialogState()
+
     data class Installing(
         val packageId: String,
         val packageName: String,

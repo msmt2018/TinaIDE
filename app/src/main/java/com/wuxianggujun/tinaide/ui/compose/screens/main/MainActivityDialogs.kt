@@ -536,7 +536,8 @@ internal fun MainActivityApkPackageDialog(
                 )
                 MainActivityApkExportPayload(
                     soFiles = resolution.packagedLibraries,
-                    executableFile = resolution.executableFile
+                    executableFile = resolution.executableFile,
+                    missingLibraries = resolution.missingLibraries
                 )
             }
 
@@ -551,7 +552,8 @@ internal fun MainActivityApkPackageDialog(
                 )
                 MainActivityApkExportPayload(
                     soFiles = resolution.packagedLibraries,
-                    executableFile = null
+                    executableFile = null,
+                    missingLibraries = resolution.missingLibraries
                 )
             }
         }
@@ -632,13 +634,15 @@ internal fun MainActivityApkPackageDialog(
         outputDir = outputDir,
         templateOptions = templateOptions,
         initialTemplateOptionId = initialTemplateOptionId,
+        missingLibraries = exportPayload.missingLibraries,
         onDismiss = state::closeApkPackageDialog
     )
 }
 
 private data class MainActivityApkExportPayload(
     val soFiles: List<File>,
-    val executableFile: File?
+    val executableFile: File?,
+    val missingLibraries: List<String>
 )
 
 private fun toApkExportTemplateOption(

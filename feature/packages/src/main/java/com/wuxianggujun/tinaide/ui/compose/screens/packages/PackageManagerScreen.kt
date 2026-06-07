@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadata
+import com.wuxianggujun.tinaide.core.packages.PackageInstallPlan
 import org.koin.androidx.compose.koinViewModel
 import com.wuxianggujun.tinaide.core.packages.model.*
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
@@ -235,6 +236,15 @@ fun PackageManagerScreen(
 
     dialogState?.let { state ->
         when (state) {
+            is PackageDialogState.InstallConfirm -> {
+                InstallConfirmDialog(
+                    packageInfo = state.packageInfo,
+                    platform = state.platform,
+                    plan = state.plan,
+                    onConfirm = { viewModel.confirmInstall(state.packageId, state.platform) },
+                    onDismiss = viewModel::dismissDialog
+                )
+            }
             is PackageDialogState.Installing -> {
                 InstallProgressDialog(
                     packageName = state.packageName,
@@ -519,6 +529,67 @@ private fun PlatformRow(
             }
         }
     }
+}
+
+@Composable
+private fun InstallConfirmDialog(
+    packageInfo: GUIPackage,
+    platform: Platform,
+    plan: PackageInstallPlan,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dependenciesToInstall = plan.packages.filterNot { it.isRoot }
+    TinaAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { TinaDialogTitleText(stringResource(Strings.pkg_manager_install_confirm_title, packageInfo.name)) },
+        text = {
+            TinaDialogContentColumn {
+                TinaDialogMessageCard(
+                    message = stringResource(
+                        Strings.pkg_manager_install_confirm_message,
+                        platform.name.lowercase(),
+                        packageInfo.name
+                    )
+                )
+                if (dependenciesToInstall.isNotEmpty()) {
+                    TinaDialogCard(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(Strings.pkg_manager_install_confirm_dependencies_title),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        dependenciesToInstall.forEach { dependency ->
+                            Text(
+                                text = "\u2022 " + stringResource(
+                                    Strings.pkg_manager_install_confirm_dependency_item,
+                                    dependency.packageName,
+                                    dependency.version
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TinaPrimaryButton(
+                text = stringResource(Strings.pkg_manager_install_confirm_button),
+                onClick = onConfirm
+            )
+        },
+        dismissButton = {
+            TinaTextButton(
+                text = stringResource(Strings.btn_cancel),
+                onClick = onDismiss
+            )
+        }
+    )
 }
 
 @Composable
