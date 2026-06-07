@@ -137,6 +137,15 @@ internal data class LspRuntimeDiagnosticText(
     val repairFixHint: String,
 )
 
+internal data class PluginCommandRuntimeDiagnosticText(
+    val missingRegistrationTemplate: String,
+    val unavailableTemplate: String,
+    val unavailableWithoutReasonTemplate: String,
+    val runtimeFixHint: String,
+    val permissionFixHint: String,
+    val missingCommandIdLabel: String,
+)
+
 internal enum class PluginDiagnosticAction {
     OPEN_LOGS,
     RELOAD_PLUGIN,
@@ -295,11 +304,103 @@ internal object PluginsSettingsSectionSupport {
         ),
     )
 
+    fun buildCommandRuntimeEntriesByPluginId(
+        installedPlugins: List<InstalledPlugin>,
+        diagnosticText: PluginCommandRuntimeDiagnosticText,
+    ): Map<String, List<PluginDiagnosticEntry>> = installedPlugins.mapNotNull { plugin ->
+        if (!plugin.enabled) {
+            return@mapNotNull null
+        }
+        val entries = buildCommandRuntimeEntries(
+            commands = resolveCommandContributions(plugin.manifest),
+            diagnosticText = diagnosticText,
+        )
+        if (entries.isEmpty()) {
+            null
+        } else {
+            plugin.manifest.id to entries
+        }
+    }.toMap()
+
+    fun buildCommandRuntimeEntries(
+        commands: List<PluginsCommandContribution>,
+        diagnosticText: PluginCommandRuntimeDiagnosticText,
+    ): List<PluginDiagnosticEntry> = commands.mapNotNull { command ->
+        when (command.status) {
+            PluginCommandContributionStatus.MISSING_RUNTIME_REGISTRATION -> {
+                buildCommandRuntimeDiagnosticEntry(
+                    severity = PluginDiagnosticSeverity.WARNING,
+                    category = PluginDiagnosticCategory.RUNTIME,
+                    message = formatLspDiagnosticText(
+                        diagnosticText.missingRegistrationTemplate,
+                        command.commandDisplayName(diagnosticText),
+                    ),
+                    fixHint = diagnosticText.runtimeFixHint,
+                )
+            }
+            PluginCommandContributionStatus.UNAVAILABLE -> {
+                val reason = command.statusMessage?.takeIf { message -> message.isNotBlank() }
+                val category = if (reason == null) {
+                    PluginDiagnosticCategory.RUNTIME
+                } else {
+                    PluginDiagnosticCategory.PERMISSIONS
+                }
+                val message = if (reason == null) {
+                    formatLspDiagnosticText(
+                        diagnosticText.unavailableWithoutReasonTemplate,
+                        command.commandDisplayName(diagnosticText),
+                    )
+                } else {
+                    formatLspDiagnosticText(
+                        diagnosticText.unavailableTemplate,
+                        command.commandDisplayName(diagnosticText),
+                        reason,
+                    )
+                }
+                buildCommandRuntimeDiagnosticEntry(
+                    severity = PluginDiagnosticSeverity.WARNING,
+                    category = category,
+                    message = message,
+                    fixHint = if (category == PluginDiagnosticCategory.PERMISSIONS) {
+                        diagnosticText.permissionFixHint
+                    } else {
+                        diagnosticText.runtimeFixHint
+                    },
+                )
+            }
+            PluginCommandContributionStatus.AVAILABLE,
+            PluginCommandContributionStatus.MISSING_COMMAND_ID,
+            PluginCommandContributionStatus.MISSING_COMMAND_DECLARATION -> null
+        }
+    }
+
+    private fun buildCommandRuntimeDiagnosticEntry(
+        severity: PluginDiagnosticSeverity,
+        category: PluginDiagnosticCategory,
+        message: String,
+        fixHint: String,
+    ): PluginDiagnosticEntry = PluginDiagnosticEntry(
+        source = PluginDiagnosticSource.RUNTIME,
+        issue = PluginDiagnosticIssue(
+            severity = severity,
+            category = category,
+            message = message,
+            fixHint = fixHint,
+        ),
+    )
+
+    private fun PluginsCommandContribution.commandDisplayName(
+        diagnosticText: PluginCommandRuntimeDiagnosticText,
+    ): String = commandId
+        .takeIf { it.isNotBlank() }
+        ?: title.takeIf { it.isNotBlank() }
+        ?: diagnosticText.missingCommandIdLabel
+
     private fun List<LspToolchainConfig>.toToolchainDisplayNames(): String = joinToString(separator = ", ") { toolchain ->
         toolchain.name.takeIf { name -> name.isNotBlank() } ?: toolchain.id
     }
 
-    private fun formatLspDiagnosticText(template: String, value: String): String = String.format(Locale.getDefault(), template, value)
+    private fun formatLspDiagnosticText(template: String, vararg values: String): String = String.format(Locale.getDefault(), template, *values)
 
     private fun normalizeRequirementItems(items: List<String>?): List<String> = items.orEmpty()
         .asSequence()
@@ -364,6 +465,7 @@ internal object PluginsSettingsSectionSupport {
 
     fun resolveCommandContributions(
         manifest: PluginManifest,
+        checkRuntimeAvailability: Boolean = true,
         isPluginCommandRegistered: (commandId: String, pluginId: String) -> Boolean = { commandId, pluginId ->
             PluginCommandRegistry.isRegistered(commandId, pluginId)
         },
@@ -380,6 +482,7 @@ internal object PluginsSettingsSectionSupport {
                 surface = ResolvedPluginCommandSurface.EDITOR_CONTEXT,
                 menuItems = contributions.menus?.editorContext.orEmpty(),
                 declaredCommands = declaredCommands,
+                checkRuntimeAvailability = checkRuntimeAvailability,
                 isPluginCommandRegistered = isPluginCommandRegistered,
                 pluginCommandAvailability = pluginCommandAvailability,
             )
@@ -388,6 +491,7 @@ internal object PluginsSettingsSectionSupport {
                 surface = ResolvedPluginCommandSurface.EDITOR_TOOLBAR,
                 menuItems = contributions.menus?.editorToolbar.orEmpty(),
                 declaredCommands = declaredCommands,
+                checkRuntimeAvailability = checkRuntimeAvailability,
                 isPluginCommandRegistered = isPluginCommandRegistered,
                 pluginCommandAvailability = pluginCommandAvailability,
             )
@@ -396,6 +500,7 @@ internal object PluginsSettingsSectionSupport {
                 surface = ResolvedPluginCommandSurface.FILE_TREE_CONTEXT,
                 menuItems = contributions.menus?.fileTreeContext.orEmpty(),
                 declaredCommands = declaredCommands,
+                checkRuntimeAvailability = checkRuntimeAvailability,
                 isPluginCommandRegistered = isPluginCommandRegistered,
                 pluginCommandAvailability = pluginCommandAvailability,
             )
@@ -420,6 +525,7 @@ internal object PluginsSettingsSectionSupport {
         surface: ResolvedPluginCommandSurface,
         menuItems: List<PluginMenuItem>,
         declaredCommands: Map<String, PluginCommand>,
+        checkRuntimeAvailability: Boolean,
         isPluginCommandRegistered: (commandId: String, pluginId: String) -> Boolean,
         pluginCommandAvailability: (commandId: String, pluginId: String) -> PluginCommandAvailability,
     ) {
@@ -432,10 +538,14 @@ internal object PluginsSettingsSectionSupport {
                 declaredCommand != null -> ResolvedPluginCommandSource.PLUGIN
                 else -> null
             }
-            val availability = if (source == ResolvedPluginCommandSource.PLUGIN &&
-                isPluginCommandRegistered(commandId, pluginId)
-            ) {
-                pluginCommandAvailability(commandId, pluginId)
+            val availability = if (source == ResolvedPluginCommandSource.PLUGIN) {
+                when {
+                    !checkRuntimeAvailability -> PluginCommandAvailability(available = true)
+                    isPluginCommandRegistered(commandId, pluginId) -> {
+                        pluginCommandAvailability(commandId, pluginId)
+                    }
+                    else -> null
+                }
             } else {
                 null
             }
@@ -756,6 +866,32 @@ internal object PluginsSettingsSectionSupport {
             }
         }.distinct()
     }
+
+    fun resolvePluginCommandContributionActions(
+        command: PluginsCommandContribution,
+        isScriptPlugin: Boolean,
+    ): List<PluginDiagnosticAction> = buildList {
+        when (command.status) {
+            PluginCommandContributionStatus.MISSING_RUNTIME_REGISTRATION -> {
+                add(PluginDiagnosticAction.OPEN_LOGS)
+                if (isScriptPlugin) {
+                    add(PluginDiagnosticAction.RELOAD_PLUGIN)
+                }
+            }
+            PluginCommandContributionStatus.UNAVAILABLE -> {
+                add(PluginDiagnosticAction.OPEN_LOGS)
+                if (command.statusMessage?.isNotBlank() == true) {
+                    add(PluginDiagnosticAction.SHOW_PERMISSIONS)
+                }
+                if (isScriptPlugin) {
+                    add(PluginDiagnosticAction.RELOAD_PLUGIN)
+                }
+            }
+            PluginCommandContributionStatus.AVAILABLE,
+            PluginCommandContributionStatus.MISSING_COMMAND_ID,
+            PluginCommandContributionStatus.MISSING_COMMAND_DECLARATION -> Unit
+        }
+    }.distinct()
 
     fun resolvePluginDiagnosticPreferredLogLevel(
         entry: PluginDiagnosticEntry,

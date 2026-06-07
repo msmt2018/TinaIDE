@@ -15,6 +15,7 @@ object PluginDiagnosticsSnapshotFactory {
         pluginLogs: List<PluginLogEntry>,
         permissionRuntimeFixHint: String,
         lspRuntimeEntriesByPluginId: Map<String, List<PluginDiagnosticEntry>> = emptyMap(),
+        commandRuntimeEntriesByPluginId: Map<String, List<PluginDiagnosticEntry>> = emptyMap(),
     ): PluginDiagnosticsSnapshot {
         val permissionRuntimeEntriesByPluginId = buildPermissionRuntimeEntriesByPluginId(
             pluginLogs = pluginLogs,
@@ -28,6 +29,7 @@ object PluginDiagnosticsSnapshotFactory {
                 runtimeFixHint = runtimeFixHint,
                 permissionRuntimeEntries = permissionRuntimeEntriesByPluginId[plugin.manifest.id].orEmpty(),
                 lspRuntimeEntries = lspRuntimeEntriesByPluginId[plugin.manifest.id].orEmpty(),
+                commandRuntimeEntries = commandRuntimeEntriesByPluginId[plugin.manifest.id].orEmpty(),
             )
         }
 
@@ -48,6 +50,7 @@ object PluginDiagnosticsSnapshotFactory {
         runtimeFixHint: String,
         permissionRuntimeEntries: List<PluginDiagnosticEntry>,
         lspRuntimeEntries: List<PluginDiagnosticEntry>,
+        commandRuntimeEntries: List<PluginDiagnosticEntry>,
     ): PluginDiagnosticsReport {
         val entries = buildList {
             addAll(
@@ -59,6 +62,7 @@ object PluginDiagnosticsSnapshotFactory {
                 }
             )
             addAll(permissionRuntimeEntries)
+            addAll(commandRuntimeEntries)
             addAll(lspRuntimeEntries)
             buildRuntimeEntry(
                 scriptPluginInfo = scriptPluginInfo,

@@ -475,6 +475,95 @@ class PluginsSettingsSectionSupportTest {
     }
 
     @Test
+    fun commandRuntimeEntries_shouldExposeDiagnosticsAndActions() {
+        val commands = listOf(
+            PluginsCommandContribution(
+                surface = ResolvedPluginCommandSurface.EDITOR_CONTEXT,
+                commandId = "plugin.missing",
+                title = "Missing Runtime",
+                group = "1_missing",
+                source = ResolvedPluginCommandSource.PLUGIN,
+                status = PluginCommandContributionStatus.MISSING_RUNTIME_REGISTRATION,
+                whenExpression = null,
+            ),
+            PluginsCommandContribution(
+                surface = ResolvedPluginCommandSurface.EDITOR_CONTEXT,
+                commandId = "plugin.denied",
+                title = "Denied Runtime",
+                group = "2_denied",
+                source = ResolvedPluginCommandSource.PLUGIN,
+                status = PluginCommandContributionStatus.UNAVAILABLE,
+                whenExpression = null,
+                statusMessage = "Permission command.execute is not granted",
+            ),
+            PluginsCommandContribution(
+                surface = ResolvedPluginCommandSurface.EDITOR_CONTEXT,
+                commandId = "plugin.ready",
+                title = "Ready Runtime",
+                group = "3_ready",
+                source = ResolvedPluginCommandSource.PLUGIN,
+                status = PluginCommandContributionStatus.AVAILABLE,
+                whenExpression = null,
+            ),
+        )
+        val diagnosticText = PluginCommandRuntimeDiagnosticText(
+            missingRegistrationTemplate = "Command %1\$s is not registered",
+            unavailableTemplate = "Command %1\$s is unavailable: %2\$s",
+            unavailableWithoutReasonTemplate = "Command %1\$s is unavailable",
+            runtimeFixHint = "Reload plugin",
+            permissionFixHint = "Grant permission",
+            missingCommandIdLabel = "Missing command ID",
+        )
+
+        val entries = PluginsSettingsSectionSupport.buildCommandRuntimeEntries(
+            commands = commands,
+            diagnosticText = diagnosticText,
+        )
+
+        assertThat(entries.map { entry -> entry.source }).containsExactly(
+            PluginDiagnosticSource.RUNTIME,
+            PluginDiagnosticSource.RUNTIME,
+        )
+        assertThat(entries.map { entry -> entry.issue.category }).containsExactly(
+            PluginDiagnosticCategory.RUNTIME,
+            PluginDiagnosticCategory.PERMISSIONS,
+        )
+        assertThat(entries.map { entry -> entry.issue.message }).containsExactly(
+            "Command plugin.missing is not registered",
+            "Command plugin.denied is unavailable: Permission command.execute is not granted",
+        ).inOrder()
+        assertThat(entries.map { entry -> entry.issue.fixHint }).containsExactly(
+            "Reload plugin",
+            "Grant permission",
+        ).inOrder()
+        assertThat(
+            PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
+                command = commands[0],
+                isScriptPlugin = true,
+            )
+        ).containsExactly(
+            PluginDiagnosticAction.OPEN_LOGS,
+            PluginDiagnosticAction.RELOAD_PLUGIN,
+        ).inOrder()
+        assertThat(
+            PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
+                command = commands[1],
+                isScriptPlugin = true,
+            )
+        ).containsExactly(
+            PluginDiagnosticAction.OPEN_LOGS,
+            PluginDiagnosticAction.SHOW_PERMISSIONS,
+            PluginDiagnosticAction.RELOAD_PLUGIN,
+        ).inOrder()
+        assertThat(
+            PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
+                command = commands[2],
+                isScriptPlugin = true,
+            )
+        ).isEmpty()
+    }
+
+    @Test
     fun commandContributionLabels_shouldMapToStableStringResources() {
         assertThat(
             PluginsSettingsSectionSupport.resolvePluginCommandSurfaceLabelRes(

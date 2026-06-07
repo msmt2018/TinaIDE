@@ -224,6 +224,35 @@ class PluginDiagnosticsSnapshotFactoryTest {
             .isEqualTo(PluginDiagnosticSeverity.ERROR)
     }
 
+    @Test
+    fun `create should merge supplied command runtime diagnostics`() {
+        val plugin = installedPlugin(id = "command.plugin", name = "Command Plugin")
+        val commandEntry = PluginDiagnosticEntry(
+            source = PluginDiagnosticSource.RUNTIME,
+            issue = PluginDiagnosticIssue(
+                severity = PluginDiagnosticSeverity.WARNING,
+                category = PluginDiagnosticCategory.PERMISSIONS,
+                message = "Command plugin.run is unavailable: command.execute is not granted",
+                fixHint = "Grant permission",
+            ),
+        )
+
+        val snapshot = PluginDiagnosticsSnapshotFactory.create(
+            installedPlugins = listOf(plugin),
+            loadReports = emptyList(),
+            healthReports = emptyMap(),
+            scriptPluginStates = emptyMap(),
+            runtimeFixHint = "Reload after fix",
+            pluginLogs = emptyList(),
+            permissionRuntimeFixHint = "Grant permission and retry",
+            commandRuntimeEntriesByPluginId = mapOf(plugin.manifest.id to listOf(commandEntry)),
+        )
+
+        assertThat(snapshot.getInstalledReport(plugin.manifest.id)?.entries).containsExactly(commandEntry)
+        assertThat(snapshot.getInstalledReport(plugin.manifest.id)?.highestSeverity)
+            .isEqualTo(PluginDiagnosticSeverity.WARNING)
+    }
+
     private fun installedPlugin(
         id: String,
         name: String,
