@@ -174,6 +174,7 @@ class PackageManagerViewModel(
                     refreshInstallState(packageId)
                     refreshInstalledMetadata(packageId)
                     _dialogState.value = PackageDialogState.InstallComplete(packageId, result)
+                    loadPackages()
                 }
                 is InstallResult.Failure -> {
                     _dialogState.value = PackageDialogState.InstallComplete(packageId, result)

@@ -106,4 +106,40 @@ class ApkExportRuntimeLibrariesResolverTest {
             tempDir.deleteRecursively()
         }
     }
+
+    @Test
+    fun `resolvePackagedLibraries includes SDL3 extension libraries and shared SDL runtime`() {
+        val tempDir = Files.createTempDirectory("apk-export-sdl3-extension-libs-test").toFile()
+        val main = File(tempDir, "libmain.so").apply { writeText("main") }
+        val sdlImage = File(tempDir, "libSDL3_image.so").apply { writeText("image") }
+        val sdlTtf = File(tempDir, "libSDL3_ttf.so").apply { writeText("ttf") }
+        val sdl = File(tempDir, "libSDL3.so").apply { writeText("sdl") }
+
+        try {
+            val result = ApkExportRuntimeLibrariesResolver.resolvePackagedLibraries(
+                buildLibraries = listOf(main),
+                runtimeCandidates = listOf(main, sdlImage, sdlTtf, sdl),
+                dependencyReader = { file ->
+                    when (file.name) {
+                        "libmain.so" -> setOf("libSDL3_image.so", "libSDL3_ttf.so")
+                        "libSDL3_image.so" -> setOf("libSDL3.so")
+                        "libSDL3_ttf.so" -> setOf("libSDL3.so")
+                        else -> emptySet()
+                    }
+                }
+            )
+
+            assertThat(result.libraries.map { it.name })
+                .containsExactly(
+                    "libmain.so",
+                    "libSDL3_image.so",
+                    "libSDL3_ttf.so",
+                    "libSDL3.so"
+                )
+                .inOrder()
+            assertThat(result.missingLibraries).isEmpty()
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

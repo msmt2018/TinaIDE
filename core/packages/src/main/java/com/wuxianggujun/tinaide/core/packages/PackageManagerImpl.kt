@@ -166,26 +166,90 @@ class PackageManagerImpl(
         platform: Platform,
         progress: (InstallProgressEvent) -> Unit
     ): InstallResult {
-        progress(InstallProgressEvent.Preparing("Fetching package info..."))
+        progress(InstallProgressEvent.Preparing("Resolving package dependencies..."))
 
+        val plan = PackageDependencyResolver.resolveInstallPlan(
+            rootPackageId = packageId,
+            platform = platform,
+            loadPackage = { dependencyId -> resolveInstallDescriptor(dependencyId, platform) },
+            isInstalled = installStateStore::isInstalled
+        ).getOrElse { error ->
+            val installError = InstallError.UnknownError(error.message ?: "Failed to resolve package dependencies")
+            progress(InstallProgressEvent.Failed(installError))
+            return InstallResult.Failure(packageId, installError)
+        }
+
+        var rootResult: InstallResult.Success? = null
+        for (descriptor in plan) {
+            if (plan.size > 1) {
+                val message = if (descriptor.packageId == packageId) {
+                    "Installing ${descriptor.packageName}..."
+                } else {
+                    "Installing dependency ${descriptor.packageName}..."
+                }
+                progress(InstallProgressEvent.Preparing(message))
+            }
+
+            when (val result = installResolvedPackage(descriptor, progress)) {
+                is InstallResult.Success -> {
+                    if (descriptor.packageId == packageId) {
+                        rootResult = result
+                    }
+                }
+                is InstallResult.Failure -> return result
+            }
+        }
+
+        return rootResult ?: InstallResult.Success(
+            packageId = packageId,
+            version = plan.lastOrNull { it.packageId == packageId }?.platformPackage?.version.orEmpty(),
+            platform = platform
+        )
+    }
+
+    private suspend fun resolveInstallDescriptor(
+        packageId: String,
+        platform: Platform
+    ): Result<PackageInstallDescriptor> {
         val packageResult = getPackageDetail(packageId)
         if (packageResult.isFailure) {
-            val error = InstallError.UnknownError(packageResult.exceptionOrNull()?.message ?: "Unknown error")
-            progress(InstallProgressEvent.Failed(error))
-            return InstallResult.Failure(packageId, error)
+            return Result.failure(packageResult.exceptionOrNull() ?: IllegalStateException("Unknown error"))
         }
 
         val pkg = packageResult.getOrNull()!!
-        val platformPkg = when (platform) {
-            Platform.LINUX -> pkg.linux
-            Platform.ANDROID -> pkg.android
-        }
+        val platformPkg = pkg.platformPackage(platform)
+            ?: return Result.failure(IllegalStateException("Package not available for $platform"))
 
-        if (platformPkg == null) {
-            val error = InstallError.UnknownError("Package not available for $platform")
-            progress(InstallProgressEvent.Failed(error))
-            return InstallResult.Failure(packageId, error)
-        }
+        return Result.success(
+            PackageInstallDescriptor(
+                packageId = packageId,
+                packageName = pkg.name,
+                platform = platform,
+                platformPackage = platformPkg,
+                dependencies = resolveDeclaredDependencies(packageId, platform, platformPkg)
+            )
+        )
+    }
+
+    private suspend fun resolveDeclaredDependencies(
+        packageId: String,
+        platform: Platform,
+        platformPkg: PlatformPackage
+    ): List<String> {
+        platformPkg.dependencies?.let { return it.normalizedPackageDependencies() }
+
+        return getLatestVersion(packageId, platform)
+            ?.dependencies
+            .normalizedPackageDependencies()
+    }
+
+    private suspend fun installResolvedPackage(
+        descriptor: PackageInstallDescriptor,
+        progress: (InstallProgressEvent) -> Unit
+    ): InstallResult {
+        val packageId = descriptor.packageId
+        val platform = descriptor.platform
+        val platformPkg = descriptor.platformPackage
 
         if (
             platform == Platform.ANDROID &&
@@ -201,7 +265,7 @@ class PackageManagerImpl(
 
         val result = when (platformPkg.installType) {
             InstallType.APT -> installLinuxPackage(packageId, platformPkg, progress)
-            InstallType.DOWNLOAD -> installDownload(packageId, pkg.name, platform, platformPkg, progress)
+            InstallType.DOWNLOAD -> installDownload(packageId, descriptor.packageName, platform, platformPkg, progress)
             InstallType.SCRIPT -> installScript(packageId, platform, platformPkg, progress)
         }
 
@@ -212,7 +276,7 @@ class PackageManagerImpl(
                     packageId = packageId,
                     platform = platform,
                     version = platformPkg.version,
-                    packageName = pkg.name,
+                    packageName = descriptor.packageName,
                     installType = platformPkg.installType
                 )
                 PackageDependencyEvents.notifyChanged(
@@ -278,6 +342,11 @@ class PackageManagerImpl(
     private suspend fun getVersionId(packageId: String, platform: Platform): Int? {
         cachedVersions[packageId]?.get(platform)?.let { return it }
 
+        val latestVersion = getLatestVersion(packageId, platform) ?: return null
+        return latestVersion.id
+    }
+
+    private suspend fun getLatestVersion(packageId: String, platform: Platform): PackageVersion? {
         val versionsResult = apiClient.getPackageVersions(packageId)
         if (versionsResult !is ApiResult.Success) {
             return null
@@ -295,7 +364,7 @@ class PackageManagerImpl(
         versionsResult.data.android?.find { it.isLatest }?.let { versionMap[Platform.ANDROID] = it.id }
         cachedVersions[packageId] = versionMap
 
-        return latestVersion.id
+        return latestVersion
     }
 
     private suspend fun installScript(
@@ -466,7 +535,36 @@ class PackageManagerImpl(
     }
 
     override suspend fun getDependentPackages(packageId: String, platform: Platform): List<String> {
-        return emptyList()
+        val installedPackageIds = installStateStore.getAllInstalledPackages()
+            .asSequence()
+            .filter { it.platform == platform }
+            .map { it.packageId }
+            .toSet()
+        if (installedPackageIds.isEmpty()) return emptyList()
+
+        val packages = getAvailablePackages(page = 1, pageSize = 10_000, platform = platform)
+            .getOrElse { error ->
+                Timber.tag(TAG).w(error, "Failed to resolve dependent packages for %s", packageId)
+                return emptyList()
+            }
+            .filter { it.id in installedPackageIds }
+            .map { summary ->
+                getPackageDetail(summary.id).getOrNull() ?: summary
+            }
+
+        return PackageDependencyResolver.findDirectDependents(
+            packageId = packageId,
+            platform = platform,
+            packages = packages,
+            dependenciesForPackage = { pkg, platformPkg ->
+                try {
+                    resolveDeclaredDependencies(pkg.id, platform, platformPkg)
+                } catch (error: Throwable) {
+                    Timber.tag(TAG).w(error, "Failed to read dependencies for %s", pkg.id)
+                    emptyList()
+                }
+            }
+        )
     }
 
     override suspend fun refreshCache() {

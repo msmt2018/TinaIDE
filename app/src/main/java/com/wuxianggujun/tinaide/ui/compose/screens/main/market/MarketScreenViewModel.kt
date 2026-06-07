@@ -388,6 +388,7 @@ class MarketScreenViewModel(
                 is InstallResult.Success -> {
                     refreshPackageState(packageId)
                     recordPackageDownload(pkg, result.version)
+                    loadPackages()
                     _packageState.update {
                         it.copy(
                             installingPackages = it.installingPackages - packageId,
