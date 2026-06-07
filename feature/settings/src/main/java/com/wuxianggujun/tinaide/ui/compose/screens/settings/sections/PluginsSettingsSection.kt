@@ -1484,7 +1484,7 @@ private fun PluginCommandContributionsCard(
     commands: List<PluginsCommandContribution>,
     summary: PluginsCommandContributionSummary,
     isScriptPlugin: Boolean,
-    onActionClick: (PluginDiagnosticAction) -> Unit,
+    onActionClick: (PluginDiagnosticAction, PluginsCommandContribution) -> Unit,
 ) {
     DetailInfoCard(
         title = stringResource(Strings.plugins_commands_title)
@@ -1518,7 +1518,7 @@ private fun PluginCommandContributionsCard(
 private fun PluginCommandContributionRow(
     command: PluginsCommandContribution,
     isScriptPlugin: Boolean,
-    onActionClick: (PluginDiagnosticAction) -> Unit,
+    onActionClick: (PluginDiagnosticAction, PluginsCommandContribution) -> Unit,
 ) {
     val missingCommandIdText = stringResource(Strings.plugins_commands_missing_command_id_value)
     val commandIdText = if (command.commandId.isBlank()) {
@@ -1589,7 +1589,7 @@ private fun PluginCommandContributionRow(
                         text = stringResource(
                             PluginsSettingsSectionSupport.resolvePluginDiagnosticActionLabelRes(action)
                         ),
-                        onClick = { onActionClick(action) },
+                        onClick = { onActionClick(action, command) },
                         contentPadding = PaddingValues(
                             horizontal = TinaSpacing.sm,
                             vertical = TinaSpacing.xxs,
@@ -2148,7 +2148,7 @@ private fun InstalledPluginDetailScreen(
                 commands = commandContributions,
                 summary = commandContributionSummary,
                 isScriptPlugin = isScriptPlugin,
-                onActionClick = { action ->
+                onActionClick = { action, command ->
                     when (action) {
                         PluginDiagnosticAction.OPEN_LOGS -> onOpenLogs(PluginLogLevel.WARN)
                         PluginDiagnosticAction.RELOAD_PLUGIN -> onReload()
@@ -2156,7 +2156,21 @@ private fun InstalledPluginDetailScreen(
                             showPluginPermissionsDialog = true
                         }
                         PluginDiagnosticAction.REPAIR_LSP_DEPENDENCIES -> onInstallLspDeps()
-                        PluginDiagnosticAction.COPY_DIAGNOSTIC -> Unit
+                        PluginDiagnosticAction.COPY_DIAGNOSTIC -> {
+                            copyPluginDiagnosticToClipboard(
+                                context = context,
+                                text = PluginsSettingsSectionSupport
+                                    .buildPluginCommandContributionClipboardText(
+                                        plugin = plugin,
+                                        command = command,
+                                    ),
+                            )
+                            Toast.makeText(
+                                context,
+                                diagnosticCopiedText,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     }
                 },
             )

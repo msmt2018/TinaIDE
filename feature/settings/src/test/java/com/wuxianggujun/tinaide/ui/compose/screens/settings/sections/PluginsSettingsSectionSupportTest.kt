@@ -544,6 +544,7 @@ class PluginsSettingsSectionSupportTest {
         ).containsExactly(
             PluginDiagnosticAction.OPEN_LOGS,
             PluginDiagnosticAction.RELOAD_PLUGIN,
+            PluginDiagnosticAction.COPY_DIAGNOSTIC,
         ).inOrder()
         assertThat(
             PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
@@ -554,6 +555,7 @@ class PluginsSettingsSectionSupportTest {
             PluginDiagnosticAction.OPEN_LOGS,
             PluginDiagnosticAction.SHOW_PERMISSIONS,
             PluginDiagnosticAction.RELOAD_PLUGIN,
+            PluginDiagnosticAction.COPY_DIAGNOSTIC,
         ).inOrder()
         assertThat(
             PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
@@ -561,6 +563,14 @@ class PluginsSettingsSectionSupportTest {
                 isScriptPlugin = true,
             )
         ).isEmpty()
+        assertThat(
+            PluginsSettingsSectionSupport.resolvePluginCommandContributionActions(
+                command = commands[2].copy(
+                    status = PluginCommandContributionStatus.MISSING_COMMAND_DECLARATION,
+                ),
+                isScriptPlugin = true,
+            )
+        ).containsExactly(PluginDiagnosticAction.COPY_DIAGNOSTIC)
     }
 
     @Test
@@ -1459,6 +1469,43 @@ class PluginsSettingsSectionSupportTest {
         assertThat(clipboardText).contains("source: HEALTH")
         assertThat(clipboardText).contains("severity: WARNING")
         assertThat(clipboardText).contains("message: Unknown permission")
+    }
+
+    @Test
+    fun commandContributionClipboardText_shouldIncludeStableStructuredFields() {
+        val plugin = installedPlugin(
+            id = "demo.plugin",
+            name = "Demo Plugin",
+        )
+        val command = PluginsCommandContribution(
+            surface = ResolvedPluginCommandSurface.EDITOR_TOOLBAR,
+            commandId = "demo.run",
+            title = "Run Demo",
+            group = "navigation",
+            source = ResolvedPluginCommandSource.PLUGIN,
+            status = PluginCommandContributionStatus.UNAVAILABLE,
+            whenExpression = "editorLang == cpp",
+            statusMessage = "Permission command.execute is not granted",
+        )
+
+        val clipboardText = PluginsSettingsSectionSupport.buildPluginCommandContributionClipboardText(
+            plugin = plugin,
+            command = command,
+        )
+
+        assertThat(clipboardText).contains("Plugin command contribution")
+        assertThat(clipboardText).contains("pluginId: demo.plugin")
+        assertThat(clipboardText).contains("pluginName: Demo Plugin")
+        assertThat(clipboardText).contains("directoryName: demo.plugin")
+        assertThat(clipboardText).contains("enabled: true")
+        assertThat(clipboardText).contains("surface: EDITOR_TOOLBAR")
+        assertThat(clipboardText).contains("source: PLUGIN")
+        assertThat(clipboardText).contains("status: UNAVAILABLE")
+        assertThat(clipboardText).contains("commandId: demo.run")
+        assertThat(clipboardText).contains("title: Run Demo")
+        assertThat(clipboardText).contains("group: navigation")
+        assertThat(clipboardText).contains("when: editorLang == cpp")
+        assertThat(clipboardText).contains("reason: Permission command.execute is not granted")
     }
 
     @Test

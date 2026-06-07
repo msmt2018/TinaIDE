@@ -877,6 +877,7 @@ internal object PluginsSettingsSectionSupport {
                 if (isScriptPlugin) {
                     add(PluginDiagnosticAction.RELOAD_PLUGIN)
                 }
+                add(PluginDiagnosticAction.COPY_DIAGNOSTIC)
             }
             PluginCommandContributionStatus.UNAVAILABLE -> {
                 add(PluginDiagnosticAction.OPEN_LOGS)
@@ -886,10 +887,13 @@ internal object PluginsSettingsSectionSupport {
                 if (isScriptPlugin) {
                     add(PluginDiagnosticAction.RELOAD_PLUGIN)
                 }
+                add(PluginDiagnosticAction.COPY_DIAGNOSTIC)
             }
-            PluginCommandContributionStatus.AVAILABLE,
             PluginCommandContributionStatus.MISSING_COMMAND_ID,
-            PluginCommandContributionStatus.MISSING_COMMAND_DECLARATION -> Unit
+            PluginCommandContributionStatus.MISSING_COMMAND_DECLARATION -> {
+                add(PluginDiagnosticAction.COPY_DIAGNOSTIC)
+            }
+            PluginCommandContributionStatus.AVAILABLE -> Unit
         }
     }.distinct()
 
@@ -949,6 +953,29 @@ internal object PluginsSettingsSectionSupport {
             issue.fixHint?.takeIf { it.isNotBlank() }?.let { fixHint ->
                 appendLine("fixHint: $fixHint")
             }
+        }
+    }.trimEnd()
+
+    fun buildPluginCommandContributionClipboardText(
+        plugin: InstalledPlugin,
+        command: PluginsCommandContribution,
+    ): String = buildString {
+        appendLine("Plugin command contribution")
+        appendLine("pluginId: ${plugin.manifest.id}")
+        appendLine("pluginName: ${plugin.manifest.name}")
+        appendLine("directoryName: ${plugin.directory.name}")
+        appendLine("enabled: ${plugin.enabled}")
+        appendLine("surface: ${command.surface.name}")
+        appendLine("source: ${command.source?.name ?: "-"}")
+        appendLine("status: ${command.status.name}")
+        appendLine("commandId: ${command.commandId.ifBlank { "-" }}")
+        appendLine("title: ${command.title.ifBlank { "-" }}")
+        appendLine("group: ${command.group.ifBlank { "-" }}")
+        command.whenExpression?.takeIf { it.isNotBlank() }?.let { whenExpression ->
+            appendLine("when: $whenExpression")
+        }
+        command.statusMessage?.takeIf { it.isNotBlank() }?.let { statusMessage ->
+            appendLine("reason: $statusMessage")
         }
     }.trimEnd()
 
