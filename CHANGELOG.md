@@ -37,6 +37,29 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.1] - 2026-06-08
+
+### Changed
+- CI APK 构建链路不再依赖 Git LFS checkout：`dev-build`、手动 PR APK 构建和 Release 构建均改为 `lfs: false`，构建前通过 GitHub Release `toolchain-v0.2.4` 恢复 tina-toolchain 资产并执行 sha256 校验，避免 LFS 带宽耗尽导致 checkout 阶段失败。
+- `dev-build` 与 PR APK 构建改为手动触发，减少公开仓库中不必要的 Actions 资源消耗；Release workflow 仍保留 tag / 手动 release 构建入口。
+- 依赖包安装体验继续补齐：包依赖预览、原生库提示和自动安装链路更清晰，减少用户创建 C/C++ 项目后手动补依赖的步骤。
+- 文档按当前开源仓库事实源刷新，明确默认 native tina-toolchain + Android sysroot 链路、MT 管理器私有目录暴露边界、文档维护状态和 CI toolchain 资产维护流程。
+
+### Removed
+- 移除 release R8 mapping 上传到私有服务器的构建链路，公开 build-logic 仅保留 `backupMappingFiles` 本地归档能力，不再注册 `uploadMappingFiles`，也不再提供 `tina.releaseMapping.uploadEnabled` / `tina.releaseMapping.serverUrl` 配置入口。
+
+### Fixed
+- 修复 AI 工具安全测试、ktlint 和文档口径相关问题，保证当前开源分支能在禁用 LFS checkout 后继续通过关键构建校验。
+- 强化存储路径和 MT 管理器访问边界的安全测试覆盖，避免默认暴露不应公开的私有目录。
+
+### Verification
+- `bash tools/ci/restore-tina-toolchain-assets.sh arm64 x86_64`
+- `.\gradlew.bat :build-logic:convention:compileKotlin --console=plain --no-daemon`
+- `.\gradlew.bat :app:verifyTinaToolchainAssets --console=plain --no-daemon`
+- `.\gradlew.bat :app:tasks --all --console=plain --no-daemon`
+- `.\gradlew.bat :app:compileArm64DebugKotlin --console=plain --no-daemon`
+- `git diff --check`
+
 ## [0.18.0] - 2026-06-06
 
 ### Added
