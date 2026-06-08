@@ -72,11 +72,6 @@ class MTDataFilesProvider : DocumentsProvider() {
     private var androidDataDir: File? = null
     private var androidObbDir: File? = null
 
-    private data class DocumentIdParts(
-        val type: String?,
-        val subPath: String
-    )
-
     override fun attachInfo(context: Context, info: ProviderInfo) {
         super.attachInfo(context, info)
         packageName = context.packageName
@@ -126,29 +121,8 @@ class MTDataFilesProvider : DocumentsProvider() {
     }
 
     @Throws(FileNotFoundException::class)
-    private fun parseDocumentId(docId: String): DocumentIdParts {
-        if (docId != packageName && !docId.startsWith("$packageName/")) {
-            throw FileNotFoundException("$docId not found")
-        }
-
-        val relative = docId.removePrefix(packageName).removePrefix("/")
-        if (relative.isEmpty()) {
-            return DocumentIdParts(type = null, subPath = "")
-        }
-
-        val separatorIndex = relative.indexOf('/')
-        val type = if (separatorIndex == -1) {
-            relative
-        } else {
-            relative.substring(0, separatorIndex)
-        }
-        val subPath = if (separatorIndex == -1) {
-            ""
-        } else {
-            relative.substring(separatorIndex + 1)
-        }
-        return DocumentIdParts(type = type, subPath = subPath)
-    }
+    private fun parseDocumentId(docId: String): MTDocumentIdParts =
+        MTDataFilesProviderPathSafety.parseDocumentId(packageName, docId)
 
     private fun getRootForType(type: String): File? = when {
         type.equals("data", ignoreCase = true) -> dataDir
@@ -159,70 +133,27 @@ class MTDataFilesProvider : DocumentsProvider() {
     }
 
     @Throws(FileNotFoundException::class)
-    private fun sanitizeDocumentSubPath(subPath: String, docId: String): String {
-        if (subPath.isEmpty()) return ""
-        if (subPath.indexOf('\u0000') >= 0 || subPath.startsWith("/") || subPath.contains('\\')) {
-            throw FileNotFoundException("$docId not found")
-        }
-
-        val segments = subPath.split('/')
-        if (segments.any { it.isEmpty() || it == "." || it == ".." }) {
-            throw FileNotFoundException("$docId not found")
-        }
-        return segments.joinToString("/")
-    }
+    private fun sanitizeDocumentSubPath(subPath: String, docId: String): String =
+        MTDataFilesProviderPathSafety.sanitizeDocumentSubPath(subPath, docId)
 
     @Throws(FileNotFoundException::class)
     private fun requireFileInsideRoot(root: File, file: File, docId: String) {
-        val rootCanonical = root.canonicalFile
-        val checked = runCatching {
-            if (existsWithoutFollowing(file) && isSymbolicLink(file)) {
-                resolveSymlinkTargetInsideRoot(rootCanonical, file, Os.readlink(file.path), docId)
-            } else {
-                canonicalCandidate(file)
-            }
-        }.getOrElse {
-            throw FileNotFoundException("$docId not found")
-        }
-
-        if (!isSameOrChild(rootCanonical, checked)) {
-            throw FileNotFoundException("$docId not found")
-        }
+        MTDataFilesProviderPathSafety.requireFileInsideRoot(
+            root = root,
+            file = file,
+            docId = docId,
+            existsWithoutFollowing = ::existsWithoutFollowing,
+            isSymbolicLink = ::isSymbolicLink,
+            readLink = { Os.readlink(it.path) },
+        )
     }
 
     @Throws(FileNotFoundException::class)
-    private fun requireSymlinkTargetInsideRoot(root: File, linkFile: File, linkTarget: String, docId: String): String {
-        val rootCanonical = root.canonicalFile
-        resolveSymlinkTargetInsideRoot(rootCanonical, linkFile, linkTarget, docId)
-        return linkTarget
-    }
+    private fun requireSymlinkTargetInsideRoot(root: File, linkFile: File, linkTarget: String, docId: String): String =
+        MTDataFilesProviderPathSafety.requireSymlinkTargetInsideRoot(root, linkFile, linkTarget, docId)
 
-    @Throws(FileNotFoundException::class)
-    private fun resolveSymlinkTargetInsideRoot(
-        rootCanonical: File,
-        linkFile: File,
-        linkTarget: String,
-        docId: String
-    ): File {
-        if (linkTarget.isBlank() || linkTarget.indexOf('\u0000') >= 0) {
-            throw FileNotFoundException("$docId not found")
-        }
-
-        val target = File(linkTarget).let { raw ->
-            if (raw.isAbsolute) raw else File(linkFile.parentFile ?: rootCanonical, linkTarget)
-        }
-        val checked = canonicalCandidate(target)
-        if (!isSameOrChild(rootCanonical, checked)) {
-            throw FileNotFoundException("$docId not found")
-        }
-        return checked
-    }
-
-    private fun canonicalCandidate(file: File): File {
-        if (file.exists()) return file.canonicalFile
-        val parent = file.parentFile ?: return file.canonicalFile
-        return File(parent.canonicalFile, file.name)
-    }
+    private fun canonicalCandidate(file: File): File =
+        MTDataFilesProviderPathSafety.canonicalCandidate(file)
 
     private fun existsWithoutFollowing(file: File): Boolean = try {
         Os.lstat(file.path)
@@ -231,43 +162,19 @@ class MTDataFilesProvider : DocumentsProvider() {
         false
     }
 
-    private fun isSameOrChild(root: File, candidate: File): Boolean {
-        val rootPath = root.path
-        val candidatePath = candidate.path
-        return candidatePath == rootPath || candidatePath.startsWith(rootPath + File.separator)
-    }
+    private fun isSameOrChild(root: File, candidate: File): Boolean =
+        MTDataFilesProviderPathSafety.isSameOrChild(root, candidate)
 
     @Throws(FileNotFoundException::class)
-    private fun sanitizeDisplayName(displayName: String): String {
-        if (
-            displayName.isBlank() ||
-            displayName == "." ||
-            displayName == ".." ||
-            displayName.indexOf('\u0000') >= 0 ||
-            displayName.contains('/') ||
-            displayName.contains('\\')
-        ) {
-            throw FileNotFoundException("Invalid display name: $displayName")
-        }
-        return displayName
-    }
+    private fun sanitizeDisplayName(displayName: String): String =
+        MTDataFilesProviderPathSafety.sanitizeDisplayName(displayName)
 
     @Throws(FileNotFoundException::class)
-    private fun getParentDocumentId(documentId: String): String {
-        val lastSlash = documentId.lastIndexOf('/')
-        if (lastSlash <= packageName.length) {
-            throw FileNotFoundException("Root document cannot be renamed: $documentId")
-        }
-        return documentId.substring(0, lastSlash)
-    }
+    private fun getParentDocumentId(documentId: String): String =
+        MTDataFilesProviderPathSafety.getParentDocumentId(packageName, documentId)
 
-    private fun appendDocumentId(parentDocumentId: String, displayName: String): String {
-        return if (parentDocumentId.endsWith("/")) {
-            parentDocumentId + displayName
-        } else {
-            "$parentDocumentId/$displayName"
-        }
-    }
+    private fun appendDocumentId(parentDocumentId: String, displayName: String): String =
+        MTDataFilesProviderPathSafety.appendDocumentId(parentDocumentId, displayName)
 
     private fun getDocumentIdFromUri(uri: Uri): String? {
         return runCatching { DocumentsContract.getDocumentId(uri) }

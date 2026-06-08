@@ -842,7 +842,7 @@
   <string name="settings_linux_rootfs_path">Rootfs 路径</string>
   <string name="value_default">默认</string>
   <string name="settings_mt_access">MT 管理器访问</string>
-  <string name="settings_mt_access_desc">允许 MT 管理器访问应用私有目录（无需 ROOT）</string>
+  <string name="settings_mt_access_desc">默认关闭。开启后仅允许 MT 管理器访问 TinaIDE 的 data、Android/data、Android/obb 和 user_de_data 目录。</string>
 
   <!-- Storage Cleanup -->
   <string name="settings_title_storage_cleanup">存储清理</string>

@@ -644,7 +644,7 @@
   <string name="settings_linux_rootfs_path">Rootfs Path</string>
   <string name="value_default">Default</string>
   <string name="settings_mt_access">MT Manager Access</string>
-  <string name="settings_mt_access_desc">Allow MT Manager to access app private directory (no ROOT required)</string>
+  <string name="settings_mt_access_desc">Off by default. When enabled, MT Manager can access only TinaIDE data, Android/data, Android/obb, and user_de_data directories.</string>
 
   <!-- Storage Cleanup -->
   <string name="settings_title_storage_cleanup">Storage Cleanup</string>
