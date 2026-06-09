@@ -6,6 +6,8 @@ import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.network.ApiResult
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
+import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxyConfig
+import com.wuxianggujun.tinaide.core.network.registry.RegistryEndpoint
 import com.wuxianggujun.tinaide.core.network.registry.RegistryUrl
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import java.io.File
@@ -27,6 +29,7 @@ class PluginMarketplaceApi private constructor(
     private val indexUrls: List<RegistryUrl>,
     private val indexClient: OkHttpClient,
     private val downloadClient: OkHttpClient,
+    private val customGitHubProxyPrefix: String? = null,
 ) {
     private val json = JsonSerializer.default
     private val indexMutex = Mutex()
@@ -37,11 +40,16 @@ class PluginMarketplaceApi private constructor(
     companion object {
         private const val TAG = "PluginMarketplaceApi"
 
-        fun create(context: Context): PluginMarketplaceApi = PluginMarketplaceApi(
-            indexUrls = GitHubRegistryConfig.pluginIndexV2Urls(),
-            indexClient = GitHubRegistryHttpClientFactory.probe(context.applicationContext),
-            downloadClient = GitHubRegistryHttpClientFactory.download(context.applicationContext),
-        )
+        fun create(context: Context): PluginMarketplaceApi {
+            val appContext = context.applicationContext
+            val settings = GitHubRegistryProxyConfig.load(appContext)
+            return PluginMarketplaceApi(
+                indexUrls = GitHubRegistryConfig.pluginIndexV2Urls(settings.customMirrorPrefix),
+                indexClient = GitHubRegistryHttpClientFactory.probe(appContext),
+                downloadClient = GitHubRegistryHttpClientFactory.download(appContext),
+                customGitHubProxyPrefix = settings.customMirrorPrefix,
+            )
+        }
     }
 
     suspend fun listPlugins(
@@ -113,7 +121,13 @@ class PluginMarketplaceApi private constructor(
                 currentVersion = installed.version,
                 latestVersion = latest.version,
                 downloadUrl = latest.downloadUrl
-                    ?.let { GitHubRegistryConfig.resolveRawUrl(it, index.baseUrl) }
+                    ?.let {
+                        GitHubRegistryConfig.registryResourceUrlCandidates(
+                            urlOrPath = it,
+                            endpoint = index.endpoint,
+                            customProxyPrefix = customGitHubProxyPrefix,
+                        ).firstOrNull()
+                    }
                     .orEmpty(),
                 changelog = latest.changelog,
                 fileSize = latest.fileSize,
@@ -144,15 +158,22 @@ class PluginMarketplaceApi private constructor(
                     404,
                     Strings.plugin_marketplace_error_plugin_version_not_found.str(version ?: "latest"),
                 )
-            val downloadUrl = pluginVersion.downloadUrl
-                ?.let { GitHubRegistryConfig.resolveRawUrl(it, index.baseUrl) }
+            val downloadUrls = pluginVersion.downloadUrl
+                ?.let {
+                    GitHubRegistryConfig.registryResourceUrlCandidates(
+                        urlOrPath = it,
+                        endpoint = index.endpoint,
+                        customProxyPrefix = customGitHubProxyPrefix,
+                    )
+                }
+                ?.takeIf { it.isNotEmpty() }
                 ?: return@withContext ApiResult.Error(
                     -1,
                     Strings.plugin_marketplace_error_download_url_missing.str(pluginId),
                 )
 
             downloadFile(
-                url = downloadUrl,
+                urls = downloadUrls,
                 targetFile = targetFile,
                 expectedHash = pluginVersion.fileHash,
                 onProgress = onProgress,
@@ -181,6 +202,7 @@ class PluginMarketplaceApi private constructor(
                 LoadedPluginRegistryCatalog(
                     catalog = json.decodeFromString<PluginRegistryCatalog>(body),
                     baseUrl = registryUrl.endpoint.baseUrl,
+                    endpoint = registryUrl.endpoint,
                 )
             }
             if (result is ApiResult.Success) {
@@ -253,39 +275,74 @@ class PluginMarketplaceApi private constructor(
         return detailMutex.withLock {
             cachedDetails[entry.pluginId]?.let { return@withLock ApiResult.Success(it) }
             cachedDetails[entry.id]?.let { return@withLock ApiResult.Success(it) }
-            val resolvedUrl = GitHubRegistryConfig.resolveRawUrl(detailUrl, index.baseUrl)
-            try {
-                val response = indexClient.newCall(
-                    Request.Builder()
-                        .url(resolvedUrl)
-                        .get()
-                        .build()
-                ).execute()
-                response.use { resp ->
-                    if (!resp.isSuccessful) {
-                        return@withLock ApiResult.Error(
-                            resp.code,
-                            "Plugin detail request failed: HTTP ${resp.code}",
-                        )
+            var lastError: ApiResult<PluginDetail>? = null
+            for (candidateUrl in GitHubRegistryConfig.registryResourceUrlCandidates(
+                urlOrPath = detailUrl,
+                endpoint = index.endpoint,
+                customProxyPrefix = customGitHubProxyPrefix,
+            )) {
+                try {
+                    val response = indexClient.newCall(
+                        Request.Builder()
+                            .url(candidateUrl)
+                            .get()
+                            .build()
+                    ).execute()
+                    response.use { resp ->
+                        if (!resp.isSuccessful) {
+                            lastError = ApiResult.Error(
+                                resp.code,
+                                "Plugin detail request failed: HTTP ${resp.code}",
+                            )
+                            return@use
+                        }
+                        val body = resp.body?.string()
+                        if (body.isNullOrBlank()) {
+                            lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
+                            return@use
+                        }
+                        val detail = json.decodeFromString<PluginDetail>(body)
+                        cachedDetails[detail.pluginId] = detail
+                        cachedDetails[detail.id] = detail
+                        return@withLock ApiResult.Success(detail)
                     }
-                    val body = resp.body?.string()
-                        ?: return@withLock ApiResult.Error(-1, Strings.error_response_empty.str())
-                    val detail = json.decodeFromString<PluginDetail>(body)
-                    cachedDetails[detail.pluginId] = detail
-                    cachedDetails[detail.id] = detail
-                    ApiResult.Success(detail)
+                } catch (e: IOException) {
+                    Timber.tag(TAG).w(e, "Load plugin detail failed: %s", pluginId)
+                    lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "Parse plugin detail failed: %s", pluginId)
+                    lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
                 }
-            } catch (e: IOException) {
-                Timber.tag(TAG).w(e, "Load plugin detail failed: %s", pluginId)
-                ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
-            } catch (e: Exception) {
-                Timber.tag(TAG).w(e, "Parse plugin detail failed: %s", pluginId)
-                ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
             }
+            lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
         }
     }
 
     private fun downloadFile(
+        urls: List<String>,
+        targetFile: File,
+        expectedHash: String?,
+        onProgress: ((downloaded: Long, total: Long) -> Unit)?,
+    ): ApiResult<File> {
+        var lastResult: ApiResult<File>? = null
+        for (candidateUrl in urls) {
+            val result = runCatching {
+                downloadSingleFile(
+                    url = candidateUrl,
+                    targetFile = targetFile,
+                    expectedHash = expectedHash,
+                    onProgress = onProgress,
+                )
+            }.getOrElse { error ->
+                ApiResult.NetworkError(error.message ?: Strings.error_network_connection_failed.str())
+            }
+            if (result is ApiResult.Success) return result
+            lastResult = result
+        }
+        return lastResult ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
+    }
+
+    private fun downloadSingleFile(
         url: String,
         targetFile: File,
         expectedHash: String?,
@@ -394,6 +451,7 @@ data class PluginRegistryCatalog(
 data class LoadedPluginRegistryCatalog(
     val catalog: PluginRegistryCatalog,
     val baseUrl: String,
+    val endpoint: RegistryEndpoint = RegistryEndpoint(name = "Registry", baseUrl = baseUrl),
 ) {
     val plugins: List<PluginRegistryCatalogEntry>
         get() = catalog.plugins

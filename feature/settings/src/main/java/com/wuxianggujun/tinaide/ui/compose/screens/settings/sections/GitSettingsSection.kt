@@ -917,6 +917,7 @@ private fun GitHubRegistryContent() {
     var enabled by remember { mutableStateOf(false) }
     var host by remember { mutableStateOf("") }
     var port by remember { mutableStateOf("") }
+    var customMirrorUrl by remember { mutableStateOf("") }
     var errorRes by remember { mutableStateOf<Int?>(null) }
 
     fun loadSettings() {
@@ -926,6 +927,7 @@ private fun GitHubRegistryContent() {
         enabled = editorState.enabled
         host = editorState.host
         port = editorState.port
+        customMirrorUrl = editorState.customMirrorUrl
         errorRes = null
     }
 
@@ -958,6 +960,16 @@ private fun GitHubRegistryContent() {
                 text = stringResource(Strings.github_registry_proxy_scope_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TinaTextField(
+                value = customMirrorUrl,
+                onValueChange = {
+                    customMirrorUrl = it
+                    errorRes = null
+                },
+                label = stringResource(Strings.github_registry_mirror_url_label),
+                placeholder = stringResource(Strings.github_registry_mirror_url_placeholder),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             TinaTextField(
                 value = host,
@@ -994,6 +1006,7 @@ private fun GitHubRegistryContent() {
                         enabled = enabled,
                         rawHost = host,
                         rawPort = port,
+                        rawCustomMirrorUrl = customMirrorUrl,
                     )
                     val settings = result.settings
                     if (settings == null) {
@@ -1006,6 +1019,7 @@ private fun GitHubRegistryContent() {
                     enabled = editorState.enabled
                     host = editorState.host
                     port = editorState.port
+                    customMirrorUrl = editorState.customMirrorUrl
                     errorRes = null
                     Toast.makeText(context, saveOk, Toast.LENGTH_SHORT).show()
                 },

@@ -9,6 +9,7 @@ import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxyConfig
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxySettings
+import com.wuxianggujun.tinaide.core.network.registry.RegistryEndpoint
 import com.wuxianggujun.tinaide.core.network.registry.RegistryUrl
 import com.wuxianggujun.tinaide.core.packages.model.DownloadInfo
 import com.wuxianggujun.tinaide.core.packages.model.DownloadSource
@@ -71,7 +72,7 @@ class PackageApiClient private constructor(
             context: Context,
             settings: GitHubRegistryProxySettings,
         ): PackageApiClient = PackageApiClient(
-            indexUrls = GitHubRegistryConfig.packageIndexV2Urls(),
+            indexUrls = GitHubRegistryConfig.packageIndexV2Urls(settings.customMirrorPrefix),
             indexClient = GitHubRegistryHttpClientFactory.probe(context),
             proxySettings = settings,
         )
@@ -155,11 +156,11 @@ class PackageApiClient private constructor(
                 val detail = detailResult.data
                 ApiResult.Success(
                     detail.downloads["$packageId:$versionId"]
-                        ?.withResolvedSources(index.baseUrl)
+                        ?.withResolvedSources(index.endpoint)
                         ?: resolveDownloadInfo(
                             packageId = packageId,
                             versionId = versionId,
-                            baseUrl = index.baseUrl,
+                            endpoint = index.endpoint,
                             versions = detail.versions,
                             pkg = detail.pkg,
                         )
@@ -189,6 +190,7 @@ class PackageApiClient private constructor(
                 LoadedPackageRegistryCatalog(
                     catalog = json.decodeFromString<PackageRegistryCatalog>(body),
                     baseUrl = registryUrl.endpoint.baseUrl,
+                    endpoint = registryUrl.endpoint,
                 )
             }
             if (result is ApiResult.Success) {
@@ -257,41 +259,52 @@ class PackageApiClient private constructor(
         cachedDetails[entry.id]?.let { return ApiResult.Success(it) }
         return detailMutex.withLock {
             cachedDetails[entry.id]?.let { return@withLock ApiResult.Success(it) }
-            val resolvedUrl = GitHubRegistryConfig.resolveRawUrl(detailUrl, index.baseUrl)
-            try {
-                val response = indexClient.newCall(
-                    Request.Builder()
-                        .url(resolvedUrl)
-                        .get()
-                        .build()
-                ).execute()
-                response.use { resp ->
-                    if (!resp.isSuccessful) {
-                        return@withLock ApiResult.Error(
-                            resp.code,
-                            "Package detail request failed: HTTP ${resp.code}",
-                        )
+            var lastError: ApiResult<PackageRegistryDetail>? = null
+            for (candidateUrl in GitHubRegistryConfig.registryResourceUrlCandidates(
+                urlOrPath = detailUrl,
+                endpoint = index.endpoint,
+                customProxyPrefix = proxySettings.customMirrorPrefix,
+            )) {
+                try {
+                    val response = indexClient.newCall(
+                        Request.Builder()
+                            .url(candidateUrl)
+                            .get()
+                            .build()
+                    ).execute()
+                    response.use { resp ->
+                        if (!resp.isSuccessful) {
+                            lastError = ApiResult.Error(
+                                resp.code,
+                                "Package detail request failed: HTTP ${resp.code}",
+                            )
+                            return@use
+                        }
+                        val body = resp.body?.string()
+                        if (body.isNullOrBlank()) {
+                            lastError = ApiResult.Error(-1, Strings.error_response_empty.str())
+                            return@use
+                        }
+                        val detail = json.decodeFromString<PackageRegistryDetail>(body)
+                        cachedDetails[detail.pkg.id] = detail
+                        return@withLock ApiResult.Success(detail)
                     }
-                    val body = resp.body?.string()
-                        ?: return@withLock ApiResult.Error(-1, Strings.error_response_empty.str())
-                    val detail = json.decodeFromString<PackageRegistryDetail>(body)
-                    cachedDetails[detail.pkg.id] = detail
-                    ApiResult.Success(detail)
+                } catch (e: IOException) {
+                    Timber.tag(TAG).w(e, "Load package detail failed: %s", packageId)
+                    lastError = ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "Parse package detail failed: %s", packageId)
+                    lastError = ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
                 }
-            } catch (e: IOException) {
-                Timber.tag(TAG).w(e, "Load package detail failed: %s", packageId)
-                ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
-            } catch (e: Exception) {
-                Timber.tag(TAG).w(e, "Parse package detail failed: %s", packageId)
-                ApiResult.Error(-1, e.message ?: Strings.error_response_parse_failed.str())
             }
+            lastError ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
         }
     }
 
     private fun resolveDownloadInfo(
         packageId: String,
         versionId: Int,
-        baseUrl: String,
+        endpoint: RegistryEndpoint,
         versions: PackageVersionsResponse?,
         pkg: GUIPackage?,
     ): DownloadInfo? {
@@ -312,7 +325,9 @@ class PackageApiClient private constructor(
                 )
             )
             else -> emptyList()
-        }.map { it.copy(url = GitHubRegistryConfig.resolveRawUrl(it.url, baseUrl)) }
+        }
+            .flatMap { source -> source.withResolvedUrlCandidates(endpoint) }
+            .distinctBy(DownloadSource::url)
 
         if (sources.isEmpty()) return null
 
@@ -391,11 +406,24 @@ class PackageApiClient private constructor(
 
     private fun PackageVersionsResponse.allVersions(): List<PackageVersion> = linux.orEmpty() + android.orEmpty()
 
-    private fun DownloadInfo.withResolvedSources(baseUrl: String): DownloadInfo = copy(
-        sources = sources.map { source ->
-            source.copy(url = GitHubRegistryConfig.resolveRawUrl(source.url, baseUrl))
-        }
+    private fun DownloadInfo.withResolvedSources(endpoint: RegistryEndpoint): DownloadInfo = copy(
+        sources = sources
+            .flatMap { source -> source.withResolvedUrlCandidates(endpoint) }
+            .distinctBy(DownloadSource::url)
     )
+
+    private fun DownloadSource.withResolvedUrlCandidates(endpoint: RegistryEndpoint): List<DownloadSource> = GitHubRegistryConfig
+        .registryResourceUrlCandidates(
+            urlOrPath = url,
+            endpoint = endpoint,
+            customProxyPrefix = proxySettings.customMirrorPrefix,
+        )
+        .mapIndexed { index, candidateUrl ->
+            copy(
+                url = candidateUrl,
+                priority = priority - index,
+            )
+        }
 }
 
 @Serializable
@@ -445,6 +473,7 @@ data class PackageRegistryDetail(
 data class LoadedPackageRegistryCatalog(
     val catalog: PackageRegistryCatalog,
     val baseUrl: String,
+    val endpoint: RegistryEndpoint = RegistryEndpoint(name = "Registry", baseUrl = baseUrl),
 ) {
     val packages: List<GUIPackage>
         get() = catalog.packages.map { it.toPackage() }

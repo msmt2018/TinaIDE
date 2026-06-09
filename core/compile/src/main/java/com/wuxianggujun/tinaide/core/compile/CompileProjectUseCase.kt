@@ -15,6 +15,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.linux.LinuxEnvironmentProvider
 import com.wuxianggujun.tinaide.core.linux.UnavailableLinuxEnvironmentProvider
+import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.editor.IEditorTabProvider
 import com.wuxianggujun.tinaide.file.IProjectContext
 import com.wuxianggujun.tinaide.output.IOutputManager
@@ -194,7 +195,6 @@ class CompileProjectUseCase(
     ): Result = withContext(Dispatchers.IO) {
         val mode = operation.mode
         val action = operation.action
-        val normalizedLaunchEnvironment = LaunchEnvironment.sanitized(launchEnvironment)
         log(Strings.compile_start.strOr(appContext))
 
         val project = projectContext.getCurrentProject() ?: run {
@@ -254,6 +254,11 @@ class CompileProjectUseCase(
         val preferSharedLibraryForRun = mode == ExecutionMode.RUN && runOutputMode.isSdlGraphical()
         val activeOutputMode = if (mode == ExecutionMode.RUN) runOutputMode else OutputMode.TERMINAL
         val request = operation.resolveRequest(activeOutputMode)
+        val normalizedLaunchEnvironment = resolveLaunchEnvironment(
+            projectRoot = projectRoot,
+            launch = request.launch,
+            launchEnvironment = launchEnvironment,
+        )
 
         val buildVariablesCtx = BuildVariables.BuildContext(
             projectDir = projectRoot,
@@ -792,6 +797,24 @@ class CompileProjectUseCase(
     private fun getRunConfiguration(): RunConfiguration {
         val project = projectContext.getCurrentProject() ?: return RunConfiguration()
         return RunConfigurationManager.load(project.rootPath).selectedConfig
+    }
+
+    private fun resolveLaunchEnvironment(
+        projectRoot: File,
+        launch: LaunchIntent,
+        launchEnvironment: Map<String, String>,
+    ): Map<String, String> {
+        val normalized = LaunchEnvironment.sanitized(launchEnvironment)
+        if (launch is LaunchIntent.None) {
+            return normalized
+        }
+
+        val packagePaths = InstalledPackagePathResolver.resolve(appContext, projectRoot)
+        return LaunchEnvironment.withPrependedPath(
+            environment = normalized,
+            variableName = "LD_LIBRARY_PATH",
+            paths = packagePaths.runtimeLibDirs.map { it.absolutePath },
+        )
     }
 
     private fun resolveBuildOptions(

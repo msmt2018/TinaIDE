@@ -79,7 +79,13 @@ object ApkExportRuntimeLibrariesResolver {
 
         val rootLibraries = resolveRootLibraries(buildLibraries)
         val primaryLibrary = rootLibraries.first()
-        when (val sdlResolveResult = SdlRuntimeResolver.resolve(appContext, primaryLibrary.absolutePath)) {
+        when (
+            val sdlResolveResult = SdlRuntimeResolver.resolve(
+                context = appContext,
+                mainLibraryPath = primaryLibrary.absolutePath,
+                extraRuntimeLibDirs = packagePaths.runtimeLibDirs,
+            )
+        ) {
             is SdlRuntimeResolver.ResolveResult.Sdl -> {
                 File(sdlResolveResult.spec.sdlLibraryPath)
                     .takeIf { it.isFile }

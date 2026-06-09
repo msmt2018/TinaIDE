@@ -77,7 +77,11 @@ object SdlRuntimeResolver {
         val missingLibraries: List<String>
     )
 
-    fun resolve(context: Context, mainLibraryPath: String): ResolveResult {
+    fun resolve(
+        context: Context,
+        mainLibraryPath: String,
+        extraRuntimeLibDirs: List<File> = emptyList(),
+    ): ResolveResult {
         if (mainLibraryPath.isBlank()) {
             return ResolveResult.Error(Strings.sdl_runtime_error_main_library_missing.strOr(context))
         }
@@ -93,6 +97,9 @@ object SdlRuntimeResolver {
         val packagePaths = InstalledPackagePathResolver.resolve(
             context = context.applicationContext,
             projectRoot = projectRoot
+        )
+        val configuredRuntimeDirs = normalizeRuntimeDirs(
+            extraRuntimeLibDirs + packagePaths.runtimeLibDirs
         )
 
         val neededLibraries = try {
@@ -124,7 +131,7 @@ object SdlRuntimeResolver {
         val selectedSdlLibrary =
             selectSdlLibraryFromManagedPackages(managedPackages, requiredSdlMajor)
                 ?: run {
-                    val runtimeDirs = packagePaths.runtimeLibDirs
+                    val runtimeDirs = configuredRuntimeDirs
                         .filter { it.isDirectory }
                     selectSdlLibraryFromRuntimeDirs(runtimeDirs, requiredSdlMajor)
                 }
@@ -137,7 +144,7 @@ object SdlRuntimeResolver {
                 )
 
         val runtimeDirs = linkedSetOf<File>().apply {
-            addAll(packagePaths.runtimeLibDirs.filter { it.isDirectory })
+            addAll(configuredRuntimeDirs.filter { it.isDirectory })
             addAll(selectedSdlLibrary.runtimeLibDirs)
             selectedSdlLibrary.libraryFile.parentFile?.let { add(it) }
         }.toList()
@@ -354,6 +361,11 @@ object SdlRuntimeResolver {
             dir.isDirectory && hasAnySharedLibrary(dir)
         }
     }
+
+    private fun normalizeRuntimeDirs(dirs: List<File>): List<File> = dirs.asSequence()
+        .map { dir -> runCatching { dir.canonicalFile }.getOrDefault(dir.absoluteFile) }
+        .distinctBy { it.absolutePath }
+        .toList()
 
     private fun hasAnySharedLibrary(dir: File): Boolean = dir.listFiles { file ->
         file.isFile && file.name.contains(".so")
