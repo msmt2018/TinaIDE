@@ -87,64 +87,6 @@ class MainActivityCommandOrderingTest {
     }
 
     @Test
-    fun `selectMainActivityQuickCommands should use pinned commands when present`() {
-        val commands = listOf(
-            command("view.settings", MainActivityCommandCategory.VIEW),
-            command("project.build", MainActivityCommandCategory.BUILD),
-        )
-
-        val selected = selectMainActivityQuickCommands(
-            commands = commands,
-            pinnedCommandIds = listOf("project.build")
-        )
-
-        assertThat(selected.map(MainActivityCommand::id))
-            .containsExactly("project.build")
-    }
-
-    @Test
-    fun `selectMainActivityQuickCommands should cap top bar commands`() {
-        val commands = listOf(
-            command("first", MainActivityCommandCategory.VIEW),
-            command("second", MainActivityCommandCategory.BUILD),
-            command("third", MainActivityCommandCategory.CODE),
-            command("fourth", MainActivityCommandCategory.FILE),
-        )
-
-        val selected = selectMainActivityQuickCommands(
-            commands = commands,
-            pinnedCommandIds = listOf("first", "second", "third", "fourth")
-        )
-
-        assertThat(selected.map(MainActivityCommand::id))
-            .containsExactly("first", "second", "third")
-            .inOrder()
-    }
-
-    @Test
-    fun `selectMainActivityQuickCommands should fall back to defaults when pinned commands are stale`() {
-        val commands = listOf(
-            command("view.globalSearch", MainActivityCommandCategory.VIEW),
-            command(HostCommands.VIEW_TOGGLE_TERMINAL, MainActivityCommandCategory.VIEW),
-            command(HostCommands.VIEW_SETTINGS, MainActivityCommandCategory.VIEW),
-            command(HostCommands.PROJECT_CLOSE, MainActivityCommandCategory.FILE),
-        )
-
-        val selected = selectMainActivityQuickCommands(
-            commands = commands,
-            pinnedCommandIds = listOf("missing.plugin.command")
-        )
-
-        assertThat(selected.map(MainActivityCommand::id))
-            .containsExactly(
-                "view.globalSearch",
-                HostCommands.VIEW_TOGGLE_TERMINAL,
-                HostCommands.VIEW_SETTINGS
-            )
-            .inOrder()
-    }
-
-    @Test
     fun `groupMainActivityCommands should split pinned recent and category commands`() {
         val commands = listOf(
             command("pinned", MainActivityCommandCategory.VIEW),
@@ -173,6 +115,30 @@ class MainActivityCommandOrderingTest {
                 listOf("recent"),
                 listOf("code"),
                 listOf("build")
+            )
+            .inOrder()
+    }
+
+    @Test
+    fun `selectMainActivityOverflowCommands should use stable top-level menu order`() {
+        val commands = listOf(
+            command(HostCommands.VIEW_SETTINGS, MainActivityCommandCategory.VIEW),
+            command("view.globalSearch", MainActivityCommandCategory.VIEW),
+            command(HostCommands.PROJECT_CLOSE, MainActivityCommandCategory.FILE),
+            command(HostCommands.VIEW_COMMAND_PALETTE, MainActivityCommandCategory.VIEW),
+            command(HostCommands.VIEW_TOGGLE_TERMINAL, MainActivityCommandCategory.VIEW),
+            command(HostCommands.PROJECT_BUILD, MainActivityCommandCategory.BUILD),
+        )
+
+        val overflowCommands = selectMainActivityOverflowCommands(commands)
+
+        assertThat(overflowCommands.map(MainActivityCommand::id))
+            .containsExactly(
+                HostCommands.VIEW_COMMAND_PALETTE,
+                "view.globalSearch",
+                HostCommands.VIEW_TOGGLE_TERMINAL,
+                HostCommands.VIEW_SETTINGS,
+                HostCommands.PROJECT_CLOSE
             )
             .inOrder()
     }

@@ -28,7 +28,9 @@ import com.wuxianggujun.tinaide.core.editorlsp.CompletionSource
 import com.wuxianggujun.tinaide.core.editorlsp.SemanticToken
 import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.editorview.EditorColorScheme
+import com.wuxianggujun.tinaide.core.editorview.EditorConfig
 import com.wuxianggujun.tinaide.core.editorview.EditorRenderPerformanceSnapshot
+import com.wuxianggujun.tinaide.core.editorview.EditorState
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
@@ -38,11 +40,14 @@ import com.wuxianggujun.tinaide.core.lsp.LocationItem
 import com.wuxianggujun.tinaide.core.lsp.WorkspaceSymbolItem
 import com.wuxianggujun.tinaide.core.packages.PackageDependencyEvents
 import com.wuxianggujun.tinaide.core.textengine.Position
+import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider.FoldRegion
 import com.wuxianggujun.tinaide.editor.EditorTab
 import com.wuxianggujun.tinaide.editor.IEditorManager
+import com.wuxianggujun.tinaide.editor.session.DetachedEditorSnapshot
 import com.wuxianggujun.tinaide.editor.session.DocumentSession
+import com.wuxianggujun.tinaide.editor.session.EditorViewState
 import com.wuxianggujun.tinaide.editor.session.SaveResult
 import com.wuxianggujun.tinaide.editor.symbol.ProjectSymbolIndexService
 import com.wuxianggujun.tinaide.editor.theme.PluginEditorThemeRegistry
@@ -96,6 +101,10 @@ class EditorContainerState(
     private val projectSymbolIndexServiceProvider: () -> ProjectSymbolIndexService?,
     private val projectRootPathProvider: () -> String?
 ) {
+    internal companion object {
+        const val CODE_EDITOR_RUNTIME_CACHE_LIMIT = 8
+    }
+
     data class TextEditOperation(
         val startLine: Int,
         val startColumn: Int,
@@ -312,6 +321,12 @@ class EditorContainerState(
         val applyEditorColorScheme: (scheme: EditorColorScheme) -> Unit = {}
     )
 
+    data class CodeEditorRuntime(
+        val buffer: RopeTextBuffer,
+        val editorState: EditorState,
+        var isContentLoaded: Boolean = false
+    )
+
     /**
      * 记录最近一次已处理的依赖变更 revision（实例字段，避免多实例间的静态变量竞争）。
      */
@@ -325,6 +340,8 @@ class EditorContainerState(
     private val splitEditorSessionStorage = SplitEditorSessionStorage(context)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val codeEditorCallbacks = mutableMapOf<String, CodeEditorCallback>()
+    private val codeEditorRuntimesByTabId =
+        java.util.LinkedHashMap<String, CodeEditorRuntime>(16, 0.75f, true)
     private val tabPaneMap = mutableStateMapOf<String, EditorPaneId>()
     private val mirroredTabIdsByPane = mutableStateMapOf<EditorPaneId, Set<String>>()
     private val activeTabIdByPane = mutableStateMapOf<EditorPaneId, String>()
@@ -732,6 +749,62 @@ class EditorContainerState(
     internal fun unbindCodeEditorCallbacks(tabId: String) {
         unbindCodeViewerSearchCallback(tabId)
         unregisterCodeEditorCallback(tabId)
+        trimCodeEditorRuntimeCache()
+    }
+
+    internal fun getOrCreateCodeEditorRuntime(tab: EditorTabState): CodeEditorRuntime {
+        val runtime = codeEditorRuntimesByTabId.getOrPut(tab.id) {
+            val buffer = RopeTextBuffer()
+            CodeEditorRuntime(
+                buffer = buffer,
+                editorState = EditorState(
+                    textBuffer = buffer,
+                    file = tab.file,
+                    projectRootPath = getEditorProjectRootPathOrNull(),
+                    config = EditorConfig.fromPrefs()
+                )
+            )
+        }
+        trimCodeEditorRuntimeCache(protectedTabIds = setOf(tab.id))
+        return runtime
+    }
+
+    internal fun isCodeEditorRuntimeLoaded(tabId: String): Boolean =
+        codeEditorRuntimesByTabId[tabId]?.isContentLoaded == true
+
+    internal fun markCodeEditorRuntimeLoaded(tabId: String) {
+        codeEditorRuntimesByTabId[tabId]?.isContentLoaded = true
+        trimCodeEditorRuntimeCache(protectedTabIds = setOf(tabId))
+    }
+
+    private fun clearCodeEditorRuntime(tabId: String) {
+        codeEditorRuntimesByTabId.remove(tabId)
+    }
+
+    private fun trimCodeEditorRuntimeCache(protectedTabIds: Set<String> = emptySet()) {
+        if (codeEditorRuntimesByTabId.size <= CODE_EDITOR_RUNTIME_CACHE_LIMIT) return
+
+        val effectiveProtectedTabIds = buildSet {
+            addAll(protectedTabIds)
+            getActiveTabId()?.let(::add)
+            if (isSplitEditorEnabled) {
+                activeTabIdByPane.values.forEach(::add)
+            }
+            codeEditorCallbacks.keys.forEach(::add)
+        }
+
+        while (codeEditorRuntimesByTabId.size > CODE_EDITOR_RUNTIME_CACHE_LIMIT) {
+            val evictableTabId = codeEditorRuntimesByTabId.keys.firstOrNull { tabId ->
+                tabId !in effectiveProtectedTabIds && tabs.firstOrNull { it.id == tabId }?.isDirty != true
+            } ?: break
+
+            codeEditorRuntimesByTabId.remove(evictableTabId)
+            Timber.tag("EditorContainerState").d(
+                "trimCodeEditorRuntimeCache: evicted tab=%s, remaining=%d",
+                evictableTabId,
+                codeEditorRuntimesByTabId.size
+            )
+        }
     }
 
     internal fun registerCodeEditorCallback(tabId: String, callback: CodeEditorCallback) {
@@ -1068,14 +1141,16 @@ class EditorContainerState(
     // ========== 标签页管理代理 ==========
 
     fun syncFromManager(managerTabs: List<EditorTab>, activeTabId: String?) {
-        val previousActiveTabId = getActiveTabId()
+        val managerTabIds = managerTabs.map { it.id }.toSet()
+        tabs.map { it.id }
+            .filter { it !in managerTabIds }
+            .forEach { removedTabId ->
+                releaseTinaLspForTab(removedTabId)
+                clearCodeEditorRuntime(removedTabId)
+            }
         tabManager.syncFromManager(managerTabs, activeTabId)
         normalizeEditorPaneState(preferredActiveTabId = activeTabId)
         restoreSplitEditorStateIfNeeded()
-        val currentActiveTabId = getActiveTabId()
-        if (previousActiveTabId != null && previousActiveTabId != currentActiveTabId) {
-            releaseTinaLspForTab(previousActiveTabId)
-        }
     }
 
     fun openFile(file: File): Int {
@@ -1138,6 +1213,8 @@ class EditorContainerState(
         val closedTabId = tabs.getOrNull(index)?.id
         tabManager.requestCloseTab(index)
         if (closedTabId != null && tabs.none { it.id == closedTabId }) {
+            releaseTinaLspForTab(closedTabId)
+            clearCodeEditorRuntime(closedTabId)
             tabPaneMap.remove(closedTabId)
             removeMirroredTabId(closedTabId)
             activeTabIdByPane
@@ -1173,8 +1250,15 @@ class EditorContainerState(
     }
 
     fun confirmSaveAndClose(): Boolean {
+        val tabIdsBeforeClose = tabs.map { it.id }
         val closed = tabManager.confirmSaveAndClose()
         if (closed) {
+            tabIdsBeforeClose
+                .filter { closedTabId -> tabs.none { it.id == closedTabId } }
+                .forEach { closedTabId ->
+                    releaseTinaLspForTab(closedTabId)
+                    clearCodeEditorRuntime(closedTabId)
+                }
             normalizeEditorPaneState()
             persistSplitEditorState()
         }
@@ -1183,8 +1267,15 @@ class EditorContainerState(
 
     fun confirmDiscardAndClose() {
         val hadPendingClose = pendingCloseTab != null
+        val tabIdsBeforeClose = tabs.map { it.id }
         tabManager.confirmDiscardAndClose()
         if (hadPendingClose) {
+            tabIdsBeforeClose
+                .filter { closedTabId -> tabs.none { it.id == closedTabId } }
+                .forEach { closedTabId ->
+                    releaseTinaLspForTab(closedTabId)
+                    clearCodeEditorRuntime(closedTabId)
+                }
             normalizeEditorPaneState()
             persistSplitEditorState()
         }
@@ -1203,8 +1294,13 @@ class EditorContainerState(
     fun closeOtherTabs(exceptIndex: Int): Boolean {
         val keptTabId = tabs.getOrNull(exceptIndex)?.id
         if (keptTabId == null) return false
+        val tabIdsToRelease = tabs.map { it.id }.filter { it != keptTabId }
         val completed = tabManager.closeOtherTabs(exceptIndex)
         if (!completed) return true
+        tabIdsToRelease.forEach { tabId ->
+            releaseTinaLspForTab(tabId)
+            clearCodeEditorRuntime(tabId)
+        }
         tabPaneMap.keys
             .filter { it != keptTabId }
             .toList()
@@ -1227,8 +1323,13 @@ class EditorContainerState(
 
     fun closeAllTabs(): Boolean {
         val hadTabs = tabs.isNotEmpty()
+        val tabIdsToRelease = tabs.map { it.id }
         val completed = tabManager.closeAllTabs()
         if (!completed) return hadTabs
+        tabIdsToRelease.forEach { tabId ->
+            releaseTinaLspForTab(tabId)
+            clearCodeEditorRuntime(tabId)
+        }
         tabPaneMap.clear()
         mirroredTabIdsByPane.clear()
         activeTabIdByPane.clear()
@@ -1240,6 +1341,7 @@ class EditorContainerState(
 
     fun updateTabState(tabId: String, isDirty: Boolean, canUndo: Boolean, canRedo: Boolean) {
         tabManager.updateTabState(tabId, isDirty, canUndo, canRedo)
+        trimCodeEditorRuntimeCache()
     }
 
     internal fun rememberDirtyTabsForSaveAllNotification() {
@@ -1316,6 +1418,26 @@ class EditorContainerState(
     internal fun detachTabEditorBinding(tabId: String, binding: DocumentSession.EditorBinding) {
         getSession(tabId)?.detachEditor(binding)
     }
+
+    internal fun getTabDetachedEditorSnapshot(tabId: String): DetachedEditorSnapshot? =
+        getSession(tabId)?.detachedEditorSnapshot()
+
+    internal fun markTabDetachedEditorSnapshotRestored(
+        tabId: String,
+        snapshot: DetachedEditorSnapshot
+    ) {
+        getSession(tabId)?.markDetachedEditorSnapshotRestored(snapshot)
+    }
+
+    internal fun getTabEditorViewState(tabId: String): EditorViewState? =
+        getSession(tabId)?.state?.value?.let { state ->
+            EditorViewState(
+                cursorLine = state.cursorLine,
+                cursorColumn = state.cursorColumn,
+                scrollX = state.scrollX,
+                scrollY = state.scrollY
+            )
+        }
 
     internal fun notifyTabEditorContentChanged(
         tabId: String,
@@ -2060,6 +2182,7 @@ class EditorContainerState(
         lspEditorManager.release()
         searchStateManager.release()
         codeEditorCallbacks.clear()
+        codeEditorRuntimesByTabId.clear()
         navigationBackStack.clear()
         navigationForwardStack.clear()
         diagnosticsByFilePath.clear()

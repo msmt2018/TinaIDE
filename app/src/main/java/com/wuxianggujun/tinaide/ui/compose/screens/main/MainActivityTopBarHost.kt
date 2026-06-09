@@ -100,10 +100,7 @@ internal fun MainActivityTopBarHost(
     LaunchedEffect(commandStore, enabledPluginIds) {
         commandStore.pruneUnavailablePluginCommands(enabledPluginIds)
     }
-    val quickCommands = rememberMainActivityQuickCommands(
-        commands = commandPaletteCommands,
-        pinnedCommandIds = pinnedCommandIds,
-    )
+    val overflowCommands = rememberMainActivityOverflowCommands(commandPaletteCommands)
     val executeCommand: (MainActivityCommand) -> Unit = remember(commandStore) {
         { command ->
             if (command.enabled) {
@@ -127,7 +124,7 @@ internal fun MainActivityTopBarHost(
         onShowRunConfigDialog = buildUiState::openRunConfigDialog,
         callbacks = topBarCallbacks,
         debugViewModel = debugViewModel,
-        quickCommands = quickCommands,
+        overflowCommands = overflowCommands,
         onExecuteCommand = executeCommand,
     )
 

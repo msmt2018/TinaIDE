@@ -31,7 +31,8 @@ private const val COMMAND_PACKAGE_APK = "project.packageApk"
 private const val COMMAND_GLOBAL_SEARCH = "view.globalSearch"
 private const val COMMAND_WORKSPACE_EXIT = HostCommands.PROJECT_CLOSE
 
-private val DEFAULT_TOP_BAR_COMMAND_IDS = listOf(
+private val DEFAULT_OVERFLOW_MENU_COMMAND_IDS = listOf(
+    HostCommands.VIEW_COMMAND_PALETTE,
     COMMAND_GLOBAL_SEARCH,
     HostCommands.VIEW_TOGGLE_TERMINAL,
     HostCommands.VIEW_SETTINGS,
@@ -108,29 +109,18 @@ internal fun rememberMainActivityCommands(
 }
 
 @Composable
-internal fun rememberMainActivityQuickCommands(
+internal fun rememberMainActivityOverflowCommands(
     commands: List<MainActivityCommand>,
-    pinnedCommandIds: List<String>,
-): List<MainActivityCommand> = remember(commands, pinnedCommandIds) {
-    selectMainActivityQuickCommands(commands, pinnedCommandIds)
+): List<MainActivityCommand> = remember(commands) {
+    selectMainActivityOverflowCommands(commands)
 }
 
-internal fun selectMainActivityQuickCommands(
+internal fun selectMainActivityOverflowCommands(
     commands: List<MainActivityCommand>,
-    pinnedCommandIds: List<String>,
 ): List<MainActivityCommand> {
     val commandById = commands.associateBy(MainActivityCommand::id)
-    val pinnedCommands = pinnedCommandIds
-        .mapNotNull(commandById::get)
-        .take(MAX_TOP_BAR_COMMANDS)
-    if (pinnedCommands.isNotEmpty()) return pinnedCommands
-
-    return DEFAULT_TOP_BAR_COMMAND_IDS
-        .mapNotNull(commandById::get)
-        .take(MAX_TOP_BAR_COMMANDS)
+    return DEFAULT_OVERFLOW_MENU_COMMAND_IDS.mapNotNull(commandById::get)
 }
-
-private const val MAX_TOP_BAR_COMMANDS = 3
 
 private fun buildMainActivityCommands(
     availability: MainActivityCommandAvailability,
@@ -358,6 +348,11 @@ private fun buildMainActivityCommands(
         category = MainActivityCommandCategory.VIEW,
         keywords = listOf("global search", "find in files"),
         execute = callbacks.onOpenGlobalSearch
+    )
+    addHostCommand(
+        id = HostCommands.VIEW_COMMAND_PALETTE,
+        availability = availability,
+        execute = callbacks.onOpenCommandPalette
     )
     addHostCommand(
         id = HostCommands.EDITOR_TOGGLE_BOOKMARK,
