@@ -53,9 +53,11 @@
 
 ### Removed
 - 删除 `AiAccessMode`、`AiConfigStrategy` 及对应测试，清理官方统一网关相关的历史配置和测试入口。
+- 删除无入口的 CI toolchain 资产维护记录和 Native CMake linker64 排障记录，并移除帮助中心中已被“关于与日志”和“已知问题”覆盖的反馈、我的、开发者选项与 FAQ 短文档。
 
 ### Documentation
 - 更新 AI 设置帮助文档和设置概览，说明当前仅保留渠道管理、模型选择与工具调用相关配置。
+- 帮助中心保留 30 篇注册文档；FAQ 分类收敛到“已知问题”，并补入开源版在线能力、BYOK、插件市场和反馈入口说明。
 
 ### Verification
 - `py tools/i18n/check_all.py`
@@ -350,7 +352,7 @@
 
 ### Added
 - **帮助中心扩展为“快速开始 + 设置索引 + 排障说明”三层结构**：
-  - 新增 [`about-and-logs.md`](app/src/main/assets/help/about-and-logs.md)、[`ai-settings.md`](app/src/main/assets/help/ai-settings.md)、[`appearance-settings.md`](app/src/main/assets/help/appearance-settings.md)、[`compiler-settings.md`](app/src/main/assets/help/compiler-settings.md)、[`developer-options.md`](app/src/main/assets/help/developer-options.md)、[`editor-settings.md`](app/src/main/assets/help/editor-settings.md)、[`feedback-guide.md`](app/src/main/assets/help/feedback-guide.md)、[`git-settings.md`](app/src/main/assets/help/git-settings.md)、[`keyboard-settings.md`](app/src/main/assets/help/keyboard-settings.md)、[`linux-storage.md`](app/src/main/assets/help/linux-storage.md)、[`lsp-settings.md`](app/src/main/assets/help/lsp-settings.md)、[`package-manager.md`](app/src/main/assets/help/package-manager.md)、[`plugins-settings.md`](app/src/main/assets/help/plugins-settings.md)、[`profile-edit.md`](app/src/main/assets/help/profile-edit.md)、[`project-settings.md`](app/src/main/assets/help/project-settings.md)、[`settings-overview.md`](app/src/main/assets/help/settings-overview.md)、[`terminal-settings.md`](app/src/main/assets/help/terminal-settings.md) 与 [`terminal-troubleshooting.md`](app/src/main/assets/help/terminal-troubleshooting.md)，并更新 [`HelpRepository.kt`](feature/help/src/main/java/com/wuxianggujun/tinaide/core/help/HelpRepository.kt) 与多语言字符串：帮助中心现在把设置项、常见运维动作和反馈入口串成完整索引，用户不需要在设置页和历史文档之间来回找入口。
+  - 新增 about-and-logs、ai-settings、appearance-settings、compiler-settings、developer-options、editor-settings、feedback-guide、git-settings、keyboard-settings、linux-storage、lsp-settings、package-manager、plugins-settings、profile-edit、project-settings、settings-overview、terminal-settings 与 terminal-troubleshooting，并更新 `HelpRepository.kt` 与多语言字符串：帮助中心现在把设置项、常见运维动作和反馈入口串成完整索引，用户不需要在设置页和历史文档之间来回找入口。
 - **文件树补齐插件图标贡献与路径过滤公共层**：
   - 新增 [`FileTreeIconResolver.kt`](app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/FileTreeIconResolver.kt)、[`PluginFileIconResolver.kt`](core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/PluginFileIconResolver.kt) 与 [`ProjectPathFilters.kt`](core/lang/src/main/java/com/wuxianggujun/tinaide/core/lang/ProjectPathFilters.kt)，并补充对应测试：工程树现在支持插件按文件名/扩展名贡献图标，同时把搜索、监听、同步共用的高噪声目录过滤规则抽成单一来源，避免各模块各写一套排除名单。
 - **插件状态与市场安装态补齐公共快照模型**：
@@ -842,7 +844,7 @@
   - 更新 [`DownloadPackageBackend.kt`](core/packages/src/main/java/com/wuxianggujun/tinaide/core/packages/backend/DownloadPackageBackend.kt)、[`BundledPackagesInstaller.kt`](core/packages/src/main/java/com/wuxianggujun/tinaide/core/packages/BundledPackagesInstaller.kt)：下载包现在支持 `zip / tar / tar.gz / tgz / tar.xz / txz / tar.zst`，同时会校验归档路径安全、自动识别归档格式，并在内置包缺少 `package.json` 时触发重装修复。
 - **编辑器补全、高亮与语义 token 链路收口到“可退化、可缓存”的状态模型**：
   - 更新 [`CompletionProvider.kt`](core/editor-lsp/src/main/java/com/wuxianggujun/tinaide/core/editorlsp/CompletionProvider.kt)、[`LspEditorManager.kt`](app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/LspEditorManager.kt)、[`TinaCodeEditorPage.kt`](app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/editor/TinaCodeEditorPage.kt)、[`EditorState.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/EditorState.kt)、[`TextRenderer.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/TextRenderer.kt)：LSP completion 改为显式区分成功/瞬时失败/超时的结果模型，首屏可预热，加载中会保留上一批候选；可见区高亮缓存与语义 token 也支持增量复用，减少补全闪烁与高亮重复计算。
-  - 更新 [`EditorOverlays.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/EditorOverlays.kt)、[`EditorKeyboardShortcuts.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/EditorKeyboardShortcuts.kt)、[`Completion-Performance-Analysis.md`](docs/design/Completion-Performance-Analysis.md)、[`TinaEditor-Highlight-Pipeline-Review.md`](docs/design/TinaEditor-Highlight-Pipeline-Review.md)：补全弹层、快捷键行为和设计文档统一对齐新的状态机与性能分析结论。
+  - 更新 [`EditorOverlays.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/EditorOverlays.kt)、[`EditorKeyboardShortcuts.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/EditorKeyboardShortcuts.kt)、历史设计稿 `Completion-Performance-Analysis.md`、[`TinaEditor-Highlight-Pipeline-Review.md`](docs/design/TinaEditor-Highlight-Pipeline-Review.md)：补全弹层、快捷键行为和设计文档统一对齐新的状态机与性能分析结论。
 - **原生执行 / 构建 / 格式化 / rsync / PRoot 链路统一注入 `tina-exec`**：
   - 更新 [`NativeExecutableRunner.kt`](core/common/src/main/java/com/wuxianggujun/tinaide/core/util/NativeExecutableRunner.kt)、[`AndroidElfExecutor.kt`](core/common/src/main/java/com/wuxianggujun/tinaide/core/util/AndroidElfExecutor.kt)、[`ProgramRunner.kt`](core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/ProgramRunner.kt)、[`NativeMakeBuildStrategy.kt`](core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/NativeMakeBuildStrategy.kt)、[`SingleFileBuildStrategy.kt`](core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/SingleFileBuildStrategy.kt)、[`NativeCMakeBuildExecutor.kt`](core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/cmake/NativeCMakeBuildExecutor.kt)、[`NativeCodeFormatter.kt`](core/compile/src/main/java/com/wuxianggujun/tinaide/core/format/NativeCodeFormatter.kt)、[`RsyncSyncProvider.kt`](core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/RsyncSyncProvider.kt)：native 进程启动时会按 direct/linker 模式自动注入合适的 preload，编译、格式化和 rsync 的派生子进程行为也跟主执行链统一。
 - **APK 导出模板升级为带权限引导的可执行壳**：
@@ -1134,7 +1136,7 @@
   - 更新 [`TinaServerApi.kt`](core/auth/src/main/java/com/wuxianggujun/tinaide/auth/api/TinaServerApi.kt) 与 [`strings.xml`](core/i18n/src/main/res/values/strings.xml)、[`strings.xml`](core/i18n/src/main/res/values-en/strings.xml)：补充 AI 额度查询 / 兑换接口及中英文文案。
 - **编辑器 snippet 补全会话能力落地**：
   - 新增 [`SnippetParser.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/SnippetParser.kt) 与 [`SnippetSession.kt`](core/editor-view/src/main/java/com/wuxianggujun/tinaide/core/editorview/SnippetSession.kt)：支持补全项 snippet 解析、占位符会话与跳转。
-  - 新增 [`Editor-Completion-System-Design.md`](docs/design/Editor-Completion-System-Design.md)：沉淀编辑器补全系统设计与 snippet 占位符处理方案。
+  - 新增历史设计稿 `Editor-Completion-System-Design.md`：沉淀编辑器补全系统设计与 snippet 占位符处理方案。
 - **工程约定与混淆文档补充**：
   - 新增 [`proguard-rules-reference.md`](docs/proguard-rules-reference.md)、[`project-conventions.md`](docs/project-conventions.md)、[`tina-server-ai-system-issues-analysis.md`](docs/tina-server-ai-system-issues-analysis.md)：补充混淆规则说明、项目约定与 AI 系统问题分析文档。
 
@@ -1356,7 +1358,7 @@
 - **测试与文档补充**：
   - 新增 [`TransformGestureFocusResolverTest.kt`](core/editor-view/src/test/java/com/wuxianggujun/tinaide/core/editorview/TransformGestureFocusResolverTest.kt)：覆盖手势焦点解析边界场景。
   - 新增调试文档：[`text-layout-technologies.md`](docs/debug/text-layout-technologies.md)、[`zoom-offset-issue-analysis.md`](docs/debug/zoom-offset-issue-analysis.md)、[`zoom-offset-root-cause-analysis.md`](docs/debug/zoom-offset-root-cause-analysis.md)。
-  - 新增设计文档：[`smart-wrap-implementation.md`](docs/design/smart-wrap-implementation.md)。
+  - 新增历史设计稿 `smart-wrap-implementation.md`。
 
 ### Changed
 - **编辑器核心链路重构与性能优化**：
@@ -2300,7 +2302,7 @@
   - 更新 `docs/API-Reference.md`：补充新增 API 文档
   - 更新 `docs/README.md`：更新项目文档索引
   - 更新 `docs/LSP-服务接入与Clangd启动（小白向）.md`：补充 LSP 服务接入说明
-  - 更新 `docs/clangd-completion-fast-path.md`：优化 clangd 补全快速路径说明
+  - 更新历史专题稿 `clangd-completion-fast-path.md`：优化 clangd 补全快速路径说明
   - 更新 `docs/planning/Next-Steps-2026-02.md`：更新下一步计划
   - 新增 `docs/clang-android-exec-fix.md`：clang Android exec 修复说明
   - 新增 `docs/clang-android-exec-lessons.md`：clang Android exec 经验总结

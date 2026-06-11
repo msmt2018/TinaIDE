@@ -335,4 +335,4 @@
 - [关于与日志](about-and-logs.md)
 - [终端与开发环境排障](terminal-troubleshooting.md)
 - [终端使用](terminal-usage.md)
-- [常见问题](faq.md)
+- [已知问题](known-issues.md)

@@ -46,6 +46,7 @@
 ## 快速开始
 
 优先使用 IDE 内的 **新建插件项目** 入口，不再把手工创建目录作为第一步。
+如果你第一次写插件，先做 `config-basic`，先把主题和代码片段跑通，再碰脚本和 LSP。
 
 ### 1. 打开新建插件项目向导
 
@@ -67,7 +68,7 @@
 
 `TinaIDE Plugin Starters` 需要先从插件市场 / Registry 安装并启用。当前提供：
 
-- `config-basic`：配置型插件，适合主题、片段、菜单等声明式扩展
+- `config-basic`：第一次写插件先选它，适合主题、片段、菜单等声明式扩展
 - `script-command`：脚本命令插件，适合先验证菜单命令闭环
 - `script-basic`：脚本插件基础工程，适合逐步接入宿主 API
 - `lsp-basic`：LSP 插件基础工程，适合语言服务集成
@@ -77,47 +78,31 @@
 
 ### 3. 修改 `manifest.json`
 
-先把模板中的 `id`、`name`、`version`、`type` 和贡献项改成你的插件信息：
+先把模板中的 `id`、`name`、`version`、`type` 和贡献项改成你的插件信息。
+第一次写插件时，先保留最小的 `themes` + `snippets`，不要一上来就加脚本和权限。
 
 ```json
 {
-  "id": "com.example.my-plugin",
-  "name": "My TinaIDE Plugin",
-  "version": "1.0.0",
+  "id": "com.example.my-first-plugin",
+  "name": "My First Plugin",
+  "version": "0.1.0",
   "type": "config",
-  "configuration": {
-    "title": "My Plugin Settings",
-    "properties": {
-      "feature.enabled": {
-        "type": "boolean",
-        "default": true,
-        "description": "Enable the feature"
-      },
-      "output.format": {
-        "type": "string",
-        "default": "json",
-        "enum": ["text", "json"],
-        "description": "Output format"
-      },
-      "build.jobs": {
-        "type": "number",
-        "default": 2,
-        "description": "Parallel build jobs"
-      }
-    }
+  "description": "My first TinaIDE plugin.",
+  "author": {
+    "name": "Your Name"
   },
   "contributions": {
-    "themes": ["themes/my-theme.json"]
+    "themes": [
+      "themes/my-theme.json"
+    ],
+    "snippets": [
+      "snippets/my-snippets.json"
+    ]
   }
 }
 ```
 
-`configuration.properties` 当前支持：
-
-- `type = "boolean"`：详情页渲染为开关。
-- `type = "string"`：详情页渲染为文本输入。
-- `type = "number"`：详情页渲染为数字输入。
-- `type = "string"` 且声明 `enum`：详情页渲染为单选项。
+`id` 只能包含字母、数字、`.`、`_`、`-`，不能是路径，也不能带 `..`。
 
 配置 key 必须匹配 `^[A-Za-z0-9][A-Za-z0-9._-]*$`。宿主会按插件 ID 隔离保存配置；
 脚本 / hybrid 插件可通过 `tina.config.get/set/reset` 读取和更新自己声明过的配置项，并可监听

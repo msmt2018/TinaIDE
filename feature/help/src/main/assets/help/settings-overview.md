@@ -235,9 +235,9 @@
 
 进入后可以看到诊断、后端调试和测试工具相关选项。普通用户不建议随意修改。
 
-对应的专门说明可看：
+更多关于日志、反馈和开发者选项的说明可看：
 
-- [开发者选项说明](developer-options.md)
+- [关于与日志](about-and-logs.md)
 
 ## 关于
 
@@ -280,7 +280,6 @@
 - [Git 设置说明](git-settings.md)
 - [Linux 系统与存储](linux-storage.md)
 - [关于与日志](about-and-logs.md)
-- [开发者选项说明](developer-options.md)
 - [项目设置说明](project-settings.md)
 - [编译器设置说明](compiler-settings.md)
 - [外观设置说明](appearance-settings.md)
@@ -292,4 +291,4 @@
 - [代码补全](code-completion.md)
 - [终端使用](terminal-usage.md)
 - [Git 基础](git-basics.md)
-- [常见问题](faq.md)
+- [已知问题](known-issues.md)

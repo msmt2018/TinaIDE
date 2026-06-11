@@ -1166,7 +1166,7 @@ fun InstallFailedContent(
                         modifier = Modifier.clickable {
                             context.openSettingsRoute(
                                 route = SettingsRouteIds.HELP,
-                                helpDocumentId = HelpDocumentIds.FEEDBACK_GUIDE
+                                helpDocumentId = HelpDocumentIds.ABOUT_AND_LOGS
                             )
                         }
                     )
@@ -1268,7 +1268,7 @@ private object SettingsRouteIds {
 }
 
 private object HelpDocumentIds {
-    const val FEEDBACK_GUIDE = "feedback-guide"
+    const val ABOUT_AND_LOGS = "about-and-logs"
 }
 
 private const val SETTINGS_ACTIVITY_CLASS_NAME = "com.wuxianggujun.tinaide.settings.SettingsActivity"

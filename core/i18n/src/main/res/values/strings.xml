@@ -2457,7 +2457,7 @@ kept=%3$d bytes
   <string name="help_doc_create_project_title">创建项目</string>
   <string name="help_doc_create_project_summary">学习如何创建 C/C++ 项目</string>
   <string name="help_doc_plugin_quick_start_title">插件开发快速开始</string>
-  <string name="help_doc_plugin_quick_start_summary">从插件模板创建项目，运行热安装，打包 .tinaplug，并用安装前预检闭环验证</string>
+  <string name="help_doc_plugin_quick_start_summary">先做一个 config 插件，改主题和代码片段，运行热安装，再打包并做安装前预检</string>
   <string name="help_quick_actions_title">快捷操作</string>
   <string name="help_action_create_plugin_project">创建插件项目</string>
   <string name="help_action_open_plugin_settings">打开插件设置</string>
@@ -2513,16 +2513,8 @@ kept=%3$d bytes
   <string name="help_doc_plugin_settings_summary">了解已安装插件管理、从文件安装、插件日志、主题插件和 LSP 插件依赖</string>
   <string name="help_doc_about_and_logs_title">关于与日志</string>
   <string name="help_doc_about_and_logs_summary">了解版本信息、社区入口、日志导出上传、崩溃上传和开源许可证</string>
-  <string name="help_doc_developer_options_title">开发者选项说明</string>
-  <string name="help_doc_developer_options_summary">了解诊断日志、后端调试、测试工具和重新安装内置包</string>
-  <string name="help_doc_feedback_guide_title">反馈提交说明</string>
-  <string name="help_doc_feedback_guide_summary">了解反馈类型、字数限制、提交频率限制和自动附带的设备信息</string>
-  <string name="help_doc_profile_edit_title">开源版我的页面</string>
-  <string name="help_doc_profile_edit_summary">了解反馈、设置、关于、下载历史和本地数据入口</string>
-  <string name="help_doc_faq_title">常见问题</string>
-  <string name="help_doc_faq_summary">常见问题解答</string>
   <string name="help_doc_known_issues_title">已知问题</string>
-  <string name="help_doc_known_issues_summary">当前版本的已知问题和限制</string>
+  <string name="help_doc_known_issues_summary">当前版本的已知问题、开源版限制和常见疑问</string>
 
   <string name="help_placeholder_tip_label">提示</string>
   <string name="help_placeholder_tip_body">此文档正在编写中，敬请期待。</string>
@@ -2549,12 +2541,16 @@ kept=%3$d bytes
     <item>插件开发</item>
     <item>插件模板</item>
     <item>插件项目</item>
+    <item>config</item>
+    <item>主题</item>
+    <item>代码片段</item>
     <item>tinaplug</item>
     <item>manifest</item>
     <item>热安装</item>
     <item>预检</item>
     <item>validate</item>
     <item>package</item>
+    <item>starter</item>
   </string-array>
   <string-array name="help_keywords_settings_overview">
     <item>设置</item>
@@ -2751,37 +2747,15 @@ kept=%3$d bytes
     <item>许可证</item>
     <item>proot 日志</item>
     <item>崩溃上传</item>
-  </string-array>
-  <string-array name="help_keywords_developer_options">
     <item>开发者选项</item>
     <item>诊断日志</item>
+    <item>反馈</item>
+    <item>下载历史</item>
+    <item>本地数据</item>
     <item>测试工具</item>
     <item>server</item>
     <item>内置包</item>
     <item>clangd 日志</item>
-  </string-array>
-  <string-array name="help_keywords_feedback_guide">
-    <item>反馈</item>
-    <item>建议</item>
-    <item>bug</item>
-    <item>功能需求</item>
-    <item>日志</item>
-    <item>提交</item>
-  </string-array>
-  <string-array name="help_keywords_profile_edit">
-    <item>我的</item>
-    <item>反馈</item>
-    <item>设置</item>
-    <item>关于</item>
-    <item>下载历史</item>
-    <item>本地数据</item>
-  </string-array>
-  <string-array name="help_keywords_faq">
-    <item>问题</item>
-    <item>帮助</item>
-    <item>错误</item>
-    <item>解决</item>
-    <item>faq</item>
   </string-array>
   <string-array name="help_keywords_known_issues">
     <item>已知</item>
@@ -2789,6 +2763,12 @@ kept=%3$d bytes
     <item>限制</item>
     <item>known</item>
     <item>bug</item>
+    <item>faq</item>
+    <item>帮助</item>
+    <item>反馈</item>
+    <item>开源版</item>
+    <item>插件市场</item>
+    <item>AI</item>
   </string-array>
 
   <!-- DependencyInstallActivity -->

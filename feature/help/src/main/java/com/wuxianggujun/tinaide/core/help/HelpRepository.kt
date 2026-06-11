@@ -308,44 +308,8 @@ class HelpRepository(private val context: Context) {
             summary = Strings.help_doc_about_and_logs_summary.strOr(context),
             order = 5
         ),
-        HelpDocument(
-            id = "developer-options",
-            title = Strings.help_doc_developer_options_title.strOr(context),
-            category = HelpCategory.ADVANCED,
-            keywords = keywords(Arrays.help_keywords_developer_options),
-            fileName = "developer-options.md",
-            summary = Strings.help_doc_developer_options_summary.strOr(context),
-            order = 6
-        ),
-        HelpDocument(
-            id = "feedback-guide",
-            title = Strings.help_doc_feedback_guide_title.strOr(context),
-            category = HelpCategory.ADVANCED,
-            keywords = keywords(Arrays.help_keywords_feedback_guide),
-            fileName = "feedback-guide.md",
-            summary = Strings.help_doc_feedback_guide_summary.strOr(context),
-            order = 7
-        ),
-        HelpDocument(
-            id = "profile-edit",
-            title = Strings.help_doc_profile_edit_title.strOr(context),
-            category = HelpCategory.ADVANCED,
-            keywords = keywords(Arrays.help_keywords_profile_edit),
-            fileName = "profile-edit.md",
-            summary = Strings.help_doc_profile_edit_summary.strOr(context),
-            order = 8
-        ),
 
         // 常见问题
-        HelpDocument(
-            id = "faq",
-            title = Strings.help_doc_faq_title.strOr(context),
-            category = HelpCategory.FAQ,
-            keywords = keywords(Arrays.help_keywords_faq),
-            fileName = "faq.md",
-            summary = Strings.help_doc_faq_summary.strOr(context),
-            order = 0
-        ),
         HelpDocument(
             id = "known-issues",
             title = Strings.help_doc_known_issues_title.strOr(context),
@@ -353,7 +317,7 @@ class HelpRepository(private val context: Context) {
             keywords = keywords(Arrays.help_keywords_known_issues),
             fileName = "known-issues.md",
             summary = Strings.help_doc_known_issues_summary.strOr(context),
-            order = 1
+            order = 0
         )
     )
 

@@ -2805,7 +2805,7 @@ kept=%3$d bytes
   <string name="help_doc_create_project_title">Create Project</string>
   <string name="help_doc_create_project_summary">Learn how to create a C/C++ project</string>
   <string name="help_doc_plugin_quick_start_title">Plugin Development Quick Start</string>
-  <string name="help_doc_plugin_quick_start_summary">Create a plugin project from a template, run to hot-install, package .tinaplug, and verify with install preflight</string>
+  <string name="help_doc_plugin_quick_start_summary">Build a first config plugin by changing theme and snippets, run to hot-install, then package .tinaplug and verify with install preflight</string>
   <string name="help_quick_actions_title">Quick actions</string>
   <string name="help_action_create_plugin_project">Create Plugin Project</string>
   <string name="help_action_open_plugin_settings">Open Plugin Settings</string>
@@ -2861,16 +2861,8 @@ kept=%3$d bytes
   <string name="help_doc_plugin_settings_summary">Understand installed plugin management, file-based installs, plugin logs, theme plugins, and LSP dependencies</string>
   <string name="help_doc_about_and_logs_title">About and Logs</string>
   <string name="help_doc_about_and_logs_summary">Understand version info, community links, log export/upload, crash upload, and open-source licenses</string>
-  <string name="help_doc_developer_options_title">Developer Options Guide</string>
-  <string name="help_doc_developer_options_summary">Understand diagnostics, backend debugging, test tools, and bundled package reinstall</string>
-  <string name="help_doc_feedback_guide_title">Feedback Guide</string>
-  <string name="help_doc_feedback_guide_summary">Understand feedback types, length limits, submit throttling, and automatic device info</string>
-  <string name="help_doc_profile_edit_title">Open-source Profile Page</string>
-  <string name="help_doc_profile_edit_summary">Understand feedback, settings, about, download history, and local data entries</string>
-  <string name="help_doc_faq_title">FAQ</string>
-  <string name="help_doc_faq_summary">Frequently asked questions</string>
   <string name="help_doc_known_issues_title">Known Issues</string>
-  <string name="help_doc_known_issues_summary">Known issues and limitations of the current version</string>
+  <string name="help_doc_known_issues_summary">Known issues, open-source limitations, and common questions</string>
 
   <string name="help_placeholder_tip_label">Tip</string>
   <string name="help_placeholder_tip_body">This document is under construction. Stay tuned.</string>
@@ -2895,12 +2887,16 @@ kept=%3$d bytes
     <item>plugin development</item>
     <item>plugin template</item>
     <item>plugin project</item>
+    <item>config</item>
+    <item>theme</item>
+    <item>snippet</item>
     <item>tinaplug</item>
     <item>manifest</item>
     <item>hot install</item>
     <item>preflight</item>
     <item>validate</item>
     <item>package</item>
+    <item>starter</item>
   </string-array>
   <string-array name="help_keywords_settings_overview">
     <item>settings</item>
@@ -3089,42 +3085,27 @@ kept=%3$d bytes
     <item>license</item>
     <item>proot log</item>
     <item>crash upload</item>
-  </string-array>
-  <string-array name="help_keywords_developer_options">
     <item>developer options</item>
     <item>diagnostics</item>
+    <item>feedback</item>
+    <item>download history</item>
+    <item>local data</item>
     <item>test tools</item>
     <item>server url</item>
     <item>bundled packages</item>
     <item>clangd log</item>
-  </string-array>
-  <string-array name="help_keywords_feedback_guide">
-    <item>feedback</item>
-    <item>suggestion</item>
-    <item>bug</item>
-    <item>feature request</item>
-    <item>logs</item>
-    <item>submit</item>
-  </string-array>
-  <string-array name="help_keywords_profile_edit">
-    <item>profile</item>
-    <item>feedback</item>
-    <item>settings</item>
-    <item>about</item>
-    <item>download history</item>
-    <item>local data</item>
-  </string-array>
-  <string-array name="help_keywords_faq">
-    <item>faq</item>
-    <item>help</item>
-    <item>question</item>
-    <item>error</item>
   </string-array>
   <string-array name="help_keywords_known_issues">
     <item>known issues</item>
     <item>limitation</item>
     <item>bug</item>
     <item>known</item>
+    <item>faq</item>
+    <item>help</item>
+    <item>feedback</item>
+    <item>open-source edition</item>
+    <item>plugin marketplace</item>
+    <item>AI</item>
   </string-array>
   <string name="hint_search">Search...</string>
   <string name="hint_search_log">Search log content...</string>

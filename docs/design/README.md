@@ -1,6 +1,6 @@
 # 设计文档索引
 
-> 更新日期：2026-06-08
+> 更新日期：2026-06-11
 
 本目录存放 TinaIDE 仍有维护价值的设计、审计与实现说明。这里的文档不是单独的当前事实源；涉及当前实现、类名、构建链路或用户可见行为时，必须回到源码、测试和 [文档状态与生命周期](../documentation-status.md) 校对。
 
@@ -22,7 +22,7 @@
 
 - [高亮链路审查报告](TinaEditor-Highlight-Pipeline-Review.md)
 - [统一布局快照](unified-layout-snapshot.md)
-- [智能换行实现说明](smart-wrap-implementation.md)
+- [LSP Snippet 占位符处理](LSP-Snippet-Placeholder-Handling.md)
 
 ### 运行时与系统
 
@@ -38,10 +38,7 @@
 
 ### 编辑器与语言服务
 
-- [补全性能分析与改进方案](Completion-Performance-Analysis.md)
-- [编辑器补全系统架构设计](Editor-Completion-System-Design.md)
-- [编辑器主题自定义功能设计](Editor-Theme-Customization-Design.md)
-- [LSP Snippet 占位符处理](LSP-Snippet-Placeholder-Handling.md)
+当前不再索引一次性性能审计稿、旧主题 UI 方案和未落地的补全状态机方案。需要判断当前行为时，优先看 `core/editor-view`、`core/editor-lsp`、`feature/editor`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/editor` 下的源码和测试。
 
 ## 相关文档
 

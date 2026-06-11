@@ -1,6 +1,6 @@
 # TinaIDE 文档中心
 
-> 更新日期：2026-06-08
+> 更新日期：2026-06-11
 
 这里汇总 TinaIDE 当前仍然有效的项目文档，并标出应该优先回看的源码入口。
 
@@ -31,7 +31,7 @@
 - 插件 LSP：`core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspPluginManager.kt`
 - AI 工具注册：`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolInitializer.kt`、`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolRegistry.kt`
 - 帮助文档入口：`feature/help/src/main/java/com/wuxianggujun/tinaide/core/help/HelpRepository.kt`
-- PRoot / Linux 环境：PRootBootstrap.kt、SelfHostedLinuxDistroRuntime.kt、core/linux-distro manifest
+- PRoot / Linux 环境：`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootBootstrap.kt`、`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/SelfHostedLinuxDistroRuntime.kt`、`core/linux-distro/src/main/assets/linux-distro/manifest.json`
 
 ## 文档导航
 
@@ -51,7 +51,6 @@
 
 ### 功能与实现
 
-- [Clangd 补全 Fast Path](clangd-completion-fast-path.md)
 - [Android-hosted LLVM 工具链对比与风险分析](android-hosted-llvm-toolchain-analysis.md)
 - [Clang Android 执行权限修复](clang-android-exec-fix.md)
 - [Toolchain 构建与同步指南](toolchain-build-guide.md)
