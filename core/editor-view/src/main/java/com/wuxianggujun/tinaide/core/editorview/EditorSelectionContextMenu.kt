@@ -82,7 +82,7 @@ internal fun EditorSelectionContextMenu(
     if (!visible) return
 
     var textMenuExpanded by remember { mutableStateOf(false) }
-    var codeMenuExpanded by remember { mutableStateOf(true) }
+    var codeMenuExpanded by remember { mutableStateOf(false) }
     val popupColors = rememberEditorPopupColors(colorScheme)
     val hasCodeGroup = peekDefinitionEnabled ||
         gotoDefinitionEnabled ||

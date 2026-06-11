@@ -42,7 +42,9 @@ import com.wuxianggujun.tinaide.core.packages.PackageDependencyEvents
 import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange
+import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider.FoldRegion
+import com.wuxianggujun.tinaide.core.treesitter.TreeSitterHighlighter
 import com.wuxianggujun.tinaide.editor.EditorTab
 import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.session.DetachedEditorSnapshot
@@ -102,7 +104,7 @@ class EditorContainerState(
     private val projectRootPathProvider: () -> String?
 ) {
     internal companion object {
-        const val CODE_EDITOR_RUNTIME_CACHE_LIMIT = 8
+        const val CODE_EDITOR_RUNTIME_CACHE_LIMIT = 16
     }
 
     data class TextEditOperation(
@@ -324,6 +326,11 @@ class EditorContainerState(
     data class CodeEditorRuntime(
         val buffer: RopeTextBuffer,
         val editorState: EditorState,
+        var syntaxHighlighter: TreeSitterHighlighter? = null,
+        var syntaxHighlighterCreationAttempted: Boolean = false,
+        var isTreeSitterSnapshotReady: Boolean = false,
+        var foldingProvider: TreeSitterFoldingProvider? = null,
+        var foldingProviderCreationAttempted: Boolean = false,
         var isContentLoaded: Boolean = false
     )
 
@@ -769,6 +776,24 @@ class EditorContainerState(
         return runtime
     }
 
+    internal fun getOrCreateSyntaxHighlighter(tab: EditorTabState): TreeSitterHighlighter? {
+        val runtime = getOrCreateCodeEditorRuntime(tab)
+        if (!runtime.syntaxHighlighterCreationAttempted) {
+            runtime.syntaxHighlighterCreationAttempted = true
+            runtime.syntaxHighlighter = TreeSitterHighlighter.create(context.applicationContext, tab.file)
+        }
+        return runtime.syntaxHighlighter
+    }
+
+    internal fun getOrCreateFoldingProvider(tab: EditorTabState): TreeSitterFoldingProvider? {
+        val runtime = getOrCreateCodeEditorRuntime(tab)
+        if (!runtime.foldingProviderCreationAttempted) {
+            runtime.foldingProviderCreationAttempted = true
+            runtime.foldingProvider = TreeSitterFoldingProvider.create(context.applicationContext, tab.file)
+        }
+        return runtime.foldingProvider
+    }
+
     internal fun isCodeEditorRuntimeLoaded(tabId: String): Boolean =
         codeEditorRuntimesByTabId[tabId]?.isContentLoaded == true
 
@@ -778,7 +803,7 @@ class EditorContainerState(
     }
 
     private fun clearCodeEditorRuntime(tabId: String) {
-        codeEditorRuntimesByTabId.remove(tabId)
+        codeEditorRuntimesByTabId.remove(tabId)?.disposeCodeEditorRuntime()
     }
 
     private fun trimCodeEditorRuntimeCache(protectedTabIds: Set<String> = emptySet()) {
@@ -798,13 +823,25 @@ class EditorContainerState(
                 tabId !in effectiveProtectedTabIds && tabs.firstOrNull { it.id == tabId }?.isDirty != true
             } ?: break
 
-            codeEditorRuntimesByTabId.remove(evictableTabId)
+            codeEditorRuntimesByTabId.remove(evictableTabId)?.disposeCodeEditorRuntime()
             Timber.tag("EditorContainerState").d(
                 "trimCodeEditorRuntimeCache: evicted tab=%s, remaining=%d",
                 evictableTabId,
                 codeEditorRuntimesByTabId.size
             )
         }
+    }
+
+    private fun CodeEditorRuntime.disposeCodeEditorRuntime() {
+        syntaxHighlighter?.setOnStateUpdated(null)
+        if (syntaxHighlighter != null && editorState.highlighter === syntaxHighlighter) {
+            editorState.highlighter = null
+        }
+        syntaxHighlighter?.dispose()
+        foldingProvider?.dispose()
+        syntaxHighlighter = null
+        foldingProvider = null
+        isTreeSitterSnapshotReady = false
     }
 
     internal fun registerCodeEditorCallback(tabId: String, callback: CodeEditorCallback) {
@@ -2182,6 +2219,7 @@ class EditorContainerState(
         lspEditorManager.release()
         searchStateManager.release()
         codeEditorCallbacks.clear()
+        codeEditorRuntimesByTabId.values.forEach { it.disposeCodeEditorRuntime() }
         codeEditorRuntimesByTabId.clear()
         navigationBackStack.clear()
         navigationForwardStack.clear()

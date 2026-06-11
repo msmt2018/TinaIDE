@@ -64,7 +64,6 @@ import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.textengine.TextChangeListener
-import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterHighlighter
 import com.wuxianggujun.tinaide.editor.session.DocumentSession
 import com.wuxianggujun.tinaide.editor.session.EditorViewState
@@ -133,12 +132,8 @@ fun TinaCodeEditorPage(
         )
     }
     val editorState = runtime.editorState
-    val syntaxHighlighter = remember(tab.id, tab.file.absolutePath, context.applicationContext) {
-        TreeSitterHighlighter.create(context.applicationContext, tab.file)
-    }
-    val foldingProvider = remember(tab.id, tab.file.absolutePath, context.applicationContext) {
-        TreeSitterFoldingProvider.create(context.applicationContext, tab.file)
-    }
+    val syntaxHighlighter = remember(tab.id, runtime) { state.getOrCreateSyntaxHighlighter(tab) }
+    val foldingProvider = remember(tab.id, runtime) { state.getOrCreateFoldingProvider(tab) }
     val breakpointStore: BreakpointStore = koinInject()
     val bookmarkRepository: IBookmarkRepository = koinInject()
     val bookmarkProjectRootPath = state.getBookmarksProjectRootPathOrNull()
@@ -189,13 +184,6 @@ fun TinaCodeEditorPage(
             if (editorState.highlighter === syntaxHighlighter) {
                 editorState.highlighter = null
             }
-            syntaxHighlighter?.dispose()
-        }
-    }
-
-    DisposableEffect(tab.id, foldingProvider) {
-        onDispose {
-            foldingProvider?.dispose()
         }
     }
 
@@ -576,6 +564,12 @@ fun TinaCodeEditorPage(
         if (runtime.isContentLoaded) {
             loading = false
             loadError = null
+            ensureTreeSitterPrepared(
+                runtime = runtime,
+                editorState = editorState,
+                syntaxHighlighter = syntaxHighlighter,
+                textSnapshot = textSnapshot
+            )
             return@LaunchedEffect
         }
 
@@ -585,7 +579,8 @@ fun TinaCodeEditorPage(
         if (detachedSnapshot != null) {
             runCatching {
                 binding.withSuppressed { buffer.replaceAll(detachedSnapshot.text) }
-                refreshTreeSitterAfterBufferLoad(
+                ensureTreeSitterPrepared(
+                    runtime = runtime,
                     editorState = editorState,
                     syntaxHighlighter = syntaxHighlighter,
                     textSnapshot = textSnapshot
@@ -611,7 +606,8 @@ fun TinaCodeEditorPage(
         val detectedCharset = FileEncodingDetector.detectCharset(tab.file)
         binding.withSuppressed { buffer.loadFromFile(tab.file, detectedCharset) }
             .onSuccess {
-                refreshTreeSitterAfterBufferLoad(
+                ensureTreeSitterPrepared(
+                    runtime = runtime,
                     editorState = editorState,
                     syntaxHighlighter = syntaxHighlighter,
                     textSnapshot = textSnapshot
@@ -840,7 +836,9 @@ fun TinaCodeEditorPage(
                                 val detectedCharset = FileEncodingDetector.detectCharset(tab.file)
                                 binding.withSuppressed { buffer.loadFromFile(tab.file, detectedCharset) }
                                     .onSuccess {
-                                        refreshTreeSitterAfterBufferLoad(
+                                        runtime.isTreeSitterSnapshotReady = false
+                                        ensureTreeSitterPrepared(
+                                            runtime = runtime,
                                             editorState = editorState,
                                             syntaxHighlighter = syntaxHighlighter,
                                             textSnapshot = textSnapshot
@@ -1269,6 +1267,21 @@ internal fun String.toEditorSemanticTokenTypeOrNull(): SemanticTokenType? = when
     "regexp", "regex" -> SemanticTokenType.REGEXP
     "operator" -> SemanticTokenType.OPERATOR
     else -> null
+}
+
+private suspend fun ensureTreeSitterPrepared(
+    runtime: EditorContainerState.CodeEditorRuntime,
+    editorState: EditorState,
+    syntaxHighlighter: TreeSitterHighlighter?,
+    textSnapshot: VersionedBufferTextSnapshot
+) {
+    if (runtime.isTreeSitterSnapshotReady) return
+    refreshTreeSitterAfterBufferLoad(
+        editorState = editorState,
+        syntaxHighlighter = syntaxHighlighter,
+        textSnapshot = textSnapshot
+    )
+    runtime.isTreeSitterSnapshotReady = true
 }
 
 private suspend fun refreshTreeSitterAfterBufferLoad(

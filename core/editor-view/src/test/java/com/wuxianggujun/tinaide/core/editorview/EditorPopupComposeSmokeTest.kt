@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -8,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -448,6 +450,86 @@ class EditorPopupComposeSmokeTest {
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_HOVER_ACTION_TAG).performClick()
 
         assertThat(events).containsExactly("copy", "hover").inOrder()
+    }
+
+    @Test
+    fun editorSelectionContextMenu_shouldKeepCodeGroupCollapsedOnInitialLongPress() {
+        val events = mutableListOf<String>()
+
+        composeRule.setContent {
+            TestSelectionContextMenu(
+                selectedText = null,
+                gotoDefinitionEnabled = true,
+                onGotoDefinition = { events += "gotoDefinition" }
+            )
+        }
+        composeRule.waitForIdle()
+
+        assertThat(
+            composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_CODE_GROUP_TAG).fetchSemanticsNode()
+        ).isNotNull()
+        assertThat(
+            composeRule.onAllNodesWithTag(SELECTION_CONTEXT_MENU_GOTO_DEFINITION_ACTION_TAG).fetchSemanticsNodes()
+        ).isEmpty()
+
+        composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_CODE_GROUP_TAG).performClick()
+        composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_GOTO_DEFINITION_ACTION_TAG).performClick()
+
+        assertThat(events).containsExactly("gotoDefinition")
+    }
+
+    @Test
+    fun editorSelectionContextMenu_shouldExpandCodeGroupForKeyboardSelectedCodeAction() {
+        composeRule.setContent {
+            TestSelectionContextMenu(
+                keyboardSelectedAction = EditorContextMenuActionId.GotoDefinition,
+                gotoDefinitionEnabled = true
+            )
+        }
+        composeRule.waitForIdle()
+
+        assertThat(
+            composeRule.onAllNodesWithTag(SELECTION_CONTEXT_MENU_GOTO_DEFINITION_ACTION_TAG).fetchSemanticsNodes()
+        ).isNotEmpty()
+    }
+
+    @Composable
+    private fun TestSelectionContextMenu(
+        selectedText: String? = "selected-text",
+        keyboardSelectedAction: EditorContextMenuActionId? = null,
+        gotoDefinitionEnabled: Boolean = false,
+        onGotoDefinition: () -> Unit = {}
+    ) {
+        EditorSelectionContextMenu(
+            visible = true,
+            positionProvider = FixedPopupPositionProvider,
+            selectedText = selectedText,
+            keyboardSelectedAction = keyboardSelectedAction,
+            colorScheme = EditorColorScheme.builtinDark(),
+            hoverEnabled = false,
+            peekDefinitionEnabled = false,
+            gotoDefinitionEnabled = gotoDefinitionEnabled,
+            findReferencesEnabled = false,
+            gotoTypeDefinitionEnabled = false,
+            gotoImplementationEnabled = false,
+            codeActionsEnabled = false,
+            renameSymbolEnabled = false,
+            switchHeaderSourceEnabled = false,
+            onCopy = {},
+            onCut = {},
+            onPaste = {},
+            onSelectAll = {},
+            onPeekDefinition = {},
+            onGotoDefinition = onGotoDefinition,
+            onFindReferences = {},
+            onGotoTypeDefinition = {},
+            onGotoImplementation = {},
+            onCodeActions = {},
+            onRenameSymbol = {},
+            onSwitchHeaderSource = {},
+            onHover = {},
+            onDismiss = {}
+        )
     }
 
     private object FixedPopupPositionProvider : PopupPositionProvider {
