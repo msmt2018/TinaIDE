@@ -9,6 +9,7 @@ data class LinuxDistroManifest(
     val schemaVersion: Int,
     val generatedAt: String? = null,
     val distros: List<DistroDefinition>,
+    val mirrors: List<DistroMirrorRule> = emptyList(),
 ) {
     init {
         require(schemaVersion == CURRENT_SCHEMA_VERSION) {
@@ -33,4 +34,6 @@ object LinuxDistroManifestParser {
     fun decode(text: String): LinuxDistroManifest = json.decodeFromString(LinuxDistroManifest.serializer(), text)
 
     fun decode(inputStream: InputStream): LinuxDistroManifest = inputStream.bufferedReader(Charsets.UTF_8).use { reader -> decode(reader.readText()) }
+
+    fun encode(manifest: LinuxDistroManifest): String = json.encodeToString(LinuxDistroManifest.serializer(), manifest)
 }

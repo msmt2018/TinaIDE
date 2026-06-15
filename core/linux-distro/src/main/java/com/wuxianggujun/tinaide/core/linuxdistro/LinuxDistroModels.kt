@@ -72,6 +72,32 @@ data class DistroChecksum(
     val normalizedValue: String = value.lowercase()
 }
 
+/**
+ * 镜像替换规则（清单级）。
+ *
+ * 下载时若 artifact 的 url 以 [matchPrefix] 开头，则可派生出
+ * 把该前缀替换为 [replaceWith] 后的镜像候选地址，用于在官方源不可达时回落。
+ * 一条规则覆盖某发行版全部架构，避免逐 artifact 重复列镜像 URL。
+ */
+@Serializable
+data class DistroMirrorRule(
+    val matchPrefix: String,
+    val replaceWith: String,
+) {
+    init {
+        require(matchPrefix.startsWith("https://") || matchPrefix.startsWith("http://")) {
+            "Mirror matchPrefix must be http(s): $matchPrefix"
+        }
+        require(replaceWith.startsWith("https://") || replaceWith.startsWith("http://")) {
+            "Mirror replaceWith must be http(s): $replaceWith"
+        }
+    }
+
+    /** 若 [url] 命中本规则前缀则返回派生后的镜像地址，否则返回 null。 */
+    fun deriveOrNull(url: String): String? =
+        if (url.startsWith(matchPrefix)) replaceWith + url.removePrefix(matchPrefix) else null
+}
+
 @Serializable
 data class DistroArtifact(
     val architecture: DistroArchitecture,

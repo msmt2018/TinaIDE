@@ -10,6 +10,8 @@ import com.wuxianggujun.tinaide.core.packages.InstalledPackageMetadataReader
 import com.wuxianggujun.tinaide.core.packages.PackageInstallPlan
 import com.wuxianggujun.tinaide.core.packages.PackageManager
 import com.wuxianggujun.tinaide.core.packages.model.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +36,9 @@ class PackageManagerViewModel(
 
     private val _dialogState = MutableStateFlow<PackageDialogState?>(null)
     val dialogState: StateFlow<PackageDialogState?> = _dialogState.asStateFlow()
+
+    // 进行中的安装任务：用于支持用户主动取消（取消协程会触发 OkHttp Call.cancel 立即断开连接）。
+    private var installJob: Job? = null
 
     init {
         loadPackages()
@@ -152,7 +157,7 @@ class PackageManagerViewModel(
             return
         }
 
-        viewModelScope.launch {
+        val job = viewModelScope.launch {
             val plan = packageManager.previewInstallPlan(packageId, installPlatform).getOrElse { error ->
                 _dialogState.value = PackageDialogState.InstallComplete(
                     packageId = packageId,
@@ -178,14 +183,28 @@ class PackageManagerViewModel(
 
             startInstall(pkg, installPlatform)
         }
+        installJob = job
+        job.invokeOnCompletion { if (installJob === job) installJob = null }
     }
 
     fun confirmInstall(packageId: String, platform: Platform) {
         val pkg = _uiState.value.packages.find { it.id == packageId } ?: return
         val installPlatform = PackageInstallUiStateSupport.resolveAvailableInstallPlatform(pkg, platform) ?: return
-        viewModelScope.launch {
+        val job = viewModelScope.launch {
             startInstall(pkg, installPlatform)
         }
+        installJob = job
+        job.invokeOnCompletion { if (installJob === job) installJob = null }
+    }
+
+    /**
+     * 取消进行中的安装。取消协程会触发 OkHttp `Call.cancel()` 立即断开网络连接，
+     * 关闭对话框，用户可在网络恢复后重新点击下载。
+     */
+    fun cancelInstall() {
+        installJob?.cancel(CancellationException("Package install cancelled by user"))
+        installJob = null
+        _dialogState.value = null
     }
 
     private suspend fun startInstall(pkg: GUIPackage, installPlatform: Platform) {
@@ -199,7 +218,7 @@ class PackageManagerViewModel(
             )
         )
 
-        val result = runCatching {
+        val result = try {
             packageManager.install(packageId, installPlatform) { event ->
                 _dialogState.update { current ->
                     if (current is PackageDialogState.Installing && current.packageId == packageId) {
@@ -209,7 +228,10 @@ class PackageManagerViewModel(
                     }
                 }
             }
-        }.getOrElse { throwable ->
+        } catch (e: CancellationException) {
+            // 用户主动取消：对话框已由 cancelInstall 关闭，向上抛出由协程框架处理。
+            throw e
+        } catch (throwable: Throwable) {
             InstallResult.Failure(
                 packageId = packageId,
                 error = InstallError.UnknownError(

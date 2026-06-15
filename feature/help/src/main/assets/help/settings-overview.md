@@ -50,7 +50,7 @@
 - CMake / Make / clang-format 的运行模式
 - CMake 构建类型、生成器、并行任务数
 - 格式化风格
-- 当前工具链与 sysroot 状态
+- 当前工具链、NDK Runtime 与 sysroot 状态
 - 导入工具链、导入 sysroot
 - 重新部署开发环境
 

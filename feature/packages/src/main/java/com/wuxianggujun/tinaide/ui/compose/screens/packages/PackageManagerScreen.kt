@@ -275,6 +275,7 @@ fun PackageManagerScreen(
                     packageName = state.packageName,
                     platform = state.platform,
                     event = state.event,
+                    onCancel = viewModel::cancelInstall,
                     onDismiss = {}
                 )
             }
@@ -725,6 +726,7 @@ private fun InstallProgressDialog(
     packageName: String,
     platform: Platform,
     event: InstallProgressEvent,
+    onCancel: () -> Unit,
     onDismiss: () -> Unit
 ) {
     TinaAlertDialog(
@@ -783,6 +785,12 @@ private fun InstallProgressDialog(
                 TinaTextButton(
                     text = stringResource(Strings.btn_close),
                     onClick = onDismiss
+                )
+            } else {
+                // 下载/安装进行中：允许取消（取消协程会触发 OkHttp Call.cancel 立即断开连接）。
+                TinaTextButton(
+                    text = stringResource(Strings.btn_cancel_install),
+                    onClick = onCancel
                 )
             }
         }

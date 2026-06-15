@@ -43,8 +43,7 @@ class RootfsDistroRuntime(
 
     fun listDistros(): List<DistroOption> = runCatching {
         val architecture = SelfHostedLinuxDistroRuntime.defaultArchitecture()
-        AndroidAssetLinuxDistroManifestSource(appContext)
-            .loadCatalog()
+        SelfHostedLinuxDistroRuntime.loadRemoteOrAssetCatalog(appContext)
             .listInstallableDefaultArtifacts(architecture)
             .map { resolved ->
                 val packageManager = resolved.distro.packageManager.toRootfsPackageManager()

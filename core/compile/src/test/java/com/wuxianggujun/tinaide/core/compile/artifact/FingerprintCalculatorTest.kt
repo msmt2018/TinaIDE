@@ -72,6 +72,13 @@ class FingerprintCalculatorTest {
     }
 
     @Test
+    fun `sysrootProfileId change invalidates fingerprint`() {
+        val ctx1 = newContext(defaultOptions().copy(sysrootProfileId = "builtin-ndk-r27c-arm64"))
+        val ctx2 = newContext(defaultOptions().copy(sysrootProfileId = "custom-ndk-r27-arm64"))
+        assertThat(calc.compute(ctx1, sampleSpec())).isNotEqualTo(calc.compute(ctx2, sampleSpec()))
+    }
+
+    @Test
     fun `expected output path change invalidates fingerprint`() {
         val ctx = newContext(defaultOptions())
         val fp1 = calc.compute(ctx, sampleSpec(expectedPath = File(ctx.buildDir, "hello")))

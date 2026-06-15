@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -145,6 +146,7 @@ fun MarketScreen(
             isFavorited = plugin.pluginId in pluginState.favoritedPlugins,
             downloadProgress = pluginState.downloadingPlugins[plugin.pluginId],
             onInstall = { viewModel.installPlugin(plugin) },
+            onCancel = { viewModel.cancelPluginInstall(plugin.pluginId) },
             onToggleFavorite = { viewModel.togglePluginFavorite(plugin.pluginId) },
             onNavigateBack = closePluginDetails
         )
@@ -197,6 +199,7 @@ fun MarketScreen(
                         isLoading = pluginState.isLoading,
                         error = pluginState.error,
                         onInstall = viewModel::installPlugin,
+                        onCancel = viewModel::cancelPluginInstall,
                         onToggleFavorite = viewModel::togglePluginFavorite,
                         onPluginClick = viewModel::selectPlugin,
                         onRefresh = viewModel::retryLoadPlugins
@@ -208,6 +211,7 @@ fun MarketScreen(
                         isLoading = packageState.isLoading,
                         error = packageState.error,
                         onInstall = viewModel::installPackage,
+                        onCancel = viewModel::cancelPackageInstall,
                         onRefresh = viewModel::retryLoadPackages
                     )
                 }
@@ -235,6 +239,7 @@ private fun PluginsMarketContent(
     isLoading: Boolean,
     error: String?,
     onInstall: (PluginSummary) -> Unit,
+    onCancel: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onPluginClick: (PluginSummary) -> Unit,
     onRefresh: () -> Unit
@@ -328,6 +333,7 @@ private fun PluginsMarketContent(
                                 isFavorited = plugin.pluginId in favoritedPlugins,
                                 downloadProgress = downloadingPlugins[plugin.pluginId],
                                 onInstall = { onInstall(plugin) },
+                                onCancel = { onCancel(plugin.pluginId) },
                                 onToggleFavorite = { onToggleFavorite(plugin.pluginId) },
                                 onClick = { onPluginClick(plugin) }
                             )
@@ -349,6 +355,7 @@ private fun PluginCard(
     isFavorited: Boolean,
     downloadProgress: Float?,
     onInstall: () -> Unit,
+    onCancel: () -> Unit,
     onToggleFavorite: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -380,7 +387,7 @@ private fun PluginCard(
             Spacer(Modifier.height(12.dp))
             when {
                 downloadProgress != null -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(progress = { downloadProgress }, modifier = Modifier.size(40.dp))
+                    DownloadProgressButton(progress = downloadProgress, onCancel = onCancel)
                 }
                 isUpdatable -> TinaPrimaryButton(
                     text = stringResource(Strings.plugin_marketplace_update),
@@ -481,6 +488,7 @@ private fun PackagesMarketContent(
     isLoading: Boolean,
     error: String?,
     onInstall: (String) -> Unit,
+    onCancel: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -508,7 +516,8 @@ private fun PackagesMarketContent(
                                 packageItem = pkg,
                                 isInstalled = isInstalled,
                                 installProgress = installingPackages[pkg.id],
-                                onInstall = { onInstall(pkg.id) }
+                                onInstall = { onInstall(pkg.id) },
+                                onCancel = { onCancel(pkg.id) }
                             )
                         }
                     }
@@ -523,7 +532,8 @@ private fun PackageCard(
     packageItem: GUIPackage,
     isInstalled: Boolean,
     installProgress: Float?,
-    onInstall: () -> Unit
+    onInstall: () -> Unit,
+    onCancel: () -> Unit
 ) {
     TinaCard(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -547,9 +557,9 @@ private fun PackageCard(
             }
             Spacer(Modifier.width(8.dp))
             when {
-                installProgress != null -> CircularProgressIndicator(
-                    progress = { installProgress },
-                    modifier = Modifier.size(40.dp)
+                installProgress != null -> DownloadProgressButton(
+                    progress = installProgress,
+                    onCancel = onCancel
                 )
                 isInstalled -> TinaOutlinedButton(
                     text = stringResource(Strings.market_installed),
@@ -565,6 +575,38 @@ private fun PackageCard(
 }
 
 // ── PLACEHOLDER_HELPERS ──
+
+/**
+ * 下载/安装进行中的紧凑控件：进度环中心叠加可点击的取消（X）按钮。
+ *
+ * 进度为 0（刚点下载、尚未拿到响应头）时显示不确定进度环；点击 X 触发 [onCancel]，
+ * ViewModel 会取消协程并通过 OkHttp `Call.cancel()` 立即断开连接。
+ */
+@Composable
+private fun DownloadProgressButton(
+    progress: Float,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.size(40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (progress > 0f) {
+            CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(40.dp))
+        } else {
+            CircularProgressIndicator(modifier = Modifier.size(40.dp))
+        }
+        IconButton(onClick = onCancel, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = stringResource(Strings.btn_cancel_install),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 private fun SearchTextField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -626,6 +668,7 @@ private fun PluginDetailScreen(
     isFavorited: Boolean,
     downloadProgress: Float?,
     onInstall: () -> Unit,
+    onCancel: () -> Unit,
     onToggleFavorite: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
@@ -708,10 +751,19 @@ private fun PluginDetailScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    progress = { downloadProgress },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    LinearProgressIndicator(
+                                        progress = { downloadProgress },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(onClick = onCancel) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = stringResource(Strings.btn_cancel_install),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                             isUpdatable -> TinaPrimaryButton(
                                 text = stringResource(Strings.plugin_marketplace_update),

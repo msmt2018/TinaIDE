@@ -835,6 +835,7 @@ class CompileProjectUseCase(
                 runConfig = runConfig,
                 projectRoot = projectRoot,
                 linuxEnvironmentAvailable = linuxEnvironmentAvailable,
+                appContext = appContext,
             )
         )
         return BuildOptions(
@@ -846,6 +847,7 @@ class CompileProjectUseCase(
             cmakeGenerator = effective.cmakeGenerator,
             compilerType = effective.compilerType,
             sysrootApiLevel = effective.sysrootApiLevel,
+            sysrootProfileId = effective.sysrootProfileId,
             nativeCFlags = effective.nativeCFlags,
             nativeCppFlags = effective.nativeCppFlags,
             nativeLdFlags = effective.nativeLdFlags,

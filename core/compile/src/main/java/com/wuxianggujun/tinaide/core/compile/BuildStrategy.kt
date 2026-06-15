@@ -42,6 +42,13 @@ data class BuildOptions(
      * 始终为合法值（21..35），默认 API 28。
      */
     val sysrootApiLevel: Int = MakeCommandOverrides.DEFAULT_SYSROOT_API_LEVEL,
+    /**
+     * Active Android sysroot / NDK runtime profile captured at build planning time.
+     *
+     * It participates in artifact fingerprints so switching libc++_shared.so/sysroot
+     * cannot accidentally reuse stale build outputs.
+     */
+    val sysrootProfileId: String? = null,
     val nativeCFlags: String = "",
     val nativeCppFlags: String = "",
     val nativeLdFlags: String = "",

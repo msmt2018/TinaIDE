@@ -242,8 +242,21 @@ class SelfHostedLinuxDistroRuntime(
             context: Context,
             configManager: IConfigManager,
         ): SelfHostedLinuxDistroRuntime {
-            val catalog = AndroidAssetLinuxDistroManifestSource(context.applicationContext).loadCatalog()
+            val catalog = loadRemoteOrAssetCatalog(context.applicationContext)
             return create(context, configManager, catalog)
+        }
+
+        /**
+         * 构造发行版清单 catalog：远程增强（registry 托管）优先，任何失败回落到内置 asset。
+         * 远程源内部已做缓存 + 多端点回落，调用方无需感知。
+         */
+        fun loadRemoteOrAssetCatalog(context: Context): LinuxDistroCatalog {
+            val appContext = context.applicationContext
+            val assetSource = AndroidAssetLinuxDistroManifestSource(appContext)
+            return RemoteLinuxDistroManifestSource(
+                context = appContext,
+                fallback = assetSource,
+            ).loadCatalog()
         }
 
         fun create(

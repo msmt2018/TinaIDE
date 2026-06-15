@@ -37,6 +37,40 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.5] - 2026-06-12
+
+### Added
+- 新增可切换的 Android Sysroot / NDK Runtime profile 体系：内置 `r25c`、`r26d`、`r27c` 多版本 sysroot 资产，并通过 `profiles.json` 记录 sha256、API Level、toolchain triple、NDK/LLVM 版本等元数据；编译器设置页现在可以查看并切换当前 NDK Runtime，也支持导入自定义 sysroot profile。
+- 新增 Linux 发行版远程清单链路：发行版 registry 可从远端更新并带本地缓存，网络失败时自动回落内置清单，便于后续修复 rootfs 下载地址而无需更新 App。
+- 新增 Linux rootfs 下载镜像回落规则：官方源失败后可按清单中的镜像规则尝试清华、中科大、阿里等镜像；用户主动取消下载时立即停止，不再继续尝试下一个镜像。
+- 新增插件市场、首页市场与依赖包安装下载的取消能力：长时间下载/安装时界面显示取消入口，底层 OkHttp call 可随协程取消一起终止。
+
+### Changed
+- 重构编辑器状态核心 `EditorState`：将补全排序、签名帮助归一化、折叠管理、悬浮/签名控制、最大行宽跟踪、视觉行映射等职责拆分到独立类/纯函数，降低单类复杂度并补齐对应单元测试。
+- 内置 sysroot 资产从单个 `*-all.tar.xz` 调整为多版本 profile 资产，构建资产校验同步验证 `profiles.json` 与每个 tarball 的 sha256，避免打包缺失或 profile 元数据漂移。
+- 编译指纹 schema 升级并纳入 `sysrootProfileId`，切换 NDK Runtime 后不会误复用旧编译产物；`BuildOptions` 与有效构建配置会携带当前 active sysroot profile。
+- Clang resource dir 自动探测补充 LLVM 20/21/22，兼容更新的 NDK/LLVM 运行时。
+- Native CMake 构建中的重试提示改走 i18n 字符串资源，避免用户可见中文硬编码。
+- Alpine rootfs 锁定到 `v3.23`，不再依赖 `latest-stable` 滚动路径，减少上游路径变化导致的 404 风险。
+
+### Fixed
+- 修复应用启动时项目路径映射在装配线程（可能是主线程）同步读数据库导致的启动卡顿隐患：`ProjectLocationManager` 初始化不再使用 `runBlocking`，改为在 IO 协程中按"加载映射 → 迁移遗留项目 → 注册私有项目"的原有顺序异步执行；缓存改用 `ConcurrentHashMap` 并以锁保护复合读改写，避免初始化协程与外部 `openProject` 并发时的数据竞争。
+- 修复依赖安装页工具链就绪检测在主线程同步等待 PRoot 进程探测可能引发 ANR 的问题：`DependencyInstallViewModel` 的 `isToolchainReady` / `needsToolchainInstall` 改为 `suspend` 并在 IO 调度器执行，初始 UI 先呈现"准备中"，真正的就绪结果由协程回填，移除了 `runBlocking`。
+- 修复安装日志导出使用 `GlobalScope` 启动协程导致的泄漏风险：`InstallLogActivity` 改用 `lifecycleScope` + `Dispatchers.IO`，UI 回调改用 `withContext(Dispatchers.Main)` 替代 `runOnUiThread`，Activity 销毁后不再有悬挂协程回调已销毁界面。
+- 修复讯飞输入法在编辑器内触发“全选”只选中 ExtractedText 窗口的问题：`getExtractedText()` 继续只返回局部窗口，但 selection 坐标改为窗口相对坐标，并识别输入法对整个窗口的 `setSelection(0, window.length)` 操作为全文件全选。
+- 修复 ExtractedText 增量协议误报：窗口返回时 `partialStartOffset` / `partialEndOffset` 统一置为 `-1`，避免输入法把局部窗口当成增量 patch。
+- 修复编辑器 IME 删除逻辑的边界问题：删除前优先处理选区，并新增 code point 级删除，避免 emoji / surrogate pair 被删成半个字符。
+- 修复可取消下载没有真正取消底层网络请求的问题：可恢复下载器和插件市场 API 改为可取消执行，取消时保留临时文件以便后续续传，不再弹出误导性的失败提示。
+
+### Documentation
+- 更新编译器设置帮助和设置概览，说明 NDK Runtime profile、内置/自定义 sysroot 与切换后的编译指纹行为。
+- 更新工具链与 Linux 发行版维护文档，补充 sysroot profile 资产同步、校验脚本、远程发行版 registry 清单和镜像回落发布流程。
+- 新增 `.plan.md` 记录 Linux 发行版下载“远程清单 + 镜像回落”的实施计划，便于后续继续迭代和回溯设计边界。
+
+### Verification
+- `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorInputConnectionUtilsTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorInputConnectionExtractedTextTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorInputConnectionEditTest" --console=plain`
+- `./gradlew :core:editor-view:compileDebugKotlin --console=plain`
+
 ## [0.18.4] - 2026-06-12
 
 ### Fixed

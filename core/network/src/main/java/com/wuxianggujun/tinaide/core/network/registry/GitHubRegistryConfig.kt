@@ -18,6 +18,7 @@ object GitHubRegistryConfig {
 
     const val PLUGINS_INDEX_V2_PATH = "plugins/index.v2.json"
     const val PACKAGES_INDEX_V2_PATH = "packages/index.v2.json"
+    const val LINUX_DISTRO_MANIFEST_PATH = "linux-distro/manifest.v1.json"
 
     val PUBLIC_GITHUB_PROXY_PREFIXES: List<String> = listOf(
         "https://gh.llkk.cc/",
@@ -49,6 +50,11 @@ object GitHubRegistryConfig {
 
     fun packageIndexV2Urls(customProxyPrefix: String? = null): List<RegistryUrl> = indexUrls(
         path = PACKAGES_INDEX_V2_PATH,
+        customProxyPrefix = customProxyPrefix,
+    )
+
+    fun linuxDistroManifestUrls(customProxyPrefix: String? = null): List<RegistryUrl> = indexUrls(
+        path = LINUX_DISTRO_MANIFEST_PATH,
         customProxyPrefix = customProxyPrefix,
     )
 

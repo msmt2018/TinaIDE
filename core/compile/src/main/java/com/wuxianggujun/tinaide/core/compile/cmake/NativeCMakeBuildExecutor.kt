@@ -9,6 +9,8 @@ import com.wuxianggujun.tinaide.core.compile.CompilerType
 import com.wuxianggujun.tinaide.core.compile.ConfigureResult
 import com.wuxianggujun.tinaide.core.compile.MakeCommandOverrides
 import com.wuxianggujun.tinaide.core.compile.toolchain.ToolchainLinker64ShimManager
+import com.wuxianggujun.tinaide.core.i18n.Strings
+import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.ndk.AndroidNativeToolchainManager
 import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
@@ -1247,7 +1249,7 @@ class NativeCMakeBuildExecutor(
                 appendLine()
             }
             appendLine("===== $retryTitle =====")
-            appendLine("上一轮疑似为 shell shim + tina-exec 组合导致的静默失败；本轮已清理 LD_PRELOAD/TINA_EXEC 后重试。")
+            appendLine(Strings.cmake_retry_without_tina_exec_notice.str())
             if (retry.output.isNotBlank()) {
                 append(retry.output)
             }

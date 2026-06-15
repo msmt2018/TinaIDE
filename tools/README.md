@@ -8,7 +8,8 @@
 
 - `build-apk.ps1`：本地 APK 构建入口。
 - `analyze-apk.ps1`、`check-apk-contents.ps1`：APK 内容与体积检查。
-- `sync-tina-toolchain-assets.ps1`、`verify-tina-toolchain-package.ps1`：tina-toolchain 资产同步与校验。
+- `sync-tina-toolchain-assets.ps1`、`verify-tina-toolchain-package.ps1`：tina-toolchain 资产同步与校验；同步脚本同时维护 `assets/android-sysroot/profiles.json`。
+- `verify-android-sysroot-assets.ps1`：校验 ABI 专属 Android sysroot profile manifest、sha256、`.version`、API 目录和 `libc++_shared.so`。
 - `device-native-smoke.ps1`：设备侧 native smoke 验证。
 - `check_i18n.py`：旧入口；完整 i18n 校验优先看 [i18n 工具说明](i18n/README.md)。
 

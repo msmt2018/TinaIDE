@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.linuxdistro
 
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -172,16 +173,38 @@ class LinuxDistroInstaller(
         }
 
         progress(request.progress(LinuxDistroInstallPhase.DOWNLOADING, 0.10f, resolved))
-        downloader.download(
-            request = DistroDownloadRequest(
-                url = resolved.artifact.url,
-                targetFile = archiveFile,
-                resume = true,
-            ),
-        ) { downloadProgress ->
-            val fraction = downloadProgress.fraction ?: 0f
-            progress(request.progress(LinuxDistroInstallPhase.DOWNLOADING, 0.10f + fraction * 0.30f, resolved))
+
+        val candidates = downloadCandidates(resolved.artifact.url)
+        var lastError: Throwable? = null
+        for (url in candidates) {
+            // 切换镜像前清掉上一候选的残留，避免续传到不同源的半包文件。
+            archiveFile.delete()
+            try {
+                downloader.download(
+                    request = DistroDownloadRequest(
+                        url = url,
+                        targetFile = archiveFile,
+                        resume = true,
+                    ),
+                ) { downloadProgress ->
+                    val fraction = downloadProgress.fraction ?: 0f
+                    progress(request.progress(LinuxDistroInstallPhase.DOWNLOADING, 0.10f + fraction * 0.30f, resolved))
+                }
+                return
+            } catch (cancellation: CancellationException) {
+                // 用户取消：不再尝试其它镜像，直接向上抛。
+                throw cancellation
+            } catch (throwable: Throwable) {
+                lastError = throwable
+            }
         }
+        throw lastError ?: IllegalStateException("No download candidates for ${resolved.artifact.url}")
+    }
+
+    /** 规范地址优先，随后按清单镜像规则派生候选（去重）。 */
+    private fun downloadCandidates(url: String): List<String> {
+        val mirrors = catalog.mirrorRules().mapNotNull { rule -> rule.deriveOrNull(url) }
+        return (listOf(url) + mirrors).distinct()
     }
 
     private fun createInstallation(

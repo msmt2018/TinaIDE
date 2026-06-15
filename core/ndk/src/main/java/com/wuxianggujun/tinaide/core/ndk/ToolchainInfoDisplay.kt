@@ -20,3 +20,35 @@ fun ToolchainInfo.displayLabel(context: Context): String {
     val versionLabel = displayVersionLabel(context) ?: return title
     return "$title ($versionLabel)"
 }
+
+fun SysrootProfileInfo.displayName(context: Context): String = when (type) {
+    SysrootProfileType.BUILTIN -> Strings.sysroot_profile_builtin_name.strOr(context)
+    SysrootProfileType.CUSTOM -> name.trim().ifBlank { id }
+    SysrootProfileType.LEGACY -> Strings.sysroot_profile_legacy_name.strOr(context)
+}
+
+fun SysrootProfileInfo.displayLabel(context: Context): String {
+    val apiLabel = if (apiLevels.isEmpty()) {
+        Strings.sysroot_profile_api_unknown.strOr(context)
+    } else {
+        apiLevels.joinToString(", ")
+    }
+    val ndkVersionLabel = ndkVersion?.trim()?.takeIf { it.isNotBlank() }
+    val ndkLlvmVersionLabel = ndkLlvmVersion?.trim()?.takeIf { it.isNotBlank() }
+    val versionLabel = when {
+        ndkVersionLabel != null && ndkLlvmVersionLabel != null ->
+            Strings.sysroot_profile_ndk_with_llvm_label.strOr(context, ndkVersionLabel, ndkLlvmVersionLabel)
+        ndkVersionLabel != null -> ndkVersionLabel
+        ndkLlvmVersionLabel != null ->
+            Strings.sysroot_profile_ndk_llvm_label.strOr(context, ndkLlvmVersionLabel)
+        else -> null
+    }
+        ?: toolchainTriple?.trim()?.takeIf { it.isNotBlank() }
+        ?: arch
+    return Strings.sysroot_profile_display_label.strOr(
+        context,
+        displayName(context),
+        versionLabel,
+        apiLabel
+    )
+}

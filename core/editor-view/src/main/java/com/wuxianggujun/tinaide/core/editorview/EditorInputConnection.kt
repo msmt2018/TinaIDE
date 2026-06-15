@@ -86,6 +86,7 @@ internal class EditorInputConnection(
     private var afterCacheStart: Int = -1
     private var afterCacheEnd: Int = -1
     private var afterCacheText: String? = null
+    private var lastExtractedTextWindow: ImeExtractedTextWindow? = null
     private var pendingDeadKeyAccent: Int = 0
 
     override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence {
@@ -179,15 +180,22 @@ internal class EditorInputConnection(
         } else {
             ""
         }
+        val windowLength = (windowEnd - windowStart).coerceAtLeast(0)
+        lastExtractedTextWindow = ImeExtractedTextWindow(
+            startOffset = windowStart,
+            endOffset = windowEnd,
+            documentLength = documentLength,
+            textVersion = state.textBuffer.version
+        )
 
         return ExtractedText().apply {
             text = extractedText
-            // partialStart/End 告诉 IME "只有 [windowStart, windowEnd) 这段是提供的"；
-            // selection 坐标是相对 startOffset 的文档绝对坐标。
-            partialStartOffset = if (windowStart == 0) -1 else windowStart
-            partialEndOffset = if (windowEnd == documentLength) -1 else windowEnd
-            selectionStart = selStart
-            selectionEnd = selEnd
+            // partialStart/End 只用于增量更新；getExtractedText 返回的是完整的当前窗口。
+            // selectionStart/End 按 Android 协议必须是相对 startOffset 的窗口内坐标。
+            partialStartOffset = -1
+            partialEndOffset = -1
+            selectionStart = extractedTextSelectionOffset(selStart, windowStart, windowLength)
+            selectionEnd = extractedTextSelectionOffset(selEnd, windowStart, windowLength)
             this.flags = 0
             startOffset = windowStart
         }
@@ -202,15 +210,7 @@ internal class EditorInputConnection(
                     "recoveredChars=${replacement.length}"
             )
         }
-        val selection = selectionOffsets()
-        val editRange = resolveEditRange(
-            selectionStart = selection.first,
-            selectionEnd = selection.second,
-            composingRange = composingRange
-        )
-        applyReplacement(
-            startOffset = editRange.first,
-            endOffset = editRange.second,
+        replaceCurrentImeEditRange(
             replacement = replacement,
             newCursorPosition = newCursorPosition,
             keepComposing = false,
@@ -221,15 +221,7 @@ internal class EditorInputConnection(
 
     override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
         val replacement = text?.toString() ?: ""
-        val selection = selectionOffsets()
-        val editRange = resolveEditRange(
-            selectionStart = selection.first,
-            selectionEnd = selection.second,
-            composingRange = composingRange
-        )
-        applyReplacement(
-            startOffset = editRange.first,
-            endOffset = editRange.second,
+        replaceCurrentImeEditRange(
             replacement = replacement,
             newCursorPosition = newCursorPosition,
             keepComposing = true,
@@ -259,20 +251,43 @@ internal class EditorInputConnection(
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-        val cursor = cursorOffset()
-        val start = (cursor - beforeLength.coerceAtLeast(0)).coerceAtLeast(0)
-        val end = (cursor + afterLength.coerceAtLeast(0)).coerceAtMost(state.textBuffer.length)
-        if (start < end) {
-            state.replaceRange(startOffset = start, endOffset = end, replacement = "")
-            clearComposingIfOverlapped(start, end)
-            onNonInsertEdit()
+        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingText") {
+            imeDeleteSurroundingCharRange(
+                cursorOffset = cursorOffset(),
+                beforeLength = beforeLength,
+                afterLength = afterLength,
+                documentLength = state.textBuffer.length
+            )
         }
-        return true
+    }
+
+    override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
+        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingTextInCodePoints") {
+            imeDeleteSurroundingCodePointRange(
+                textBuffer = state.textBuffer,
+                cursorOffset = cursorOffset(),
+                beforeLength = beforeLength,
+                afterLength = afterLength
+            )
+        }
     }
 
     override fun setSelection(start: Int, end: Int): Boolean {
         val documentLength = state.textBuffer.length
         val before = imeSelectionOffsets()
+        val extractedWindow = currentExtractedTextWindow(documentLength)
+        if (isFullExtractedTextWindowSelection(start, end, extractedWindow)) {
+            state.selectAll()
+            composingRange = null
+            onNonInsertEdit()
+            val applied = imeSelectionOffsets()
+            logIme(
+                "setSelection extractedWindowSelectAll request=($start,$end) " +
+                    "window=(${extractedWindow!!.startOffset},${extractedWindow.endOffset}) " +
+                    "applied=(${applied.first},${applied.second}) docLen=$documentLength"
+            )
+            return true
+        }
         val (mappedStart, mappedEnd) = mapImeSelectionToDocument(
             start = start,
             end = end,
@@ -330,15 +345,7 @@ internal class EditorInputConnection(
             }
 
             KeyEvent.KEYCODE_ENTER -> {
-                val selection = selectionOffsets()
-                val editRange = resolveEditRange(
-                    selectionStart = selection.first,
-                    selectionEnd = selection.second,
-                    composingRange = composingRange
-                )
-                applyReplacement(
-                    startOffset = editRange.first,
-                    endOffset = editRange.second,
+                replaceCurrentImeEditRange(
                     replacement = "\n",
                     newCursorPosition = 1,
                     keepComposing = false,
@@ -348,15 +355,7 @@ internal class EditorInputConnection(
             }
 
             KeyEvent.KEYCODE_TAB -> {
-                val selection = selectionOffsets()
-                val editRange = resolveEditRange(
-                    selectionStart = selection.first,
-                    selectionEnd = selection.second,
-                    composingRange = composingRange
-                )
-                applyReplacement(
-                    startOffset = editRange.first,
-                    endOffset = editRange.second,
+                replaceCurrentImeEditRange(
                     replacement = "\t",
                     newCursorPosition = 1,
                     keepComposing = false,
@@ -531,15 +530,7 @@ internal class EditorInputConnection(
 
     override fun commitCompletion(text: CompletionInfo?): Boolean {
         val completionText = text?.text?.toString() ?: return false
-        val selection = selectionOffsets()
-        val editRange = resolveEditRange(
-            selectionStart = selection.first,
-            selectionEnd = selection.second,
-            composingRange = composingRange
-        )
-        applyReplacement(
-            startOffset = editRange.first,
-            endOffset = editRange.second,
+        replaceCurrentImeEditRange(
             replacement = completionText,
             newCursorPosition = 1,
             keepComposing = false,
@@ -550,15 +541,7 @@ internal class EditorInputConnection(
 
     override fun commitCorrection(correctionInfo: CorrectionInfo?): Boolean {
         val correctionText = correctionInfo?.newText?.toString() ?: return false
-        val selection = selectionOffsets()
-        val editRange = resolveEditRange(
-            selectionStart = selection.first,
-            selectionEnd = selection.second,
-            composingRange = composingRange
-        )
-        applyReplacement(
-            startOffset = editRange.first,
-            endOffset = editRange.second,
+        replaceCurrentImeEditRange(
             replacement = correctionText,
             newCursorPosition = 1,
             keepComposing = false,
@@ -579,15 +562,7 @@ internal class EditorInputConnection(
             IME_ACTION_SEARCH,
             IME_ACTION_UNSPECIFIED,
             IME_NULL -> {
-                val selection = selectionOffsets()
-                val editRange = resolveEditRange(
-                    selectionStart = selection.first,
-                    selectionEnd = selection.second,
-                    composingRange = composingRange
-                )
-                applyReplacement(
-                    startOffset = editRange.first,
-                    endOffset = editRange.second,
+                replaceCurrentImeEditRange(
                     replacement = "\n",
                     newCursorPosition = 1,
                     keepComposing = false,
@@ -644,15 +619,8 @@ internal class EditorInputConnection(
                     .recoverPossiblyTruncatedClipboardText(systemPasteText)
                     ?: return false
                 val beforeSelection = selectionOffsets()
-                val selection = selectionOffsets()
-                val editRange = resolveEditRange(
-                    selectionStart = selection.first,
-                    selectionEnd = selection.second,
-                    composingRange = composingRange
-                )
-                applyReplacement(
-                    startOffset = editRange.first,
-                    endOffset = editRange.second,
+                val editRange = currentImeEditRange()
+                replaceCurrentImeEditRange(
                     replacement = pasteText,
                     newCursorPosition = 1,
                     keepComposing = false,
@@ -674,6 +642,55 @@ internal class EditorInputConnection(
     }
 
     override fun performPrivateCommand(action: String?, data: Bundle?): Boolean = false
+
+    private fun currentImeEditRange(): Pair<Int, Int> {
+        val selection = selectionOffsets()
+        return resolveEditRange(
+            selectionStart = selection.first,
+            selectionEnd = selection.second,
+            composingRange = composingRange
+        )
+    }
+
+    private fun replaceCurrentImeEditRange(
+        replacement: String,
+        newCursorPosition: Int,
+        keepComposing: Boolean,
+        insertedCallback: (String) -> Unit
+    ) {
+        val editRange = currentImeEditRange()
+        applyReplacement(
+            startOffset = editRange.first,
+            endOffset = editRange.second,
+            replacement = replacement,
+            newCursorPosition = newCursorPosition,
+            keepComposing = keepComposing,
+            insertedCallback = insertedCallback
+        )
+    }
+
+    private fun deleteSelectionOrSurroundingText(
+        reason: String,
+        surroundingRange: () -> ImeDeleteRange?
+    ): Boolean {
+        val selectedRange = state.selectionRange
+            ?.takeUnless { it.isEmpty }
+            ?.let { ImeDeleteRange(start = it.start, end = it.end) }
+        val deleteRange = selectedRange ?: surroundingRange() ?: return true
+        if (deleteRange.isEmpty) return true
+
+        val changed = state.replaceRange(
+            startOffset = deleteRange.start,
+            endOffset = deleteRange.end,
+            replacement = ""
+        )
+        if (changed) {
+            clearComposingIfOverlapped(deleteRange.start, deleteRange.end)
+            onNonInsertEdit()
+            logIme("$reason deleteRange=(${deleteRange.start},${deleteRange.end})")
+        }
+        return true
+    }
 
     private fun applyReplacement(
         startOffset: Int,
@@ -787,6 +804,11 @@ internal class EditorInputConnection(
     private fun cursorOffset(): Int = state.cursorOffset.coerceIn(0, state.textBuffer.length)
 
     private fun surroundingContextChars(): Int = state.config.imeWindowChars.coerceIn(64, 4096)
+
+    private fun currentExtractedTextWindow(documentLength: Int): ImeExtractedTextWindow? {
+        val window = lastExtractedTextWindow ?: return null
+        return window.takeIf { it.isCurrent(documentLength, state.textBuffer.version) }
+    }
 
     private fun copySelectedTextToClipboard(): Boolean {
         val (start, end) = selectionOffsets()

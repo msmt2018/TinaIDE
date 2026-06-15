@@ -4,6 +4,7 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.network.ApiResult
+import com.wuxianggujun.tinaide.core.network.executeCancellable
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryConfig
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryHttpClientFactory
 import com.wuxianggujun.tinaide.core.network.registry.GitHubRegistryProxyConfig
@@ -14,7 +15,10 @@ import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.security.MessageDigest
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -178,6 +182,9 @@ class PluginMarketplaceApi private constructor(
                 expectedHash = pluginVersion.fileHash,
                 onProgress = onProgress,
             )
+        } catch (e: CancellationException) {
+            // 用户取消：向上抛出由协程框架处理，不当作下载错误。
+            throw e
         } catch (e: IOException) {
             Timber.tag(TAG).e(e, "Download plugin failed")
             ApiResult.NetworkError(e.message ?: Strings.error_network_connection_failed.str())
@@ -318,7 +325,7 @@ class PluginMarketplaceApi private constructor(
         }
     }
 
-    private fun downloadFile(
+    private suspend fun downloadFile(
         urls: List<String>,
         targetFile: File,
         expectedHash: String?,
@@ -326,14 +333,17 @@ class PluginMarketplaceApi private constructor(
     ): ApiResult<File> {
         var lastResult: ApiResult<File>? = null
         for (candidateUrl in urls) {
-            val result = runCatching {
+            val result = try {
                 downloadSingleFile(
                     url = candidateUrl,
                     targetFile = targetFile,
                     expectedHash = expectedHash,
                     onProgress = onProgress,
                 )
-            }.getOrElse { error ->
+            } catch (e: CancellationException) {
+                // 用户取消：不再尝试下一个镜像，直接向上抛出。
+                throw e
+            } catch (error: Throwable) {
                 ApiResult.NetworkError(error.message ?: Strings.error_network_connection_failed.str())
             }
             if (result is ApiResult.Success) return result
@@ -342,7 +352,7 @@ class PluginMarketplaceApi private constructor(
         return lastResult ?: ApiResult.NetworkError(Strings.error_network_connection_failed.str())
     }
 
-    private fun downloadSingleFile(
+    private suspend fun downloadSingleFile(
         url: String,
         targetFile: File,
         expectedHash: String?,
@@ -361,7 +371,7 @@ class PluginMarketplaceApi private constructor(
             requestBuilder.addHeader("Range", "bytes=$startByte-")
         }
 
-        val response = downloadClient.newCall(requestBuilder.build()).execute()
+        val response = downloadClient.newCall(requestBuilder.build()).executeCancellable()
         response.use { resp ->
             if (!resp.isSuccessful && resp.code != 206) {
                 return ApiResult.Error(resp.code, "${Strings.error_download_failed.str()} (HTTP ${resp.code})")
@@ -388,6 +398,7 @@ class PluginMarketplaceApi private constructor(
                 body.byteStream().use { inputStream ->
                     var bytesRead: Int
                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        coroutineContext.ensureActive()
                         raf.write(buffer, 0, bytesRead)
                         downloaded += bytesRead
                         onProgress?.invoke(downloaded, total)
