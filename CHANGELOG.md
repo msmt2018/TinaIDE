@@ -62,6 +62,8 @@
 - 修复编辑器 IME 删除逻辑的边界问题：删除前优先处理选区，并新增 code point 级删除，避免 emoji / surrogate pair 被删成半个字符。
 - 修复 LSP 补全项返回较早、用户继续输入后再选择补全时残留字符的问题：应用 LSP `textEdit` 前会按当前光标前缀扩展匹配范围，前缀不匹配或光标已离开原范围时拒绝旧补全，避免 `op` 选择 `operator` 后变成 `operatorp`。
 - 修复编辑器双击/长按选词在 `operator+`、`operator-` 等贴靠符号后缀附近不稳定的问题：选词落点若命中紧贴标识符的少量符号后缀，会回退选择前面的标识符，但不会跨过空白；同时修正选择句柄拖动的文本锚点偏移，避免拖动时按手指/光标位置而不是句柄对应文本边界更新选区。
+- 修复长按代码内容会主动拉起软键盘的问题：长按现在只请求编辑器焦点、同步选区并显示上下文菜单，不再调用会显示输入法的焦点请求，避免长按选择或粘贴时被键盘打断。
+- 修复侧边栏文件树长按菜单总是贴在左侧的问题：文件/文件夹行会记录真实按下位置作为菜单锚点，若没有有效触点再回退到行底部中心，避免整行宽度撑满抽屉时锚点固定到左下角。
 - 修复可取消下载没有真正取消底层网络请求的问题：可恢复下载器和插件市场 API 改为可取消执行，取消时保留临时文件以便后续续传，不再弹出误导性的失败提示。
 
 ### Documentation
@@ -75,6 +77,8 @@
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorPopupComposeSmokeTest" --tests "com.wuxianggujun.tinaide.core.editorview.PopupOverlaySharedAnchorIntegrationTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorOverlaysIntegrationTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorSnippetChoiceCompletionTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorCompletionStateTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorStateSelectWordTest" --tests "com.wuxianggujun.tinaide.core.editorview.SelectionHandleLayoutTest" --console=plain`
+- `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorGestureCoordinatorLongPressTest" --console=plain`
+- `./gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.components.FileTreeItemLongPressAnchorTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorGestureHandlerTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorGestureCoordinatorCtrlClickTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorPopupComposeSmokeTest" --tests "com.wuxianggujun.tinaide.core.editorview.PopupOverlaySharedAnchorIntegrationTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorOverlaysIntegrationTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --console=plain`
 - `./gradlew :core:editor-view:compileDebugKotlin --console=plain`

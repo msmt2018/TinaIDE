@@ -174,7 +174,7 @@ internal class EditorGestureCoordinator(
 
         // 无论是否选中了单词，长按都显示上下文菜单。
         // 空白区域长按的主要用途是粘贴剪贴板内容，若不显示菜单则无法粘贴。
-        interactionController.requestEditorFocusAndKeyboard()
+        interactionController.requestEditorFocus()
         interactionController.syncSelectionToIme()
         showSelectionUi(position)
     }
