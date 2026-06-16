@@ -61,6 +61,7 @@
 - 修复 ExtractedText 增量协议误报：窗口返回时 `partialStartOffset` / `partialEndOffset` 统一置为 `-1`，避免输入法把局部窗口当成增量 patch。
 - 修复编辑器 IME 删除逻辑的边界问题：删除前优先处理选区，并新增 code point 级删除，避免 emoji / surrogate pair 被删成半个字符。
 - 修复 LSP 补全项返回较早、用户继续输入后再选择补全时残留字符的问题：应用 LSP `textEdit` 前会按当前光标前缀扩展匹配范围，前缀不匹配或光标已离开原范围时拒绝旧补全，避免 `op` 选择 `operator` 后变成 `operatorp`。
+- 修复编辑器双击/长按选词在 `operator+`、`operator-` 等贴靠符号后缀附近不稳定的问题：选词落点若命中紧贴标识符的少量符号后缀，会回退选择前面的标识符，但不会跨过空白；同时修正选择句柄拖动的文本锚点偏移，避免拖动时按手指/光标位置而不是句柄对应文本边界更新选区。
 - 修复可取消下载没有真正取消底层网络请求的问题：可恢复下载器和插件市场 API 改为可取消执行，取消时保留临时文件以便后续续传，不再弹出误导性的失败提示。
 
 ### Documentation
@@ -73,6 +74,8 @@
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorCompletionStateTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorPopupComposeSmokeTest" --tests "com.wuxianggujun.tinaide.core.editorview.PopupOverlaySharedAnchorIntegrationTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorOverlaysIntegrationTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorSnippetChoiceCompletionTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorCompletionStateTest" --console=plain`
+- `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorStateSelectWordTest" --tests "com.wuxianggujun.tinaide.core.editorview.SelectionHandleLayoutTest" --console=plain`
+- `./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorGestureHandlerTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorGestureCoordinatorCtrlClickTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorPopupComposeSmokeTest" --tests "com.wuxianggujun.tinaide.core.editorview.PopupOverlaySharedAnchorIntegrationTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorOverlaysIntegrationTest" --console=plain`
 - `./gradlew :core:editor-view:testDebugUnitTest --console=plain`
 - `./gradlew :core:editor-view:compileDebugKotlin --console=plain`
 

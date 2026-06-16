@@ -12,6 +12,7 @@ import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
+import com.wuxianggujun.tinaide.core.textengine.WordBounds
 import com.wuxianggujun.tinaide.core.treesitter.SyntaxHighlighter
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider.FoldRegion
 import java.io.File
@@ -1039,7 +1040,7 @@ class EditorState(
         val clampedLine = line.coerceIn(0, (textBuffer.lineCount - 1).coerceAtLeast(0))
         val lineText = textBuffer.getLine(clampedLine)
         if (lineText.isEmpty()) return false
-        return TextScanKernel.findWordBounds(lineText, column) != null
+        return findSelectableWordBounds(lineText, column) != null
     }
 
     fun selectWord(line: Int, column: Int): Boolean {
@@ -1047,7 +1048,7 @@ class EditorState(
         val lineText = textBuffer.getLine(clampedLine)
         if (lineText.isEmpty()) return false
 
-        val bounds = TextScanKernel.findWordBounds(lineText, column) ?: return false
+        val bounds = findSelectableWordBounds(lineText, column) ?: return false
 
         selectRange(
             startOffset = textBuffer.positionToOffset(clampedLine, bounds.start),
@@ -1055,6 +1056,32 @@ class EditorState(
         )
         return true
     }
+
+    private fun findSelectableWordBounds(lineText: String, column: Int): WordBounds? {
+        val safeColumn = column.coerceIn(0, lineText.length)
+        TextScanKernel.findWordBounds(lineText, safeColumn)?.let { return it }
+        val adjacentWordColumn = findWordColumnBeforeAttachedPunctuation(lineText, safeColumn) ?: return null
+        return TextScanKernel.findWordBounds(lineText, adjacentWordColumn)
+    }
+
+    private fun findWordColumnBeforeAttachedPunctuation(lineText: String, column: Int): Int? {
+        if (column <= 0) return null
+        var probe = (column - 1).coerceIn(0, lineText.lastIndex)
+        var skippedPunctuation = 0
+        while (
+            probe >= 0 &&
+            skippedPunctuation < MAX_SELECTABLE_ATTACHED_PUNCTUATION &&
+            isAttachedWordPunctuation(lineText[probe])
+        ) {
+            skippedPunctuation++
+            probe--
+        }
+        if (skippedPunctuation <= 0) return null
+        return if (probe >= 0 && TextScanKernel.isWordChar(lineText[probe])) probe else null
+    }
+
+    private fun isAttachedWordPunctuation(char: Char): Boolean =
+        !char.isWhitespace() && !TextScanKernel.isWordChar(char)
 
     fun startSelection(anchorOffset: Int) {
         val oldCursor = cursorOffset
@@ -1453,3 +1480,5 @@ class EditorState(
         )
     }
 }
+
+private const val MAX_SELECTABLE_ATTACHED_PUNCTUATION = 4
