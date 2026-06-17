@@ -1,0 +1,352 @@
+# TinaIDE 架构优化任务清单
+
+> 更新日期：2026-06-17
+> 状态：推进中
+> 范围：主工作区、编辑器、文件操作链路、LSP 连接链路、模块装配与测试维护性
+
+## 1. 目标
+
+本任务文档用于跟踪 TinaIDE 后续架构优化工作。目标不是一次性大重构，而是把已经暴露出问题的链路逐步收口，让主编辑器、侧边栏、AI 文件工具、插件事件和项目文件状态保持一致。
+
+核心目标：
+
+- 降低 `app` 层继续膨胀的风险。
+- 统一用户项目文件操作入口，避免删除、重命名、移动文件后编辑器和文件树状态不同步。
+- 清理编辑器/LSP 链路中的阻塞点，降低卡顿、补全异常和交互延迟风险。
+- 拆小主工作区装配层，减少参数爆炸和跨模块隐式耦合。
+- 逐步拆分高复杂度类，保持 KISS、DRY、SOLID。
+
+## 2. 明确暂缓项
+
+以下事项暂时不纳入本轮任务：
+
+- Manifest 暴露面和权限收紧。
+  - 包括 `usesCleartextTraffic`、`exported`、高权限声明、provider 暴露策略等。
+  - 当前先记录为后续安全专项，不影响本任务推进。
+- 大规模目录重组。
+- 全量模块依赖重构。
+- PRoot 默认链路替换。
+- Release 构建流程调整。
+
+## 3. 当前主要问题
+
+### P0-1：用户项目文件操作入口不够统一
+
+现象：
+
+- 文件删除、重命名、移动可能由不同入口直接调用 `delete()`、`deleteRecursively()`、`renameTo()`。
+- 一旦绕过统一文件操作服务，文件树、编辑器 tab、插件事件、AI 工具回调就可能不同步。
+- 最近“侧边栏删除已打开文件后 Toast 已删除但编辑器无反应”的问题就属于这个类型。
+
+重点关注文件：
+
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/ProjectManagerViewModel.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/FileTreeDialogs.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/main/project/ProjectScreen.kt`
+- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/executor/filesystem/DefaultFileSystemCallbacks.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ai/integration/FileSystemCallbacksImpl.kt`
+
+### P0-2：编辑器/LSP 链路仍有阻塞点
+
+现象：
+
+- 生产代码中仍存在少量 `runBlocking` 和 `Thread.sleep(...)`。
+- 如果这些逻辑进入编辑器交互、补全请求、LSP 连接探测路径，可能放大卡顿、补全延迟、焦点/光标异常。
+
+重点关注文件：
+
+- `core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/RemoteLspConnectionProvider.kt`
+- `core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/PluginLspConnectionProvider.kt`
+- `core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/NativeClangdConnectionProvider.kt`
+- `core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootManager.kt`
+- `core/logging/src/main/java/com/wuxianggujun/tinaide/core/logging/FileLoggingTree.kt`
+
+### P1-1：主工作区装配层参数过多
+
+现象：
+
+- `MainActivityScreenHost` 同时接收 Activity、多个 ViewModel、多个 manager、bridge、delegate、state 和 action。
+- 参数爆炸会让后续主界面改动更容易互相影响，也增加测试构造成本。
+
+重点关注文件：
+
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/main/MainActivityScreenHost.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/MainActivity.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/MainActivityBindings.kt`
+
+### P1-2：高复杂度类需要按职责逐步拆分
+
+候选热点：
+
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/EditorContainerState.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/lsp/LspEditorManager.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/pages/TinaCodeEditorPage.kt`
+- `core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/NativeCMakeBuildExecutor.kt`
+- `core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootManager.kt`
+- `feature/settings/src/main/java/com/wuxianggujun/tinaide/ui/settings/sections/PluginsSettingsSection.kt`
+
+## 4. 迭代计划
+
+### 迭代一：统一项目文件操作事件链路
+
+优先级：P0
+
+目标：
+
+- 所有用户项目文件的创建、删除、重命名、移动统一进入一个可观测链路。
+- 文件变更后统一通知文件树、编辑器、插件和 AI 工具集成。
+- 避免再次出现“Toast 成功但编辑器状态没有变化”的问题。
+
+任务：
+
+- 梳理当前所有直接文件操作入口，按类型分组：
+  - 用户项目文件操作。
+  - 项目列表/工作区管理。
+  - 模板文件管理。
+  - 缓存、日志、runtime 资产清理。
+- 在用户项目文件操作范围内复用或扩展 `IFileOperations`。
+- 必要时增加轻量协调器，例如 `ProjectFileMutationCoordinator`。
+- 删除、重命名、移动目录时，需要覆盖目录下已打开文件。
+- 对脏 tab 不直接丢弃内容，应触发未保存确认。
+- AI 文件工具和侧边栏文件树必须走同一套结果同步规则。
+
+验收标准：
+
+- 删除已打开文件后，对应干净 tab 自动关闭。
+- 删除包含已打开文件的目录后，目录内干净 tab 自动关闭。
+- 删除脏文件后，不强制丢内容，弹出未保存确认。
+- 重命名已打开文件后，编辑器 tab 路径同步更新，或明确关闭/重新打开策略。
+- AI 工具删除/重命名文件与 UI 侧边栏行为一致。
+- 重复收到文件删除事件时逻辑幂等，不崩溃、不重复弹窗。
+
+建议验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
+```
+
+建议补充测试：
+
+- 删除已打开单文件。
+- 删除包含多个已打开文件的目录。
+- 删除脏文件。
+- 重命名已打开文件。
+- AI 工具删除同一文件。
+- 文件树事件重复到达。
+
+回滚策略：
+
+- 保留现有 `IFileOperations` 行为。
+- 新协调器只接管用户项目文件操作，不接管缓存、日志、runtime 清理。
+- 如果新链路出现问题，可临时让具体入口回退到旧实现。
+
+### 迭代二：清理编辑器/LSP 阻塞点
+
+优先级：P0
+
+目标：
+
+- 移除 LSP 连接链路中的同步阻塞。
+- 避免补全、诊断、光标交互、文件打开过程被 `runBlocking` 或 `Thread.sleep` 放大延迟。
+
+任务：
+
+- 审查 `RemoteLspConnectionProvider` 的 `runBlocking` 调用。
+- 审查 `PluginLspConnectionProvider` 的 `runBlocking` 调用。
+- 将连接探测改为 `suspend` + timeout。
+- 将固定 `Thread.sleep(...)` 改为 coroutine `delay(...)` 或明确后台线程等待策略。
+- 对确实运行在专用后台线程的 sleep 保留注释，说明不会阻塞 UI 和编辑器交互。
+
+验收标准：
+
+- LSP 连接失败时不会卡住 UI。
+- LSP 连接超时有明确时间上限。
+- 补全请求不会因连接探测同步阻塞而明显延迟。
+- 相关单元测试可稳定运行，不依赖真实 sleep。
+
+建议验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "*Lsp*" --console=plain
+```
+
+如测试范围过大，先运行具体新增测试类。
+
+回滚策略：
+
+- 保留旧连接流程接口。
+- 新 suspend 实现通过小范围适配接入，不一次性改完整 LSP 架构。
+
+### 迭代三：主工作区装配参数分组
+
+优先级：P1
+
+目标：
+
+- 降低 `MainActivityScreenHost` 参数数量。
+- 让主工作区依赖按职责分组，减少后续改动冲突。
+
+任务：
+
+- 按职责引入轻量参数对象：
+  - `MainActivityViewModels`
+  - `MainActivityServices`
+  - `MainActivityBridges`
+  - `MainActivityDelegates`
+  - `MainActivityRuntimeState`
+- 保持对象只做分组，不放业务逻辑。
+- 每次只迁移一组参数，避免大规模改动。
+
+验收标准：
+
+- `MainActivityScreenHost` 顶层参数明显减少。
+- 参数对象职责清晰，不变成新的“大杂烩”。
+- 原有主界面行为不变。
+- 代码 review 时能快速判断新增依赖应该放在哪个分组。
+
+建议验证：
+
+```powershell
+.\gradlew :app:compileArm64DebugKotlin --console=plain
+```
+
+回滚策略：
+
+- 参数对象是纯结构调整，可按提交回滚。
+- 不修改业务状态流，降低行为回归风险。
+
+### 迭代四：拆分高复杂度状态类和 UI 文件
+
+优先级：P1
+
+目标：
+
+- 降低编辑器、LSP、构建、PRoot、插件设置等热点文件复杂度。
+- 每次只抽一个稳定职责，不做目录级大迁移。
+
+推荐拆分顺序：
+
+1. `EditorContainerState`
+   - tab 生命周期。
+   - split editor 状态。
+   - 文件删除/重命名响应。
+   - session 持久化。
+2. `LspEditorManager`
+   - LSP session routing。
+   - 文档同步。
+   - completion/diagnostic 分发。
+3. `TinaCodeEditorPage`
+   - 编辑器主体。
+   - 顶部/底部状态区域。
+   - overlay/menu/selection 相关 UI。
+4. `NativeCMakeBuildExecutor`
+   - 命令构造。
+   - 环境变量。
+   - 进程执行。
+   - 日志解析。
+5. `PRootManager`
+   - 安装/校验。
+   - 启动参数。
+   - runtime 状态检查。
+
+验收标准：
+
+- 每次拆分后原有测试通过。
+- 新类有明确单一职责。
+- 不增加新的跨层依赖。
+- 文件变小但调用关系更清晰，而不是简单搬代码。
+
+建议验证：
+
+```powershell
+.\gradlew :app:compileArm64DebugKotlin --console=plain
+```
+
+涉及 core 模块时运行对应模块测试或编译任务。
+
+回滚策略：
+
+- 每次只拆一个职责点。
+- 每个拆分点单独提交，方便按提交回滚。
+
+### 迭代五：维护性检查自动化
+
+优先级：P2
+
+目标：
+
+- 把容易反复出现的问题变成可检查项。
+
+任务：
+
+- 增强 i18n 检查，覆盖 Toast、Dialog、Snackbar、用户可见状态文案。
+- 测试代码逐步从 `runBlocking` / `Thread.sleep` 迁移到 `runTest`。
+- 整理 `settings.gradle.kts` 中 task-based include 逻辑，增加注释或改为显式 Gradle property。
+- 建立“直接文件操作扫描”检查，避免用户项目文件再次绕过统一链路。
+
+验收标准：
+
+- 新增用户可见文案能被 i18n 检查发现。
+- 新增直接 `delete()`、`deleteRecursively()`、`renameTo()` 的用户项目文件操作需要 review 说明。
+- task-based include 逻辑有清晰注释或显式开关。
+
+建议验证：
+
+```powershell
+py tools/i18n/check_all.py
+```
+
+```powershell
+rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
+```
+
+## 5. 推荐执行顺序
+
+1. 统一项目文件操作事件链路。
+2. 清理编辑器/LSP 阻塞点。
+3. 主工作区装配参数分组。
+4. 按职责拆分高复杂度类。
+5. 增强维护性检查自动化。
+
+## 6. 设计边界
+
+- 优先小步重构，不做一次性大改。
+- 优先复用现有 `IFileOperations`、`EditorContainerState`、`LspEditorManager`、`ProjectPaths` 等已有能力。
+- 不把业务逻辑继续上移到 `app` 层。
+- 不为当前没有明确需求的能力提前设计复杂框架。
+- 每个迭代都必须有可运行的验证命令。
+
+## 7. 推进记录
+
+### 2026-06-17
+
+- 已推进 P0-1：用户项目文件操作事件链路。
+  - 侧栏删除、重命名改为复用 `IFileOperations`，避免 UI 入口直接调用 `delete()` / `renameTo()` 后遗漏编辑器同步。
+  - `FileChangeListener` 增加重命名事件，`FileManager` 的重命名/移动事件不再退化为 delete + create。
+  - 编辑器支持删除文件/目录时关闭受影响 tab；脏 tab 触发未保存确认；目录删除覆盖子文件。
+  - 编辑器支持重命名/移动文件或目录后 retarget 已打开 tab、底层 session、recent files 与 LSP 绑定。
+  - AI 文件删除/移动集成回调改为委托 `IFileOperations`，并保留编辑器同步兜底。
+  - 新增/扩展 `EditorContainerStateTest` 与 `FileSystemCallbacksImplTest` 覆盖删除、目录删除、脏 tab、重命名/移动和 AI 委托链路。
+- 已推进 P0-2 的低风险部分：LSP/运行时等待点。
+  - `NativeClangdConnectionProvider` 的启动探测从固定 `Thread.sleep` 改为 `Process.waitFor(timeout)`。
+  - `PRootManager` 的退出等待从手动 sleep 轮询改为 `Process.waitFor(timeout)`。
+  - `RemoteLspConnectionProvider.start()` 与 `PluginLspConnectionProvider` 的同步探测当前经 `LspEditorManager` 在 `Dispatchers.IO` 内调用，暂不做接口级大改。
+- 本轮验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
+- 已推进 P1-1：主工作区装配参数分组。
+  - 新增 `MainActivityContentViewModels`、`MainActivityContentServices`、`MainActivityContentBridges`、`MainActivityContentDelegates`、`MainActivityExternalFileActions` 作为纯参数对象。
+  - `installMainActivityContent` 和 `MainActivityScreenHost` 改为按职责接收参数分组，降低顶层参数数量。
+  - 参数对象只做装配分组，不承载业务逻辑，不改变原有状态流、回调流和 UI 行为。
+  - 参数对象在 `setContent` 外创建，避免 Compose 重组时重复创建依赖分组。
+- 本轮补充验证：
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
