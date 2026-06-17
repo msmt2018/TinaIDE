@@ -353,7 +353,7 @@ class EditorContainerState(
         attachedCodeEditorTabIdsProvider = { codeEditorCallbacks.keys.toSet() },
         openTabsProvider = { tabs },
     )
-    private var pendingSaveAllNotificationTargets: List<ActiveSaveTarget> = emptyList()
+    private val saveAllNotificationTracker = EditorSaveAllNotificationTracker()
 
     private val lspUiState = EditorLspUiState()
     private val diagnosticsState = EditorDiagnosticsState(
@@ -1232,28 +1232,12 @@ class EditorContainerState(
     }
 
     internal fun rememberDirtyTabsForSaveAllNotification() {
-        pendingSaveAllNotificationTargets = tabs
-            .asSequence()
-            .filter { it.isDirty }
-            .map { tab ->
-                ActiveSaveTarget(
-                    tabId = tab.id,
-                    file = tab.file
-                )
-            }
-            .toList()
+        saveAllNotificationTracker.rememberDirtyTabs(tabs)
     }
 
     internal fun resolveSuccessfulSaveAllNotificationTargets(
         results: List<SaveResult>
-    ): List<ActiveSaveTarget> {
-        val targets = pendingSaveAllNotificationTargets
-        pendingSaveAllNotificationTargets = emptyList()
-        if (targets.isEmpty() || results.isEmpty()) return emptyList()
-        return targets.zip(results).mapNotNull { (target, result) ->
-            target.takeIf { result is SaveResult.Success }
-        }
-    }
+    ): List<ActiveSaveTarget> = saveAllNotificationTracker.resolveSuccessfulTargets(results)
 
     internal fun notifySuccessfulSaveAllResults(
         results: List<SaveResult>,

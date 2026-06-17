@@ -339,6 +339,21 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 
 结果：`BUILD SUCCESSFUL`。
 
+### 2026-06-17 补充：P1-2 第九步
+
+- 已推进 P1-2 的第九步：收口 Save All 成功通知追踪职责。
+  - 新增 `EditorSaveAllNotificationTracker`，集中维护 save-all 前的 dirty tab 快照和保存结果到成功通知目标的映射。
+  - `EditorContainerState` 保留 `rememberDirtyTabsForSaveAllNotification()`、`resolveSuccessfulSaveAllNotificationTargets(...)` 和 `notifySuccessfulSaveAllResults(...)` 对外入口，内部委托追踪器。
+  - `EditorContainerState` 仍负责真正触发 `notifyFileSaved(...)`，避免把插件保存事件分发和 LSP 保存通知语义搬入追踪类。
+  - 本步不改变 save-all 结果顺序匹配、失败结果过滤和保存成功通知策略。
+- 本轮补充验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
 ### 2026-06-17 补充：P1-2 第八步
 
 - 已推进 P1-2 的第八步：收口 LSP UI 状态职责。
