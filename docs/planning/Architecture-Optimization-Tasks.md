@@ -318,6 +318,20 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 
 ## 7. 推进记录
 
+### 2026-06-17 补充：P1-2 第十二步
+
+- 已推进 P1-2 的第十二步：收口 `LspEditorManager` 的 tab 请求跟踪职责。
+  - 新增 `LspTabRequestTracker`，集中维护 tab 请求 generation、inflight `CompletableFuture` 注册/移除、tab 请求 ticket 有效性校验和全量 drain 清理。
+  - `LspEditorManager` 保留原有请求创建、有效性判断和等待入口，内部改为委托 tracker；不改 LSP 请求发起、超时、取消、completion/semantic tokens/navigation 行为。
+  - 新增 `LspTabRequestTrackerTest`，覆盖请求失效、inflight 归还、untrack 清理、URI/连接状态校验和 drain 清理。
+  - 本步不调整 LSP session routing、provider attach、协议请求参数和 UI 状态分发策略。
+- 本轮补充验证：
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.LspTabRequestTrackerTest" --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.LspRoutingSupportTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
 ### 2026-06-17
 
 - 已推进 P0-1：用户项目文件操作事件链路。
