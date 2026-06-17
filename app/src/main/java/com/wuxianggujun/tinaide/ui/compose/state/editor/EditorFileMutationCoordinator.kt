@@ -20,9 +20,7 @@ internal class EditorFileMutationCoordinator(
     private val tabs: SnapshotStateList<EditorTabState>,
     private val navigationBackStack: SnapshotStateList<EditorContainerState.NavigationHistoryEntry>,
     private val navigationForwardStack: SnapshotStateList<EditorContainerState.NavigationHistoryEntry>,
-    private val tabPaneMap: MutableMap<String, EditorContainerState.EditorPaneId>,
-    private val mirroredTabIdsByPane: MutableMap<EditorContainerState.EditorPaneId, Set<String>>,
-    private val activeTabIdByPane: MutableMap<EditorContainerState.EditorPaneId, String>,
+    private val splitPaneState: EditorSplitPaneState,
     private val codeEditorCallbacks: MutableMap<String, EditorContainerState.CodeEditorCallback>,
     private val codeEditorRuntimesByTabId: MutableMap<String, EditorContainerState.CodeEditorRuntime>,
     private val lspStatusesByTabId: MutableMap<String, EditorStatus>,
@@ -98,27 +96,11 @@ internal class EditorFileMutationCoordinator(
         if (idMap.isEmpty()) return
 
         idMap.forEach { (oldId, newId) ->
-            tabPaneMap.remove(oldId)?.let { pane -> tabPaneMap[newId] = pane }
             codeEditorCallbacks.remove(oldId)?.let { callback -> codeEditorCallbacks[newId] = callback }
             codeEditorRuntimesByTabId.remove(oldId)?.let { runtime -> codeEditorRuntimesByTabId[newId] = runtime }
             lspStatusesByTabId.remove(oldId)?.let { status -> lspStatusesByTabId[newId] = status }
         }
-
-        mirroredTabIdsByPane.keys.toList().forEach { pane ->
-            val updated = mirroredTabIdsByPane[pane]
-                .orEmpty()
-                .mapTo(linkedSetOf()) { tabId -> idMap[tabId] ?: tabId }
-            if (updated.isEmpty()) {
-                mirroredTabIdsByPane.remove(pane)
-            } else {
-                mirroredTabIdsByPane[pane] = updated
-            }
-        }
-
-        activeTabIdByPane.keys.toList().forEach { pane ->
-            val activeTabId = activeTabIdByPane[pane] ?: return@forEach
-            idMap[activeTabId]?.let { activeTabIdByPane[pane] = it }
-        }
+        splitPaneState.remapTabIds(idMap)
     }
 
     private fun retargetNavigationHistory(oldPath: File, newPath: File) {

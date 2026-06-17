@@ -347,9 +347,7 @@ class EditorContainerState(
     private val codeEditorCallbacks = mutableMapOf<String, CodeEditorCallback>()
     private val codeEditorRuntimesByTabId =
         java.util.LinkedHashMap<String, CodeEditorRuntime>(16, 0.75f, true)
-    private val tabPaneMap = mutableStateMapOf<String, EditorPaneId>()
-    private val mirroredTabIdsByPane = mutableStateMapOf<EditorPaneId, Set<String>>()
-    private val activeTabIdByPane = mutableStateMapOf<EditorPaneId, String>()
+    private val splitPaneState = EditorSplitPaneState()
     private var pendingSaveAllNotificationTargets: List<ActiveSaveTarget> = emptyList()
     private var pluginLspDependencyAlertSequence: Long = 0L
 
@@ -384,9 +382,7 @@ class EditorContainerState(
         tabs = tabManager.tabs,
         navigationBackStack = navigationHistoryManager.backStack,
         navigationForwardStack = navigationHistoryManager.forwardStack,
-        tabPaneMap = tabPaneMap,
-        mirroredTabIdsByPane = mirroredTabIdsByPane,
-        activeTabIdByPane = activeTabIdByPane,
+        splitPaneState = splitPaneState,
         codeEditorCallbacks = codeEditorCallbacks,
         codeEditorRuntimesByTabId = codeEditorRuntimesByTabId,
         lspStatusesByTabId = lspStatusesByTabId,
@@ -433,13 +429,7 @@ class EditorContainerState(
                 lspEditorManager.releaseLspEditor(tabId)
                 lspStatusesByTabId.remove(tabId)
             }
-            tabPaneMap.remove(tabId)
-            removeMirroredTabId(tabId)
-            activeTabIdByPane
-                .filterValues { it == tabId }
-                .keys
-                .toList()
-                .forEach(activeTabIdByPane::remove)
+            splitPaneState.removeTab(tabId)
             normalizeEditorPaneState()
             codeEditorCallbacks.remove(tabId)
             searchStateManager.cleanupForTab(tabId)
@@ -844,7 +834,7 @@ class EditorContainerState(
             addAll(protectedTabIds)
             getActiveTabId()?.let(::add)
             if (isSplitEditorEnabled) {
-                activeTabIdByPane.values.forEach(::add)
+                splitPaneState.activeTabIds.forEach(::add)
             }
             codeEditorCallbacks.keys.forEach(::add)
         }
@@ -1231,13 +1221,7 @@ class EditorContainerState(
         if (closedTabId != null && tabs.none { it.id == closedTabId }) {
             releaseTinaLspForTab(closedTabId)
             clearCodeEditorRuntime(closedTabId)
-            tabPaneMap.remove(closedTabId)
-            removeMirroredTabId(closedTabId)
-            activeTabIdByPane
-                .filterValues { it == closedTabId }
-                .keys
-                .toList()
-                .forEach(activeTabIdByPane::remove)
+            splitPaneState.removeTab(closedTabId)
         }
         normalizeEditorPaneState()
         persistSplitEditorState()
@@ -1317,16 +1301,9 @@ class EditorContainerState(
             releaseTinaLspForTab(tabId)
             clearCodeEditorRuntime(tabId)
         }
-        tabPaneMap.keys
-            .filter { it != keptTabId }
-            .toList()
-            .forEach(tabPaneMap::remove)
-        removeMirroredTabsExcept(keptTabId)
         val keptPane = resolvePaneForTab(keptTabId)
-        activeTabIdByPane.keys
-            .filter { it != keptPane }
-            .toList()
-            .forEach(activeTabIdByPane::remove)
+        splitPaneState.removeTabsExcept(keptTabId)
+        splitPaneState.removeActiveTabsExceptPane(keptPane)
         normalizeEditorPaneState(preferredActiveTabId = keptTabId)
         persistSplitEditorState()
         return true
@@ -1346,9 +1323,7 @@ class EditorContainerState(
             releaseTinaLspForTab(tabId)
             clearCodeEditorRuntime(tabId)
         }
-        tabPaneMap.clear()
-        mirroredTabIdsByPane.clear()
-        activeTabIdByPane.clear()
+        splitPaneState.clear()
         isSplitEditorEnabled = false
         focusedPane = EditorPaneId.PRIMARY
         persistSplitEditorState()
@@ -1495,10 +1470,10 @@ class EditorContainerState(
             val pane = if (isSplitEditorEnabled) resolvePaneForTab(tab.id) else EditorPaneId.PRIMARY
             normalizeOpenTabLookupPath(tab.file.absolutePath) to pane
         }
-        val mirroredPaths = mirroredTabIdsByPane.mapValues { (_, tabIds) ->
+        val mirroredPaths = splitPaneState.mirroredTabIdsByPane().mapValues { (_, tabIds) ->
             tabIds.mapNotNullTo(linkedSetOf()) { tabId -> pathByTabId[tabId] }
         }.filterValues { it.isNotEmpty() }
-        val activePaths = activeTabIdByPane.mapNotNull { (pane, tabId) ->
+        val activePaths = splitPaneState.activeTabIdsByPane().mapNotNull { (pane, tabId) ->
             pathByTabId[tabId]?.let { path -> pane to path }
         }.toMap()
 
@@ -1520,20 +1495,19 @@ class EditorContainerState(
             normalizeOpenTabLookupPath(path)
         }
 
-        tabPaneMap.clear()
-        mirroredTabIdsByPane.clear()
-        activeTabIdByPane.clear()
+        splitPaneState.clear()
         splitEditorLayout = normalized.layout
         splitEditorPrimaryRatio = normalized.primaryRatio
         isSplitEditorEnabled = normalized.isEnabled && tabs.isNotEmpty()
 
         tabs.forEach { tab ->
             val path = normalizeOpenTabLookupPath(tab.file.absolutePath)
-            tabPaneMap[tab.id] = if (isSplitEditorEnabled) {
+            val pane = if (isSplitEditorEnabled) {
                 paneAssignmentsByPath[path] ?: EditorPaneId.PRIMARY
             } else {
                 EditorPaneId.PRIMARY
             }
+            splitPaneState.setPane(tab.id, pane)
         }
 
         if (isSplitEditorEnabled) {
@@ -1542,13 +1516,19 @@ class EditorContainerState(
                     tabIdByPath[normalizeOpenTabLookupPath(path)]
                 }
                 if (mirroredTabIds.isNotEmpty()) {
-                    mirroredTabIdsByPane[pane] = mirroredTabIds
+                    mirroredTabIds.forEach { tabId ->
+                        splitPaneState.addMirroredTabToPane(
+                            pane = pane,
+                            tabId = tabId,
+                            ownerPane = resolvePaneForTab(tabId),
+                        )
+                    }
                 }
             }
 
             normalized.activeFilePathByPane.forEach { (pane, path) ->
                 tabIdByPath[normalizeOpenTabLookupPath(path)]?.let { tabId ->
-                    activeTabIdByPane[pane] = tabId
+                    splitPaneState.setActiveTabId(pane, tabId)
                 }
             }
         }
@@ -1558,7 +1538,7 @@ class EditorContainerState(
         } else {
             EditorPaneId.PRIMARY
         }
-        normalizeEditorPaneState(preferredActiveTabId = activeTabIdByPane[focusedPane])
+        normalizeEditorPaneState(preferredActiveTabId = splitPaneState.activeTabId(focusedPane))
     }
 
     private fun persistSplitEditorState() {
@@ -1570,9 +1550,7 @@ class EditorContainerState(
     }
 
     private fun clearSplitEditorStateInMemory() {
-        tabPaneMap.clear()
-        mirroredTabIdsByPane.clear()
-        activeTabIdByPane.clear()
+        splitPaneState.clear()
         isSplitEditorEnabled = false
         focusedPane = EditorPaneId.PRIMARY
         splitEditorPrimaryRatio = DEFAULT_SPLIT_EDITOR_PRIMARY_RATIO
@@ -1582,7 +1560,7 @@ class EditorContainerState(
     fun getTabsForPane(pane: EditorPaneId): List<EditorTabState> = getTabsForPaneInternal(pane)
 
     fun getActiveIndexForPane(pane: EditorPaneId): Int {
-        val activeTabId = activeTabIdByPane[pane]
+        val activeTabId = splitPaneState.activeTabId(pane)
         val activeIndex = activeTabId?.let { id -> tabs.indexOfFirst { it.id == id } } ?: -1
         if (activeIndex >= 0 && isTabVisibleInPane(activeTabId!!, pane)) return activeIndex
         return tabs.indexOfFirst { isTabVisibleInPane(it.id, pane) }
@@ -1607,9 +1585,9 @@ class EditorContainerState(
         }
         focusedPane = targetPane
         if (!isTabMirroredToPane(tab.id, targetPane)) {
-            tabPaneMap[tab.id] = targetPane
+            splitPaneState.setPane(tab.id, targetPane)
         }
-        activeTabIdByPane[targetPane] = tab.id
+        splitPaneState.setActiveTabId(targetPane, tab.id)
         tabManager.selectTab(index)
         normalizeEditorPaneState(preferredActiveTabId = tab.id)
         persistSplitEditorState()
@@ -1638,12 +1616,10 @@ class EditorContainerState(
             isSplitEditorEnabled = true
             if (tabs.isNotEmpty()) {
                 val activeTab = getActiveTab()
-                tabs.forEach { tab ->
-                    tabPaneMap.putIfAbsent(tab.id, EditorPaneId.PRIMARY)
-                }
+                splitPaneState.ensurePaneForTabs(tabs.map { it.id }, EditorPaneId.PRIMARY)
                 activeTab?.let {
                     focusedPane = EditorPaneId.PRIMARY
-                    activeTabIdByPane[EditorPaneId.PRIMARY] = it.id
+                    splitPaneState.setActiveTabId(EditorPaneId.PRIMARY, it.id)
                 }
             }
             normalizeEditorPaneState()
@@ -1653,10 +1629,10 @@ class EditorContainerState(
 
     fun closeSecondaryPane() {
         val activeTabId = getActiveTabId()
-        tabPaneMap.keys.toList().forEach { tabPaneMap[it] = EditorPaneId.PRIMARY }
-        mirroredTabIdsByPane.clear()
-        activeTabIdByPane.clear()
-        activeTabId?.let { activeTabIdByPane[EditorPaneId.PRIMARY] = it }
+        splitPaneState.moveAllTabsToPane(EditorPaneId.PRIMARY)
+        splitPaneState.clearMirrors()
+        splitPaneState.clearActiveTabs()
+        activeTabId?.let { splitPaneState.setActiveTabId(EditorPaneId.PRIMARY, it) }
         isSplitEditorEnabled = false
         focusedPane = EditorPaneId.PRIMARY
         normalizeEditorPaneState(preferredActiveTabId = activeTabId)
@@ -1674,9 +1650,9 @@ class EditorContainerState(
             return false
         }
         isSplitEditorEnabled = true
-        removeMirroredTabId(activeTab.id)
-        tabPaneMap[activeTab.id] = EditorPaneId.SECONDARY
-        activeTabIdByPane[EditorPaneId.SECONDARY] = activeTab.id
+        splitPaneState.removeMirroredTabId(activeTab.id)
+        splitPaneState.setPane(activeTab.id, EditorPaneId.SECONDARY)
+        splitPaneState.setActiveTabId(EditorPaneId.SECONDARY, activeTab.id)
         focusedPane = EditorPaneId.SECONDARY
         normalizeEditorPaneState(preferredActiveTabId = activeTab.id)
         tabManager.findTabIndex(activeTab.id)
@@ -1698,10 +1674,10 @@ class EditorContainerState(
         }
         isSplitEditorEnabled = true
         val ownerPane = resolvePaneForTab(activeTab.id)
-        tabPaneMap.putIfAbsent(activeTab.id, ownerPane)
-        addMirroredTabToPane(EditorPaneId.SECONDARY, activeTab.id)
-        activeTabIdByPane[ownerPane] = activeTab.id
-        activeTabIdByPane[EditorPaneId.SECONDARY] = activeTab.id
+        splitPaneState.setPaneIfAbsent(activeTab.id, ownerPane)
+        splitPaneState.addMirroredTabToPane(EditorPaneId.SECONDARY, activeTab.id, ownerPane)
+        splitPaneState.setActiveTabId(ownerPane, activeTab.id)
+        splitPaneState.setActiveTabId(EditorPaneId.SECONDARY, activeTab.id)
         focusedPane = EditorPaneId.SECONDARY
         normalizeEditorPaneState(preferredActiveTabId = activeTab.id)
         tabManager.findTabIndex(activeTab.id)
@@ -1714,8 +1690,8 @@ class EditorContainerState(
     private fun assignOpenedTabToFocusedPane(openedIndex: Int) {
         val openedTab = tabs.getOrNull(openedIndex) ?: return
         val targetPane = if (isSplitEditorEnabled) focusedPane else EditorPaneId.PRIMARY
-        tabPaneMap[openedTab.id] = targetPane
-        activeTabIdByPane[targetPane] = openedTab.id
+        splitPaneState.setPane(openedTab.id, targetPane)
+        splitPaneState.setActiveTabId(targetPane, openedTab.id)
         focusedPane = targetPane
         normalizeEditorPaneState(preferredActiveTabId = openedTab.id)
         persistSplitEditorState()
@@ -1734,39 +1710,29 @@ class EditorContainerState(
             resolvePaneForTab(openedTab.id)
         }
         focusedPane = targetPane
-        activeTabIdByPane[targetPane] = openedTab.id
+        splitPaneState.setActiveTabId(targetPane, openedTab.id)
         normalizeEditorPaneState(preferredActiveTabId = openedTab.id)
         persistSplitEditorState()
     }
 
     private fun normalizeEditorPaneState(preferredActiveTabId: String? = getActiveTabId()) {
         val liveTabIds = tabs.map { it.id }.toSet()
-        tabPaneMap.keys
-            .filter { it !in liveTabIds }
-            .toList()
-            .forEach(tabPaneMap::remove)
-        pruneMirroredTabs(liveTabIds)
-        activeTabIdByPane
-            .filterValues { it !in liveTabIds }
-            .keys
-            .toList()
-            .forEach(activeTabIdByPane::remove)
+        splitPaneState.removeMissingTabs(liveTabIds)
+        splitPaneState.pruneMirroredTabs(liveTabIds, ::resolvePaneForTab)
 
-        tabs.forEach { tab ->
-            tabPaneMap.putIfAbsent(tab.id, EditorPaneId.PRIMARY)
-        }
+        splitPaneState.ensurePaneForTabs(tabs.map { it.id }, EditorPaneId.PRIMARY)
 
         if (!isSplitEditorEnabled) {
-            tabPaneMap.keys.toList().forEach { tabPaneMap[it] = EditorPaneId.PRIMARY }
-            mirroredTabIdsByPane.clear()
+            splitPaneState.moveAllTabsToPane(EditorPaneId.PRIMARY)
+            splitPaneState.clearMirrors()
             focusedPane = EditorPaneId.PRIMARY
         }
 
         EditorPaneId.values().forEach { pane ->
-            val activeTabId = activeTabIdByPane[pane]
+            val activeTabId = splitPaneState.activeTabId(pane)
             if (activeTabId == null || activeTabId !in liveTabIds || !isTabVisibleInPane(activeTabId, pane)) {
-                getTabsForPaneInternal(pane).firstOrNull()?.let { activeTabIdByPane[pane] = it.id }
-                    ?: activeTabIdByPane.remove(pane)
+                getTabsForPaneInternal(pane).firstOrNull()?.let { splitPaneState.setActiveTabId(pane, it.id) }
+                    ?: splitPaneState.removeActiveTab(pane)
             }
         }
 
@@ -1778,7 +1744,7 @@ class EditorContainerState(
 
         val targetTabId = preferredActiveTabId
             ?.takeIf { it in liveTabIds && isTabVisibleInPane(it, focusedPane) }
-            ?: activeTabIdByPane[focusedPane]
+            ?: splitPaneState.activeTabId(focusedPane)
             ?: tabs.firstOrNull()?.id
             ?: return
         val targetIndex = tabs.indexOfFirst { it.id == targetTabId }
@@ -1791,55 +1757,11 @@ class EditorContainerState(
 
     private fun isTabVisibleInPane(tabId: String, pane: EditorPaneId): Boolean = resolvePaneForTab(tabId) == pane || isTabMirroredToPane(tabId, pane)
 
-    private fun isTabMirroredToPane(tabId: String, pane: EditorPaneId): Boolean = isSplitEditorEnabled && mirroredTabIdsByPane[pane]?.contains(tabId) == true
+    private fun isTabMirroredToPane(tabId: String, pane: EditorPaneId): Boolean =
+        splitPaneState.isMirroredToPane(tabId, pane, isSplitEditorEnabled)
 
-    private fun addMirroredTabToPane(pane: EditorPaneId, tabId: String) {
-        if (resolvePaneForTab(tabId) == pane) return
-        mirroredTabIdsByPane[pane] = mirroredTabIdsByPane[pane].orEmpty() + tabId
-    }
-
-    private fun removeMirroredTabId(tabId: String) {
-        mirroredTabIdsByPane.keys.toList().forEach { pane ->
-            val updated = mirroredTabIdsByPane[pane].orEmpty() - tabId
-            if (updated.isEmpty()) {
-                mirroredTabIdsByPane.remove(pane)
-            } else {
-                mirroredTabIdsByPane[pane] = updated
-            }
-        }
-    }
-
-    private fun removeMirroredTabsExcept(keptTabId: String) {
-        mirroredTabIdsByPane.keys.toList().forEach { pane ->
-            val updated = mirroredTabIdsByPane[pane].orEmpty().filterTo(linkedSetOf()) { it == keptTabId }
-            if (updated.isEmpty()) {
-                mirroredTabIdsByPane.remove(pane)
-            } else {
-                mirroredTabIdsByPane[pane] = updated
-            }
-        }
-    }
-
-    private fun pruneMirroredTabs(liveTabIds: Set<String>) {
-        mirroredTabIdsByPane.keys.toList().forEach { pane ->
-            val updated = mirroredTabIdsByPane[pane]
-                .orEmpty()
-                .filterTo(linkedSetOf()) { tabId ->
-                    tabId in liveTabIds && resolvePaneForTab(tabId) != pane
-                }
-            if (updated.isEmpty()) {
-                mirroredTabIdsByPane.remove(pane)
-            } else {
-                mirroredTabIdsByPane[pane] = updated
-            }
-        }
-    }
-
-    private fun resolvePaneForTab(tabId: String): EditorPaneId = if (isSplitEditorEnabled) {
-        tabPaneMap[tabId] ?: EditorPaneId.PRIMARY
-    } else {
-        EditorPaneId.PRIMARY
-    }
+    private fun resolvePaneForTab(tabId: String): EditorPaneId =
+        splitPaneState.paneFor(tabId, isSplitEditorEnabled)
 
     private fun getActiveTab(): EditorTabState? = tabManager.getActiveTab()
 

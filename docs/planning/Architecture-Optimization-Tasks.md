@@ -339,6 +339,21 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 
 结果：`BUILD SUCCESSFUL`。
 
+### 2026-06-17 补充：P1-2 第四步
+
+- 已推进 P1-2 的第四步：收口 split editor 的 pane/mirror/active tab 基础状态维护。
+  - 新增 `EditorSplitPaneState`，集中维护 tab 所属 pane、镜像 tab、pane active tab 三组 Compose state map。
+  - `EditorContainerState` 保留 split editor 的业务动作编排，只通过 `EditorSplitPaneState` 读写底层 pane 状态。
+  - `EditorFileMutationCoordinator` 不再直接持有三组 pane map，文件移动/重命名后的 tab id remap 改为委托给 `EditorSplitPaneState`。
+  - 本步不改变 split editor UI、tab 选择、镜像打开、关闭 pane、关闭 tab 和文件 mutation 行为。
+- 本轮补充验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
 - 已推进 P1-2 的第二步：拆分 `EditorContainerState` 中的导航历史职责。
   - 新增 `EditorNavigationHistoryManager`，集中维护 back/forward 栈、跳转去重、历史长度限制和前进/后退逻辑。
   - `EditorContainerState` 只提供当前导航位置和打开目标位置两个回调，减少主状态类对导航栈细节的直接维护。
