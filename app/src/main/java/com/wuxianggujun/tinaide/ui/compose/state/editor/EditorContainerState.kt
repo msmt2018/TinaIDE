@@ -7,11 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -356,15 +354,15 @@ class EditorContainerState(
         openTabsProvider = { tabs },
     )
     private var pendingSaveAllNotificationTargets: List<ActiveSaveTarget> = emptyList()
-    private var pluginLspDependencyAlertSequence: Long = 0L
 
-    private val lspStatusesByTabId = mutableStateMapOf<String, EditorStatus>()
+    private val lspUiState = EditorLspUiState()
     private val diagnosticsState = EditorDiagnosticsState(
         filePathNormalizer = ::fileToNormalizedPath,
         fileUriNormalizer = ::fileUriToNormalizedPath,
     )
-    var pluginLspDependencyAlert by mutableStateOf<PluginLspDependencyAlert?>(null)
-        private set
+    val pluginLspDependencyAlert: PluginLspDependencyAlert?
+        get() = lspUiState.pluginDependencyAlert
+
     private val tabLifecycleCoordinator = EditorTabLifecycleCoordinator(
         splitPaneState = splitPaneState,
         isCodeEditableType = ::isCodeEditableType,
@@ -404,7 +402,7 @@ class EditorContainerState(
         splitPaneState = splitPaneState,
         codeRuntimeCache = codeRuntimeCache,
         codeEditorCallbacks = codeEditorCallbacks,
-        lspStatusesByTabId = lspStatusesByTabId,
+        lspUiState = lspUiState,
         diagnosticsState = diagnosticsState,
         isCodeEditableType = ::isCodeEditableType,
         requestCloseTabAt = ::requestCloseTab,
@@ -421,19 +419,9 @@ class EditorContainerState(
 
         lspEditorManager.onDiagnosticsChanged = diagnosticsState::handleDiagnosticsChanged
 
-        lspEditorManager.onLspStatusChanged = { tabId, status ->
-            lspStatusesByTabId[tabId] = status
-        }
+        lspEditorManager.onLspStatusChanged = lspUiState::handleStatusChanged
 
-        lspEditorManager.onPluginLspDependencyNotReady = { event ->
-            pluginLspDependencyAlertSequence += 1
-            pluginLspDependencyAlert = PluginLspDependencyAlert(
-                sequence = pluginLspDependencyAlertSequence,
-                pluginId = event.pluginId,
-                pluginName = event.pluginName,
-                message = event.message,
-            )
-        }
+        lspEditorManager.onPluginLspDependencyNotReady = lspUiState::handlePluginDependencyNotReady
 
         // 设置标签关闭回调，清理状态
         tabManager.onTabClosed = { tabId, contentType ->
@@ -452,9 +440,7 @@ class EditorContainerState(
     val lastOpenError: String? get() = tabManager.lastOpenError
 
     fun consumePluginLspDependencyAlert(): PluginLspDependencyAlert? {
-        val alert = pluginLspDependencyAlert
-        pluginLspDependencyAlert = null
-        return alert
+        return lspUiState.consumePluginDependencyAlert()
     }
 
     var isSplitEditorEnabled by mutableStateOf(false)
@@ -605,12 +591,10 @@ class EditorContainerState(
         else -> false
     }
 
-    internal fun getLspStatus(tabId: String): EditorStatus = lspStatusesByTabId[tabId] ?: EditorStatus.NoLsp
+    internal fun getLspStatus(tabId: String): EditorStatus = lspUiState.getStatus(tabId)
 
-    internal fun getLspStatusFlow(tabId: String): Flow<EditorStatus> = snapshotFlow {
-        lspStatusesByTabId[tabId] ?: EditorStatus.NoLsp
-    }
-        .distinctUntilChanged()
+    internal fun getLspStatusFlow(tabId: String): Flow<EditorStatus> =
+        lspUiState.getStatusFlow(tabId)
 
     internal fun getActiveLspStatus(): EditorStatus {
         val tab = getActiveTab() ?: return EditorStatus.NoLsp
@@ -1788,7 +1772,7 @@ class EditorContainerState(
 
     fun releaseTinaLspForTab(tabId: String) {
         lspEditorManager.releaseLspEditor(tabId)
-        lspStatusesByTabId.remove(tabId)
+        lspUiState.removeStatus(tabId)
     }
 
     fun notifyTinaTextChanged(tabId: String, change: TextChange) {
@@ -2014,6 +1998,7 @@ class EditorContainerState(
         codeEditorCallbacks.clear()
         codeRuntimeCache.release()
         navigationHistoryManager.clear()
+        lspUiState.clear()
         diagnosticsState.clear()
     }
 

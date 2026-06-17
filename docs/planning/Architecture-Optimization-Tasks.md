@@ -339,6 +339,21 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 
 结果：`BUILD SUCCESSFUL`。
 
+### 2026-06-17 补充：P1-2 第八步
+
+- 已推进 P1-2 的第八步：收口 LSP UI 状态职责。
+  - 新增 `EditorLspUiState`，集中维护 tab LSP status map、status flow、插件 LSP 依赖告警序号生成与消费。
+  - `EditorContainerState` 保留 `pluginLspDependencyAlert`、`consumePluginLspDependencyAlert()`、`getLspStatus(...)`、`getLspStatusFlow(...)` 等对外入口，内部委托 LSP UI 状态类。
+  - `EditorFileMutationCoordinator` 不再直接持有 LSP status map，文件移动/重命名后的 tab id remap 改为委托给 `EditorLspUiState`。
+  - 本步不改变 LSP 状态来源、底部状态展示、插件依赖告警展示和 LSP 释放策略。
+- 本轮补充验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
 ### 2026-06-17 补充：P1-2 第七步
 
 - 已推进 P1-2 的第七步：收口 LSP diagnostics 状态职责。

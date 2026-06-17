@@ -2,7 +2,6 @@ package com.wuxianggujun.tinaide.ui.compose.state.editor
 
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.wuxianggujun.tinaide.editor.IEditorManager
-import com.wuxianggujun.tinaide.ui.compose.components.EditorStatus
 import com.wuxianggujun.tinaide.ui.compose.components.editor.ContentType
 import com.wuxianggujun.tinaide.ui.compose.components.editor.EditorTabState
 import java.io.File
@@ -22,7 +21,7 @@ internal class EditorFileMutationCoordinator(
     private val splitPaneState: EditorSplitPaneState,
     private val codeRuntimeCache: EditorCodeRuntimeCache,
     private val codeEditorCallbacks: MutableMap<String, EditorContainerState.CodeEditorCallback>,
-    private val lspStatusesByTabId: MutableMap<String, EditorStatus>,
+    private val lspUiState: EditorLspUiState,
     private val diagnosticsState: EditorDiagnosticsState,
     private val isCodeEditableType: (ContentType) -> Boolean,
     private val requestCloseTabAt: (Int) -> Unit,
@@ -96,10 +95,10 @@ internal class EditorFileMutationCoordinator(
 
         idMap.forEach { (oldId, newId) ->
             codeEditorCallbacks.remove(oldId)?.let { callback -> codeEditorCallbacks[newId] = callback }
-            lspStatusesByTabId.remove(oldId)?.let { status -> lspStatusesByTabId[newId] = status }
         }
         splitPaneState.remapTabIds(idMap)
         codeRuntimeCache.remapTabIds(idMap)
+        lspUiState.remapTabIds(idMap)
     }
 
     private fun retargetNavigationHistory(oldPath: File, newPath: File) {

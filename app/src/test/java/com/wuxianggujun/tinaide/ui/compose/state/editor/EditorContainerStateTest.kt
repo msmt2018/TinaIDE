@@ -1780,12 +1780,11 @@ class EditorContainerStateTest {
         projectRootPathProvider = { context.cacheDir.absolutePath }
     )
 
-    @Suppress("UNCHECKED_CAST")
     private fun setLspStatus(tabId: String, status: EditorStatus) {
-        val field = EditorContainerState::class.java.getDeclaredField("lspStatusesByTabId")
+        val field = EditorContainerState::class.java.getDeclaredField("lspUiState")
         field.isAccessible = true
-        val statuses = field.get(state) as MutableMap<String, EditorStatus>
-        statuses[tabId] = status
+        val lspUiState = field.get(state) as EditorLspUiState
+        lspUiState.handleStatusChanged(tabId, status)
     }
 }
 
