@@ -339,6 +339,21 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 
 结果：`BUILD SUCCESSFUL`。
 
+### 2026-06-17 补充：P1-2 第五步
+
+- 已推进 P1-2 的第五步：收口 tab 生命周期清理职责。
+  - 新增 `EditorTabLifecycleCoordinator`，集中处理 tab 关闭后的 LSP 释放、CodeEditor runtime 清理、pane 状态清理、搜索状态清理和 peek panel 关闭。
+  - `EditorContainerState` 保留 tab 打开、选择、导航和 split editor 编排逻辑，不再在多个关闭入口重复散落资源释放代码。
+  - `syncFromManager`、`requestCloseTab`、`confirmSaveAndClose`、`confirmDiscardAndClose`、`closeOtherTabs`、`closeAllTabs` 改为委托生命周期协调器处理关闭后资源清理。
+  - 本步不改变 tab 关闭确认、脏文件保护、split pane 选择、LSP 路由和 editor runtime 缓存策略。
+- 本轮补充验证：
+
+```powershell
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
+```
+
+结果：`BUILD SUCCESSFUL`。
+
 ### 2026-06-17 补充：P1-2 第四步
 
 - 已推进 P1-2 的第四步：收口 split editor 的 pane/mirror/active tab 基础状态维护。

@@ -356,6 +356,16 @@ class EditorContainerState(
     private var diagnosticsObserver: ((fileUri: String, diagnostics: List<Diagnostic>) -> Unit)? = null
     var pluginLspDependencyAlert by mutableStateOf<PluginLspDependencyAlert?>(null)
         private set
+    private val tabLifecycleCoordinator = EditorTabLifecycleCoordinator(
+        splitPaneState = splitPaneState,
+        isCodeEditableType = ::isCodeEditableType,
+        releaseLspForTab = ::releaseTinaLspForTab,
+        clearCodeEditorRuntime = ::clearCodeEditorRuntime,
+        removeCodeEditorCallback = codeEditorCallbacks::remove,
+        cleanupSearchState = searchStateManager::cleanupForTab,
+        dismissPeekDefinitionPanel = ::dismissPeekDefinitionPanel,
+        normalizeEditorPaneState = { normalizeEditorPaneState() },
+    )
     private val navigationHistoryManager = EditorNavigationHistoryManager(
         currentLocationProvider = ::snapshotActiveNavigationLocationOrNull,
         openLocation = { target ->
@@ -425,15 +435,7 @@ class EditorContainerState(
 
         // 设置标签关闭回调，清理状态
         tabManager.onTabClosed = { tabId, contentType ->
-            if (contentType == ContentType.CODE || contentType == ContentType.JSON) {
-                lspEditorManager.releaseLspEditor(tabId)
-                lspStatusesByTabId.remove(tabId)
-            }
-            splitPaneState.removeTab(tabId)
-            normalizeEditorPaneState()
-            codeEditorCallbacks.remove(tabId)
-            searchStateManager.cleanupForTab(tabId)
-            dismissPeekDefinitionPanel(tabId)
+            tabLifecycleCoordinator.handleManagerTabClosed(tabId, contentType)
         }
     }
 
@@ -1146,10 +1148,7 @@ class EditorContainerState(
         val managerTabIds = managerTabs.map { it.id }.toSet()
         tabs.map { it.id }
             .filter { it !in managerTabIds }
-            .forEach { removedTabId ->
-                releaseTinaLspForTab(removedTabId)
-                clearCodeEditorRuntime(removedTabId)
-            }
+            .let { removedTabIds -> tabLifecycleCoordinator.releaseRemovedTabResources(removedTabIds) }
         tabManager.syncFromManager(managerTabs, activeTabId)
         normalizeEditorPaneState(preferredActiveTabId = activeTabId)
         restoreSplitEditorStateIfNeeded()
@@ -1219,9 +1218,7 @@ class EditorContainerState(
         val closedTabId = tabs.getOrNull(index)?.id
         tabManager.requestCloseTab(index)
         if (closedTabId != null && tabs.none { it.id == closedTabId }) {
-            releaseTinaLspForTab(closedTabId)
-            clearCodeEditorRuntime(closedTabId)
-            splitPaneState.removeTab(closedTabId)
+            tabLifecycleCoordinator.cleanupClosedTabState(closedTabId)
         }
         normalizeEditorPaneState()
         persistSplitEditorState()
@@ -1255,10 +1252,7 @@ class EditorContainerState(
         if (closed) {
             tabIdsBeforeClose
                 .filter { closedTabId -> tabs.none { it.id == closedTabId } }
-                .forEach { closedTabId ->
-                    releaseTinaLspForTab(closedTabId)
-                    clearCodeEditorRuntime(closedTabId)
-                }
+                .let { closedTabIds -> tabLifecycleCoordinator.releaseRemovedTabResources(closedTabIds) }
             normalizeEditorPaneState()
             persistSplitEditorState()
         }
@@ -1272,10 +1266,7 @@ class EditorContainerState(
         if (hadPendingClose) {
             tabIdsBeforeClose
                 .filter { closedTabId -> tabs.none { it.id == closedTabId } }
-                .forEach { closedTabId ->
-                    releaseTinaLspForTab(closedTabId)
-                    clearCodeEditorRuntime(closedTabId)
-                }
+                .let { closedTabIds -> tabLifecycleCoordinator.releaseRemovedTabResources(closedTabIds) }
             normalizeEditorPaneState()
             persistSplitEditorState()
         }
@@ -1297,13 +1288,9 @@ class EditorContainerState(
         val tabIdsToRelease = tabs.map { it.id }.filter { it != keptTabId }
         val completed = tabManager.closeOtherTabs(exceptIndex)
         if (!completed) return true
-        tabIdsToRelease.forEach { tabId ->
-            releaseTinaLspForTab(tabId)
-            clearCodeEditorRuntime(tabId)
-        }
+        tabLifecycleCoordinator.releaseRemovedTabResources(tabIdsToRelease)
         val keptPane = resolvePaneForTab(keptTabId)
-        splitPaneState.removeTabsExcept(keptTabId)
-        splitPaneState.removeActiveTabsExceptPane(keptPane)
+        tabLifecycleCoordinator.retainOnlyTabPaneState(keptTabId, keptPane)
         normalizeEditorPaneState(preferredActiveTabId = keptTabId)
         persistSplitEditorState()
         return true
@@ -1319,11 +1306,8 @@ class EditorContainerState(
         val tabIdsToRelease = tabs.map { it.id }
         val completed = tabManager.closeAllTabs()
         if (!completed) return hadTabs
-        tabIdsToRelease.forEach { tabId ->
-            releaseTinaLspForTab(tabId)
-            clearCodeEditorRuntime(tabId)
-        }
-        splitPaneState.clear()
+        tabLifecycleCoordinator.releaseRemovedTabResources(tabIdsToRelease)
+        tabLifecycleCoordinator.clearSplitPaneState()
         isSplitEditorEnabled = false
         focusedPane = EditorPaneId.PRIMARY
         persistSplitEditorState()
