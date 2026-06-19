@@ -48,6 +48,8 @@ class AndroidSysrootManager private constructor(
 
         private const val SYSROOT_DIR_NAME = "android-sysroot"
         private const val CUSTOM_PROFILE_PREFIX = "custom"
+        private const val API_LEVEL_HEADER_PATH = "usr/include/android/api-level.h"
+        private const val CXX_SHARED_LIBRARY_NAME = "libc++_shared.so"
 
         private fun readBuiltinManifestFromAssets(context: Context): BuiltinSysrootProfileManifest? = try {
             context.assets.open(SYSROOT_ASSET_MANIFEST).use { input ->
@@ -98,6 +100,20 @@ class AndroidSysrootManager private constructor(
         validConfiguredActiveProfile(arch)
             ?: installedDefaultBuiltinProfile(arch)
 
+    fun resolveProfileId(profileId: String?, arch: Arch = Arch.current()): String? {
+        val explicitProfileId = profileId?.trim()?.takeIf { it.isNotBlank() }
+        if (explicitProfileId != null) {
+            val explicitProfile = findConfiguredProfile(explicitProfileId, arch)
+                ?: findBuiltinAssetProfile(explicitProfileId, arch)?.toProfileInfo()
+            if (explicitProfile != null) {
+                return explicitProfile.id
+            }
+        }
+
+        return activeProfileId(arch)
+            ?: defaultBuiltinAssetProfile(arch)?.id
+    }
+
     fun activateProfile(profileId: String, arch: Arch = Arch.current()): Result<Unit> {
         val id = profileId.trim()
         if (id.isBlank()) {
@@ -137,7 +153,45 @@ class AndroidSysrootManager private constructor(
         activateProfile(id, arch)
     }
 
-    fun isInstalled(arch: Arch = Arch.current()): Boolean = isValidSysrootRoot(getSysrootDir(arch), arch)
+    suspend fun ensureProfileInstalled(
+        profileId: String,
+        arch: Arch = Arch.current(),
+        onProgress: ((Float) -> Unit)? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val id = profileId.trim()
+        if (id.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Sysroot profile id is blank"))
+        }
+
+        val builtin = findBuiltinAssetProfile(id, arch)
+        if (builtin != null) {
+            val profileDir = configManager.getProfileDir(id)
+            if (!isValidSysrootRoot(profileDir, arch)) {
+                return@withContext installBuiltinProfile(
+                    assetProfile = builtin,
+                    arch = arch,
+                    onProgress = onProgress,
+                    activate = false
+                ).map { Unit }
+            }
+
+            val installedInfo = builtin.toProfileInfo(
+                installedAt = profileDir.lastModified().takeIf { it > 0L } ?: System.currentTimeMillis()
+            )
+            configManager.registerOrReplaceProfile(installedInfo).getOrThrow()
+            return@withContext Result.success(Unit)
+        }
+
+        val configured = findConfiguredProfile(id, arch)
+            ?: return@withContext Result.failure(IllegalArgumentException("Sysroot profile not found: $id"))
+        if (!isValidSysrootRoot(configManager.getProfileDir(configured), arch)) {
+            return@withContext Result.failure(IllegalStateException("Sysroot profile is not installed: $id"))
+        }
+        Result.success(Unit)
+    }
+
+    fun isInstalled(arch: Arch = Arch.current(), profileId: String? = null): Boolean =
+        isValidSysrootRoot(getSysrootDir(arch, profileId), arch)
 
     suspend fun importFromFile(
         archiveFile: File,
@@ -234,7 +288,8 @@ class AndroidSysrootManager private constructor(
     private suspend fun installBuiltinProfile(
         assetProfile: BuiltinSysrootProfileAsset,
         arch: Arch,
-        onProgress: ((Float) -> Unit)? = null
+        onProgress: ((Float) -> Unit)? = null,
+        activate: Boolean = true
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             Timber.tag(TAG).i("Starting sysroot installation: arch=%s profile=%s", arch, assetProfile.id)
@@ -308,7 +363,9 @@ class AndroidSysrootManager private constructor(
                     assetProfile = assetProfile
                 )
                 configManager.registerOrReplaceProfile(info).getOrThrow()
-                configManager.switchProfile(profileId, arch).getOrThrow()
+                if (activate) {
+                    configManager.switchProfile(profileId, arch).getOrThrow()
+                }
 
                 onProgress?.invoke(1.0f)
                 Timber.tag(TAG).i("Sysroot installation complete: id=%s path=%s", profileId, targetDir.absolutePath)
@@ -322,26 +379,35 @@ class AndroidSysrootManager private constructor(
         }
     }
 
-    fun getSysrootDir(arch: Arch = Arch.current()): File {
-        val active = validConfiguredActiveProfile(arch)
-        return active?.let(configManager::getProfileDir)
-            ?: defaultBuiltinAssetProfile(arch)?.let { configManager.getProfileDir(it.id) }
+    fun getSysrootDir(arch: Arch = Arch.current(), profileId: String? = null): File {
+        val explicitProfileId = profileId?.trim()?.takeIf { it.isNotBlank() }
+        if (explicitProfileId != null) {
+            val resolvedProfileId = resolveProfileId(explicitProfileId, arch)
+            return if (resolvedProfileId != null) {
+                configManager.getProfileDir(resolvedProfileId)
+            } else {
+                configManager.getProfileDir(explicitProfileId)
+            }
+        }
+
+        return resolveProfileId(profileId = null, arch = arch)
+            ?.let(configManager::getProfileDir)
             ?: File(context.filesDir, "android-sysroots/${arch.name.lowercase(Locale.US)}")
     }
 
-    fun getSysrootPath(arch: Arch = Arch.current()): String? {
-        val dir = getSysrootDir(arch)
+    fun getSysrootPath(arch: Arch = Arch.current(), profileId: String? = null): String? {
+        val dir = getSysrootDir(arch, profileId)
         return if (dir.exists()) dir.absolutePath else null
     }
 
-    fun getLibPath(apiLevel: Int, arch: Arch = Arch.current()): String? {
-        val sysroot = getSysrootDir(arch)
+    fun getLibPath(apiLevel: Int, arch: Arch = Arch.current(), profileId: String? = null): String? {
+        val sysroot = getSysrootDir(arch, profileId)
         val libDir = File(sysroot, "usr/lib/${arch.triple}/$apiLevel")
         return if (libDir.exists()) libDir.absolutePath else null
     }
 
-    fun getIncludePath(arch: Arch = Arch.current()): String? {
-        val sysroot = getSysrootDir(arch)
+    fun getIncludePath(arch: Arch = Arch.current(), profileId: String? = null): String? {
+        val sysroot = getSysrootDir(arch, profileId)
         val includeDir = File(sysroot, "usr/include")
         return if (includeDir.exists()) includeDir.absolutePath else null
     }
@@ -349,10 +415,11 @@ class AndroidSysrootManager private constructor(
     fun getCompilerFlags(
         apiLevel: Int,
         arch: Arch = Arch.current(),
-        isCpp: Boolean = false
+        isCpp: Boolean = false,
+        profileId: String? = null
     ): List<String> {
-        val sysroot = getSysrootPath(arch) ?: return emptyList()
-        val libPath = getLibPath(apiLevel, arch) ?: return emptyList()
+        val sysroot = getSysrootPath(arch, profileId) ?: return emptyList()
+        val libPath = getLibPath(apiLevel, arch, profileId) ?: return emptyList()
 
         return buildList {
             add("--target=${arch.triple}$apiLevel")
@@ -380,7 +447,14 @@ class AndroidSysrootManager private constructor(
     }
 
     private fun activeProfileId(arch: Arch): String? =
-        validConfiguredActiveProfile(arch)?.id ?: installedDefaultBuiltinProfile(arch)?.id
+        configManager.getActiveProfile(arch)
+            ?.takeIf { isCurrentConfiguredProfile(it, arch) }
+            ?.takeIf {
+                it.type == SysrootProfileType.BUILTIN ||
+                    isValidSysrootRoot(configManager.getProfileDir(it), arch)
+            }
+            ?.id
+            ?: installedDefaultBuiltinProfile(arch)?.id
 
     private fun validConfiguredActiveProfile(arch: Arch): SysrootProfileInfo? =
         configManager.getActiveProfile(arch)
@@ -428,6 +502,11 @@ class AndroidSysrootManager private constructor(
             installedAt = profileDir.lastModified().takeIf { it > 0L } ?: 0L
         )
     }
+
+    private fun findConfiguredProfile(id: String, arch: Arch): SysrootProfileInfo? =
+        configManager.listProfiles(arch)
+            .filter { isCurrentConfiguredProfile(it, arch) }
+            .firstOrNull { it.id == id }
 
     private fun findBuiltinAssetProfile(id: String, arch: Arch): BuiltinSysrootProfileAsset? =
         listBuiltinAssetProfiles(arch).firstOrNull { it.id == id }
@@ -525,8 +604,14 @@ class AndroidSysrootManager private constructor(
     private fun isValidSysrootRoot(root: File, arch: Arch): Boolean {
         if (!root.isDirectory) return false
         val includeDir = File(root, "usr/include")
+        val apiLevelHeader = File(root, API_LEVEL_HEADER_PATH)
         val libDir = File(root, "usr/lib/${arch.triple}")
-        return includeDir.isDirectory && libDir.isDirectory
+        val cxxSharedLibrary = File(libDir, CXX_SHARED_LIBRARY_NAME)
+        return includeDir.isDirectory &&
+            apiLevelHeader.isFile &&
+            libDir.isDirectory &&
+            cxxSharedLibrary.isFile &&
+            discoverApiLevels(root, arch).isNotEmpty()
     }
 
     private fun discoverApiLevels(root: File, arch: Arch): List<Int> {

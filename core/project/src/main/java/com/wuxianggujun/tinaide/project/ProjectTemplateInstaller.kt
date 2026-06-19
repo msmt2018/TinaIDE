@@ -43,6 +43,20 @@ object ProjectTemplateInstaller {
             val resolvedAuthorName = authorName.trim().ifBlank {
                 templateSpec.variables[AUTHOR_VARIABLE_NAME]?.trim().orEmpty()
             }
+            val resolvedDefaultRunTargetName = replaceOptionalText(
+                templateSpec.defaultRunTargetName,
+                projectName,
+                cppStandard,
+                effectiveNdkApiLevel,
+                resolvedAuthorName,
+            )
+            val resolvedDefaultSdlTargetName = replaceOptionalText(
+                templateSpec.defaultSdlTargetName,
+                projectName,
+                cppStandard,
+                effectiveNdkApiLevel,
+                resolvedAuthorName,
+            )
             val staging = createStagingDirectory(destDir).also { stagingDir = it }
 
             extractZipTemplate(
@@ -62,6 +76,8 @@ object ProjectTemplateInstaller {
                 primaryLanguage = templateSpec.primaryLanguage,
                 apkExportType = ProjectApkExportSupportResolver.detect(destDir),
                 nativeApiLevel = templateNativeApiLevel,
+                defaultRunTargetName = resolvedDefaultRunTargetName,
+                defaultSdlTargetName = resolvedDefaultSdlTargetName,
             )
             Timber.tag(TAG).i(
                 "Project created: $projectName, buildSystem: ${templateSpec.buildSystem}, cppStandard: $cppStandard, language: ${templateSpec.primaryLanguage}, ndkApiLevel: ${effectiveNdkApiLevel?.level}, nativeApiLevel: $templateNativeApiLevel",
@@ -214,4 +230,15 @@ object ProjectTemplateInstaller {
         }
         return result
     }
+
+    private fun replaceOptionalText(
+        text: String?,
+        projectName: String,
+        cppStandard: CppStandard,
+        ndkApiLevel: AndroidApiLevel?,
+        authorName: String,
+    ): String? = text
+        ?.let { replaceText(it, projectName, cppStandard, ndkApiLevel, authorName) }
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
 }

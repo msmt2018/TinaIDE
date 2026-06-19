@@ -6,6 +6,7 @@ import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactSpec
 import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactStore
 import com.wuxianggujun.tinaide.core.compile.artifact.BuildFingerprint
 import com.wuxianggujun.tinaide.core.compile.artifact.FingerprintCalculator
+import com.wuxianggujun.tinaide.core.compile.artifact.SourceRef
 import com.wuxianggujun.tinaide.core.compile.strategy.BuildContext
 import com.wuxianggujun.tinaide.core.compile.strategy.BuildStrategy
 import com.wuxianggujun.tinaide.core.compile.strategy.BuildStrategyRegistry
@@ -83,9 +84,26 @@ class BuildPlanner(
             return BuildPlan.Build(strategy, spec, expected, fingerprintDiffReason(cached.fingerprint, expected))
         }
 
+        val missingTrackedInput = missingTrackedInput(spec, cached.sources, ctx.projectRoot)
+        if (missingTrackedInput != null) {
+            Timber.tag(TAG).d("tracked input missing from cached artifact: %s", missingTrackedInput)
+            return BuildPlan.Build(
+                strategy,
+                spec,
+                expected,
+                "tracked input missing from cached artifact: $missingTrackedInput",
+            )
+        }
+
+        val reconfigureInputsHash = expected.reconfigureInputsHash
+        if (reconfigureInputsHash != null && cached.fingerprint.reconfigureInputsHash != reconfigureInputsHash) {
+            Timber.tag(TAG).d("reconfigure inputs changed for %s", spec.id.storageKey())
+            return BuildPlan.Build(strategy, spec, expected, "reconfigureInputsHash")
+        }
+
         val changedInput = cached.sources.firstOrNull { ref ->
             val f = File(ctx.projectRoot, ref.relativePath)
-            !f.isFile || f.lastModified() != ref.mtime || f.length() != ref.size
+            !f.isFile || SourceRef.capture(f, ctx.projectRoot) != ref
         }
         if (changedInput != null) {
             Timber.tag(TAG).d("tracked input changed: %s", changedInput.relativePath)
@@ -102,6 +120,7 @@ class BuildPlanner(
             "compilerType" to { old.compilerType != expected.compilerType },
             "compilerPath" to { old.compilerPath != expected.compilerPath },
             "toolchainId" to { old.toolchainId != expected.toolchainId },
+            "sysrootProfileId" to { old.sysrootProfileId != expected.sysrootProfileId },
             "sysrootApiLevel" to { old.sysrootApiLevel != expected.sysrootApiLevel },
             "buildType" to { old.buildType != expected.buildType },
             "cmakeBuildType" to { old.cmakeBuildType != expected.cmakeBuildType },
@@ -120,8 +139,23 @@ class BuildPlanner(
             "artifactKind" to { old.artifactKind != expected.artifactKind },
             "expectedOutputPath" to { old.expectedOutputPath != expected.expectedOutputPath },
             "trackedInputsHash" to { old.trackedInputsHash != expected.trackedInputsHash },
+            "reconfigureInputsHash" to { old.reconfigureInputsHash != expected.reconfigureInputsHash },
         )
         return checks.firstOrNull { it.second() }?.first?.let { "fingerprint changed: $it" }
             ?: "fingerprint changed"
     }
+
+    private fun missingTrackedInput(spec: ArtifactSpec, cachedSources: List<SourceRef>, projectRoot: File): String? {
+        val cachedPaths = cachedSources
+            .asSequence()
+            .map { normalizeRelativePath(it.relativePath) }
+            .toSet()
+        return spec.sources
+            .asSequence()
+            .map { normalizeRelativePath(it.absoluteFile.relativeToOrSelf(projectRoot.absoluteFile).path) }
+            .sorted()
+            .firstOrNull { it !in cachedPaths }
+    }
+
+    private fun normalizeRelativePath(path: String): String = path.replace('\\', '/')
 }

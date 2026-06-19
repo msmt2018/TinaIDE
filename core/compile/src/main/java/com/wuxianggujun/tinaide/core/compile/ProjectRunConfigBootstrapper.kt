@@ -1,6 +1,5 @@
 package com.wuxianggujun.tinaide.core.compile
 
-import com.wuxianggujun.tinaide.project.ProjectApkExportType
 import com.wuxianggujun.tinaide.project.ProjectMetadataStore
 import java.io.File
 import timber.log.Timber
@@ -19,13 +18,25 @@ object ProjectRunConfigBootstrapper {
         if (configFile.exists()) return false
 
         val metadata = ProjectMetadataStore.read(projectDir) ?: return false
-        if (metadata.apkExportType != ProjectApkExportType.SDL3) return false
+        val defaultConfig = CMakeRunTargetResolver.createDefaultRunConfiguration(
+            metadata = metadata,
+            requireTargetForNonSdl = true,
+        ) ?: return false
 
-        val defaultManager = RunConfigurationManager.load(projectPath)
+        val defaultManager = RunConfigurationManager(
+            configurations = listOf(defaultConfig),
+            selectedId = defaultConfig.id,
+        )
         val saved = RunConfigurationManager.save(projectPath, defaultManager)
         if (saved) {
-            Timber.tag(TAG).i("Initialized explicit SDL run config for SDL3 project: %s", projectPath)
+            Timber.tag(TAG).i(
+                "Initialized explicit run config for project: %s target=%s outputMode=%s",
+                projectPath,
+                defaultConfig.targetName,
+                defaultConfig.outputMode,
+            )
         }
         return saved
     }
+
 }

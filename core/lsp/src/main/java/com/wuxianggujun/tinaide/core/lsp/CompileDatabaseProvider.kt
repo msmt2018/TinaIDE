@@ -40,6 +40,9 @@ class CompileDatabaseProvider(context: Context) {
         private const val META_KEY_CPP_STANDARD = "cppStandard"
         private const val META_KEY_PACKAGE_FINGERPRINT = "packageFingerprint"
         private const val META_KEY_TOOLCHAIN_ID = "toolchainId"
+        private const val META_KEY_SYSROOT_PROFILE_ID = "sysrootProfileId"
+        private const val META_KEY_SYSROOT_API_LEVEL = "sysrootApiLevel"
+        private const val DEFAULT_SYSROOT_API_LEVEL = 28
 
         /** 标记 compile_commands.json 的来源，用于区分 Tina 兜底生成与外部权威导出。 */
         private const val META_KEY_GENERATED_BY = "generatedBy"
@@ -94,6 +97,14 @@ class CompileDatabaseProvider(context: Context) {
         val desiredCppStandard: CppStandard,
         val packageFingerprint: String,
         val toolchainId: String?,
+        val sysrootProfileId: String?,
+        val sysrootApiLevel: Int,
+    )
+
+    data class RuntimeIdentity(
+        val toolchainId: String,
+        val sysrootProfileId: String?,
+        val sysrootApiLevel: Int,
     )
 
     data class EnsureResult(
@@ -126,6 +137,7 @@ class CompileDatabaseProvider(context: Context) {
         val scanRoot = workspaceRoot
         val desiredCppStandard = resolveCppStandard(workspaceRoot)
         val packageFingerprint = resolvePackageFingerprint(workspaceRoot)
+        val runtimeIdentity = resolveRuntimeIdentity(workspaceRoot, toolchainId)
         val hasUsableCompileCommands =
             sourceCompileCommandsFile.isFile && sourceCompileCommandsFile.length() > 0
         val shouldReuseExisting = when {
@@ -140,7 +152,7 @@ class CompileDatabaseProvider(context: Context) {
                 compileCommandsDir = compileCommandsDir,
                 desiredCppStandard = desiredCppStandard,
                 packageFingerprint = packageFingerprint,
-                toolchainId = toolchainId,
+                runtimeIdentity = runtimeIdentity,
             )
         }
         val projectType = when {
@@ -161,7 +173,7 @@ class CompileDatabaseProvider(context: Context) {
                 shouldGenerate,
                 isCxx,
                 desiredCppStandard.flag,
-                toolchainId ?: "active"
+                runtimeIdentity.toolchainId
             )
             if (hasUsableCompileCommands) {
                 CompileCommandsDebugLogger.logCompileCommandsSelectionSummary(
@@ -183,7 +195,9 @@ class CompileDatabaseProvider(context: Context) {
             isCxx = isCxx,
             desiredCppStandard = desiredCppStandard,
             packageFingerprint = packageFingerprint,
-            toolchainId = toolchainId,
+            toolchainId = runtimeIdentity.toolchainId,
+            sysrootProfileId = runtimeIdentity.sysrootProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
         )
     }
 
@@ -223,6 +237,8 @@ class CompileDatabaseProvider(context: Context) {
                     cppStandard = prepared.desiredCppStandard,
                     packageFingerprint = prepared.packageFingerprint,
                     toolchainId = prepared.toolchainId,
+                    sysrootProfileId = prepared.sysrootProfileId,
+                    sysrootApiLevel = prepared.sysrootApiLevel,
                     // 复用已有数据库时沿用其原始来源标记；缺失则按外部权威处理。
                     generatedBy = resolveExistingGeneratedBy(prepared.sourceCompileCommandsDir),
                 )
@@ -405,6 +421,8 @@ class CompileDatabaseProvider(context: Context) {
                     cppStandard = prepared.desiredCppStandard,
                     packageFingerprint = prepared.packageFingerprint,
                     toolchainId = prepared.toolchainId,
+                    sysrootProfileId = prepared.sysrootProfileId,
+                    sysrootApiLevel = prepared.sysrootApiLevel,
                     generatedBy = GENERATED_BY_TINA,
                 )
             }
@@ -415,6 +433,8 @@ class CompileDatabaseProvider(context: Context) {
                     sourceFile = generatedSourceFile,
                     targetFile = compileCommandsFile,
                     toolchainId = prepared.toolchainId,
+                    sysrootProfileId = prepared.sysrootProfileId,
+                    sysrootApiLevel = prepared.sysrootApiLevel,
                 )
             } else {
                 false
@@ -433,6 +453,8 @@ class CompileDatabaseProvider(context: Context) {
                     cppStandard = prepared.desiredCppStandard,
                     packageFingerprint = prepared.packageFingerprint,
                     toolchainId = prepared.toolchainId,
+                    sysrootProfileId = prepared.sysrootProfileId,
+                    sysrootApiLevel = prepared.sysrootApiLevel,
                     generatedBy = GENERATED_BY_TINA,
                 )
             }
@@ -479,12 +501,15 @@ class CompileDatabaseProvider(context: Context) {
         )
         val desiredCppStandard = resolveCppStandard(workspaceRoot)
         val packageFingerprint = resolvePackageFingerprint(workspaceRoot)
+        val runtimeIdentity = resolveRuntimeIdentity(workspaceRoot, toolchainId)
 
         val materialized = materializeCompileCommandsForLsp(
             effectiveRunMode = effectiveRunMode,
             sourceFile = sourceCompileCommandsFile,
             targetFile = sourceCompileCommandsFile,
-            toolchainId = toolchainId,
+            toolchainId = runtimeIdentity.toolchainId,
+            sysrootProfileId = runtimeIdentity.sysrootProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
         )
         if (!materialized) return null
 
@@ -492,7 +517,9 @@ class CompileDatabaseProvider(context: Context) {
             compileCommandsDir = compileCommandsDir,
             cppStandard = desiredCppStandard,
             packageFingerprint = packageFingerprint,
-            toolchainId = toolchainId,
+            toolchainId = runtimeIdentity.toolchainId,
+            sysrootProfileId = runtimeIdentity.sysrootProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
             generatedBy = GENERATED_BY_EXTERNAL,
         )
         return compileCommandsDir
@@ -504,14 +531,16 @@ class CompileDatabaseProvider(context: Context) {
         compileCommandsDir: File,
         desiredCppStandard: CppStandard,
         packageFingerprint: String,
-        toolchainId: String?
+        runtimeIdentity: RuntimeIdentity,
     ): Boolean {
         val standardMatches = !isCxx || compileCommandsMatchesCppStandard(compileCommandsFile, desiredCppStandard)
         if (!standardMatches) return false
 
         if (!compileCommandsMatchesPackageFingerprint(compileCommandsDir, packageFingerprint)) return false
+        if (!compileCommandsMatchesToolchainId(compileCommandsDir, runtimeIdentity.toolchainId)) return false
+        if (!compileCommandsMatchesSysrootProfileId(compileCommandsDir, runtimeIdentity.sysrootProfileId)) return false
 
-        return compileCommandsMatchesToolchainId(compileCommandsDir, toolchainId)
+        return compileCommandsMatchesSysrootApiLevel(compileCommandsDir, runtimeIdentity.sysrootApiLevel)
     }
 
     private fun compileCommandsMatchesPackageFingerprint(
@@ -527,10 +556,30 @@ class CompileDatabaseProvider(context: Context) {
         compileCommandsDir: File,
         toolchainId: String?
     ): Boolean {
-        if (toolchainId == null) return true
         val metadata = readCompileCommandsMetadata(compileCommandsDir) ?: return false
         val storedToolchainId = metadata.getProperty(META_KEY_TOOLCHAIN_ID)?.trim().orEmpty()
-        return storedToolchainId == toolchainId
+        val expectedToolchainId = toolchainId?.trim().orEmpty()
+        return expectedToolchainId.isNotEmpty() && storedToolchainId == expectedToolchainId
+    }
+
+    private fun compileCommandsMatchesSysrootProfileId(
+        compileCommandsDir: File,
+        sysrootProfileId: String?
+    ): Boolean {
+        val metadata = readCompileCommandsMetadata(compileCommandsDir) ?: return false
+        val storedProfileId = metadata.getProperty(META_KEY_SYSROOT_PROFILE_ID)?.trim().orEmpty()
+        val expectedProfileId = sysrootProfileId?.trim().orEmpty()
+        return storedProfileId == expectedProfileId
+    }
+
+    private fun compileCommandsMatchesSysrootApiLevel(
+        compileCommandsDir: File,
+        sysrootApiLevel: Int
+    ): Boolean {
+        val metadata = readCompileCommandsMetadata(compileCommandsDir) ?: return false
+        val storedApiLevel = metadata.getProperty(META_KEY_SYSROOT_API_LEVEL)?.trim()?.toIntOrNull()
+            ?: DEFAULT_SYSROOT_API_LEVEL
+        return storedApiLevel == sysrootApiLevel
     }
 
     private fun readCompileCommandsMetadata(compileCommandsDir: File): Properties? {
@@ -574,6 +623,8 @@ class CompileDatabaseProvider(context: Context) {
         cppStandard: CppStandard,
         packageFingerprint: String,
         toolchainId: String?,
+        sysrootProfileId: String?,
+        sysrootApiLevel: Int,
         generatedBy: String,
     ) {
         val metaFile = File(compileCommandsDir, COMPILE_COMMANDS_META_FILE_NAME)
@@ -586,6 +637,8 @@ class CompileDatabaseProvider(context: Context) {
                 setProperty(META_KEY_PACKAGE_FINGERPRINT, packageFingerprint)
                 setProperty(META_KEY_GENERATED_BY, generatedBy)
                 toolchainId?.let { setProperty(META_KEY_TOOLCHAIN_ID, it) }
+                setProperty(META_KEY_SYSROOT_PROFILE_ID, sysrootProfileId.orEmpty())
+                setProperty(META_KEY_SYSROOT_API_LEVEL, sysrootApiLevel.toString())
             }
             FileOutputStream(metaFile).use { out ->
                 props.store(out, "TinaIDE compile_commands metadata")
@@ -663,11 +716,52 @@ class CompileDatabaseProvider(context: Context) {
         ProjectMetadataStore.read(workspaceRoot)?.getCppStandard()
     }.getOrNull() ?: CppStandard.DEFAULT
 
+    fun resolveRuntimeIdentity(projectRoot: File?, toolchainId: String? = null): RuntimeIdentity {
+        val normalizedToolchainId = resolveEffectiveToolchainId(toolchainId)
+        val effectiveRunMode = resolveEffectiveRunMode()
+        val sysrootProfileId = if (effectiveRunMode == LinuxRunModePolicy.RunMode.NATIVE) {
+            runCatching {
+                AndroidSysrootManager(appContext).getActiveProfile()?.id?.trim()?.takeIf { it.isNotEmpty() }
+            }.getOrNull()
+        } else {
+            null
+        }
+        return RuntimeIdentity(
+            toolchainId = normalizedToolchainId,
+            sysrootProfileId = sysrootProfileId,
+            sysrootApiLevel = resolveSysrootApiLevel(projectRoot),
+        )
+    }
+
+    private fun resolveEffectiveToolchainId(toolchainId: String?): String {
+        val explicitId = toolchainId?.trim()?.takeIf { it.isNotEmpty() }
+        if (explicitId != null) return explicitId
+
+        return runCatching {
+            AndroidNativeToolchainManager(appContext).getConfigManager().getActiveToolchainId()
+        }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() } ?: "active"
+    }
+
+    private fun resolveEffectiveRunMode(): LinuxRunModePolicy.RunMode = LinuxRunModePolicy.resolve(
+        configuredMode = Prefs.clangdRunMode,
+        linuxEnvironmentAvailable = linuxEnvironmentProvider.get().isAvailable()
+    )
+
+    private fun resolveSysrootApiLevel(projectRoot: File?): Int {
+        return projectRoot
+            ?.let { root ->
+                runCatching { ProjectMetadataStore.read(root)?.getNativeApiLevelOrNull() }.getOrNull()
+            }
+            ?: DEFAULT_SYSROOT_API_LEVEL
+    }
+
     private fun materializeCompileCommandsForLsp(
         effectiveRunMode: LinuxRunModePolicy.RunMode,
         sourceFile: File,
         targetFile: File,
         toolchainId: String?,
+        sysrootProfileId: String? = null,
+        sysrootApiLevel: Int = DEFAULT_SYSROOT_API_LEVEL,
     ): Boolean {
         if (!sourceFile.isFile || sourceFile.length() <= 0L) return false
 

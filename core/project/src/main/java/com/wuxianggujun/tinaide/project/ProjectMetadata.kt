@@ -8,7 +8,7 @@ import timber.log.Timber
 
 object ProjectMetadataStore {
     private const val TAG = "ProjectMetadataStore"
-    private const val PROJECT_METADATA_SCHEMA_CURRENT = 2
+    private const val PROJECT_METADATA_SCHEMA_CURRENT = 3
 
     private val json = JsonSerializer.pretty
 
@@ -58,9 +58,13 @@ object ProjectMetadataStore {
         cppStandard: CppStandard? = null,
         primaryLanguage: ProjectLanguage? = null,
         apkExportType: ProjectApkExportType? = null,
-        nativeApiLevel: Int? = null
+        nativeApiLevel: Int? = null,
+        defaultRunTargetName: String? = null,
+        defaultSdlTargetName: String? = null
     ): ProjectMetadata {
         val normalizedNativeApiLevel = normalizeNativeApiLevel(nativeApiLevel)
+        val normalizedDefaultRunTargetName = normalizeTargetName(defaultRunTargetName)
+        val normalizedDefaultSdlTargetName = normalizeTargetName(defaultSdlTargetName)
         read(projectRoot)?.let { existing ->
             var needsUpdate = false
             var updated = existing
@@ -89,6 +93,22 @@ object ProjectMetadataStore {
                 needsUpdate = true
             }
 
+            if (
+                normalizedDefaultRunTargetName != null &&
+                existing.defaultRunTargetName != normalizedDefaultRunTargetName
+            ) {
+                updated = updated.copy(defaultRunTargetName = normalizedDefaultRunTargetName)
+                needsUpdate = true
+            }
+
+            if (
+                normalizedDefaultSdlTargetName != null &&
+                existing.defaultSdlTargetName != normalizedDefaultSdlTargetName
+            ) {
+                updated = updated.copy(defaultSdlTargetName = normalizedDefaultSdlTargetName)
+                needsUpdate = true
+            }
+
             if (needsUpdate) {
                 write(projectRoot, updated)
             }
@@ -107,7 +127,9 @@ object ProjectMetadataStore {
             apkExportType = apkExportType,
             lastOpenedIdeVersion = currentIdeVersion,
             lastOpenedAt = System.currentTimeMillis(),
-            nativeApiLevel = normalizedNativeApiLevel
+            nativeApiLevel = normalizedNativeApiLevel,
+            defaultRunTargetName = normalizedDefaultRunTargetName,
+            defaultSdlTargetName = normalizedDefaultSdlTargetName
         )
         write(projectRoot, meta)
         return meta
@@ -239,7 +261,9 @@ object ProjectMetadataStore {
         nativeCppFlags = normalizeFlagValue(metadata.nativeCppFlags),
         nativeLdFlags = normalizeFlagValue(metadata.nativeLdFlags),
         nativeLdLibs = normalizeFlagValue(metadata.nativeLdLibs),
-        nativeCMakeArgs = normalizePathEntries(metadata.nativeCMakeArgs)
+        nativeCMakeArgs = normalizePathEntries(metadata.nativeCMakeArgs),
+        defaultRunTargetName = normalizeTargetName(metadata.defaultRunTargetName),
+        defaultSdlTargetName = normalizeTargetName(metadata.defaultSdlTargetName)
     )
 
     private fun normalizeNativeApiLevel(nativeApiLevel: Int?): Int? = nativeApiLevel?.takeIf { it in 21..35 }
@@ -261,4 +285,8 @@ object ProjectMetadataStore {
             .joinToString(" ")
             .trim()
     }
+
+    private fun normalizeTargetName(value: String?): String? = value
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
 }

@@ -4,10 +4,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -104,51 +107,58 @@ internal fun MainActivityBottomPanelHost(
                 )
             }
 
-            BottomPanel(
-                editorContainerState = editorContainerState,
-                bottomPanelState = bottomPanelState,
-                bottomPanelViewModel = bottomPanelViewModel,
-                editorStateViewModel = editorStateViewModel,
-                debugViewModel = debugViewModel,
-                projectSymbolIndexService = projectSymbolIndexService,
-                modifier = Modifier.fillMaxWidth(),
-                onUndoClick = { actionsDelegate.performUndo(editorContainerState) },
-                onRedoClick = { actionsDelegate.performRedo(editorContainerState) },
-                onSymbolClick = { symbol ->
-                    editorContainerState.insertTextAtCursor(symbol)
-                },
-                onBookmarkNavigate = { filePath, line ->
-                    actionsDelegate.navigateToBookmark(editorContainerState, filePath, line)
-                },
-                onDiagnosticClick = { diagnostic ->
-                    navigationDelegate.navigateToDiagnostic(editorContainerState, diagnostic)
-                },
-                gitCurrentBranch = gitUiState.status.branch,
-                gitBranches = gitUiState.branches,
-                gitCommits = gitUiState.commitHistory,
-                gitIsLoadingHistory = gitUiState.isLoadingHistory,
-                onGitRefresh = callbacks.onGitRefresh,
-                onGitBranchSelect = callbacks.onGitBranchSelect,
-                onGitCommitClick = callbacks.onGitCommitClick,
-                cursorLine = cursorLine,
-                cursorColumn = cursorColumn,
-                fileEncoding = fileEncoding,
-                onCursorPositionClick = {
-                    when (editorContainerState.getActiveEditableEditorCommandAvailability()) {
-                        EditorContainerState.ActiveEditorCommandResult.SUCCESS -> {
-                            dialogState.openGotoLineDialog()
-                        }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.ime)
+                    .consumeWindowInsets(WindowInsets.ime)
+            ) {
+                BottomPanel(
+                    editorContainerState = editorContainerState,
+                    bottomPanelState = bottomPanelState,
+                    bottomPanelViewModel = bottomPanelViewModel,
+                    editorStateViewModel = editorStateViewModel,
+                    debugViewModel = debugViewModel,
+                    projectSymbolIndexService = projectSymbolIndexService,
+                    modifier = Modifier.fillMaxWidth(),
+                    onUndoClick = { actionsDelegate.performUndo(editorContainerState) },
+                    onRedoClick = { actionsDelegate.performRedo(editorContainerState) },
+                    onSymbolClick = { symbol ->
+                        editorContainerState.insertTextAtCursor(symbol)
+                    },
+                    onBookmarkNavigate = { filePath, line ->
+                        actionsDelegate.navigateToBookmark(editorContainerState, filePath, line)
+                    },
+                    onDiagnosticClick = { diagnostic ->
+                        navigationDelegate.navigateToDiagnostic(editorContainerState, diagnostic)
+                    },
+                    gitCurrentBranch = gitUiState.status.branch,
+                    gitBranches = gitUiState.branches,
+                    gitCommits = gitUiState.commitHistory,
+                    gitIsLoadingHistory = gitUiState.isLoadingHistory,
+                    onGitRefresh = callbacks.onGitRefresh,
+                    onGitBranchSelect = callbacks.onGitBranchSelect,
+                    onGitCommitClick = callbacks.onGitCommitClick,
+                    cursorLine = cursorLine,
+                    cursorColumn = cursorColumn,
+                    fileEncoding = fileEncoding,
+                    onCursorPositionClick = {
+                        when (editorContainerState.getActiveEditableEditorCommandAvailability()) {
+                            EditorContainerState.ActiveEditorCommandResult.SUCCESS -> {
+                                dialogState.openGotoLineDialog()
+                            }
 
-                        EditorContainerState.ActiveEditorCommandResult.NO_OPEN_FILE -> {
-                            callbacks.onNoOpenFile()
-                        }
+                            EditorContainerState.ActiveEditorCommandResult.NO_OPEN_FILE -> {
+                                callbacks.onNoOpenFile()
+                            }
 
-                        EditorContainerState.ActiveEditorCommandResult.UNSUPPORTED_EDITOR -> {
-                            callbacks.onUnsupportedEditor()
+                            EditorContainerState.ActiveEditorCommandResult.UNSUPPORTED_EDITOR -> {
+                                callbacks.onUnsupportedEditor()
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     }
 }

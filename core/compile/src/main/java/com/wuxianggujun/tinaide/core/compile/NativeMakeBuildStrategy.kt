@@ -79,8 +79,13 @@ class NativeMakeBuildStrategy(
         val startTime = System.currentTimeMillis()
         val outputBuilder = StringBuilder()
         val sysrootApiLevel = options.sysrootApiLevel
+        val sysrootProfileId = options.sysrootProfileId
 
-        val sysrootValidationError = validateSysrootForBuild(sysrootApiLevel)
+        NativeSysrootPreparer.ensureInstalled(context, sysrootProfileId)?.let { error ->
+            options.onProgress?.invoke(error)
+            return makeBuildError(error)
+        }
+        val sysrootValidationError = validateSysrootForBuild(sysrootApiLevel, sysrootProfileId)
         if (sysrootValidationError != null) {
             options.onProgress?.invoke(sysrootValidationError)
             return makeBuildError(sysrootValidationError)
@@ -104,7 +109,8 @@ class NativeMakeBuildStrategy(
             extraLibraryDirs = listOfNotNull(
                 sysrootManager.getLibPath(
                     apiLevel = sysrootApiLevel,
-                    arch = AndroidSysrootManager.Companion.Arch.current()
+                    arch = AndroidSysrootManager.Companion.Arch.current(),
+                    profileId = sysrootProfileId
                 )
             )
         )
@@ -113,7 +119,7 @@ class NativeMakeBuildStrategy(
         // Android 上 /bin/sh 不存在，GNU make 默认 SHELL=/bin/sh 会导致 Error 127，
         // 且 make 不会从环境变量继承 SHELL，所以必须通过命令行变量显式覆盖。
         makeCommand.add(buildRecipeShellAssignment())
-        appendMakeToolchainOverrides(makeCommand, sysrootApiLevel)
+        appendMakeToolchainOverrides(makeCommand, sysrootApiLevel, sysrootProfileId)
 
         // 添加并行任务数
         if (options.parallelJobs > 1) {
@@ -271,7 +277,8 @@ class NativeMakeBuildStrategy(
 
     private fun appendMakeToolchainOverrides(
         makeCommand: MutableList<String>,
-        sysrootApiLevel: Int
+        sysrootApiLevel: Int,
+        sysrootProfileId: String?
     ) {
         if (!NativeExecutableRunner.shouldPreferLinker64()) {
             Timber.tag(TAG).d("Skip make toolchain overrides because preferLinker64=false")
@@ -284,10 +291,10 @@ class NativeMakeBuildStrategy(
             return
         }
         val cFlagSplit = MakeCommandOverrides.splitCompileAndLinkFlags(
-            buildSysrootFlags(isCpp = false, apiLevel = sysrootApiLevel)
+            buildSysrootFlags(isCpp = false, apiLevel = sysrootApiLevel, profileId = sysrootProfileId)
         )
         val cxxFlagSplit = MakeCommandOverrides.splitCompileAndLinkFlags(
-            buildSysrootFlags(isCpp = true, apiLevel = sysrootApiLevel)
+            buildSysrootFlags(isCpp = true, apiLevel = sysrootApiLevel, profileId = sysrootProfileId)
         )
         val cSysrootFlags = cFlagSplit.compileFlags
         val cxxSysrootFlags = cxxFlagSplit.compileFlags
@@ -324,19 +331,20 @@ class NativeMakeBuildStrategy(
         return fullCmd
     }
 
-    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int): List<String> {
+    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int, profileId: String?): List<String> {
         val arch = AndroidSysrootManager.Companion.Arch.current()
         return sysrootManager.getCompilerFlags(
             apiLevel = apiLevel,
             arch = arch,
-            isCpp = isCpp
+            isCpp = isCpp,
+            profileId = profileId
         )
     }
 
-    private fun validateSysrootForBuild(apiLevel: Int): String? {
+    private fun validateSysrootForBuild(apiLevel: Int, profileId: String?): String? {
         val arch = AndroidSysrootManager.Companion.Arch.current()
-        val sysrootDir = sysrootManager.getSysrootDir(arch)
-        if (!sysrootManager.isInstalled(arch)) {
+        val sysrootDir = sysrootManager.getSysrootDir(arch, profileId)
+        if (!sysrootManager.isInstalled(arch, profileId)) {
             return Strings.compile_sysroot_missing.strOr(context, sysrootDir.absolutePath)
         }
 

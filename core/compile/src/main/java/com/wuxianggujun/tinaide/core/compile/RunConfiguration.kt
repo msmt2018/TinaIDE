@@ -5,7 +5,7 @@ import com.wuxianggujun.tinaide.core.i18n.str
 import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import com.wuxianggujun.tinaide.project.CppStandard
-import com.wuxianggujun.tinaide.project.ProjectApkExportType
+import com.wuxianggujun.tinaide.project.ProjectMetadata
 import com.wuxianggujun.tinaide.project.ProjectMetadataStore
 import java.io.File
 import java.util.UUID
@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import timber.log.Timber
 
-private const val RUN_CONFIG_SCHEMA_CURRENT = 3
+private const val RUN_CONFIG_SCHEMA_CURRENT = 4
 
 /**
  * 源文件模式 - 决定编译哪个源文件
@@ -78,6 +78,14 @@ data class RunConfiguration(
     val toolchainId: String? = null,
 
     /**
+     * Optional NDK Runtime/sysroot profile override.
+     *
+     * - null: follow the global active NDK Runtime
+     * - non-null: pin this run configuration to the selected sysroot/libc++_shared.so
+     */
+    val sysrootProfileId: String? = null,
+
+    /**
      * 自定义 C 编译器路径（仅当 compilerType == CUSTOM 时使用）
      *
      * 路径应为 PRoot guest rootfs 内的可执行文件路径（如 /usr/bin/gcc）。
@@ -122,6 +130,7 @@ data class RunConfiguration(
 ) {
     fun normalized(): RunConfiguration = copy(
         toolchainId = toolchainId?.trim()?.takeIf { it.isNotEmpty() },
+        sysrootProfileId = sysrootProfileId?.trim()?.takeIf { it.isNotEmpty() },
         customCCompiler = normalizeCompilerPath(customCCompiler),
         customCppCompiler = normalizeCompilerPath(customCppCompiler),
         singleFileCppStandard = normalizeSingleFileCppStandard(singleFileCppStandard)
@@ -312,26 +321,35 @@ data class RunConfigurationManager(
                             configurations = validConfigs
                         )
                         val normalizedConfigManager = normalizeManager(sanitizedManager)
-                        val normalizedSelectedId = normalizedConfigManager.selectedId
+                        val targetRepair = CMakeRunTargetResolver.repairBlankTargets(
+                            normalizedConfigManager,
+                            resolveProjectMetadata(projectPath)
+                        )
+                        val repairedConfigManager = targetRepair.manager
+                        val normalizedSelectedId = repairedConfigManager.selectedId
                             ?.takeIf { selected ->
-                                normalizedConfigManager.configurations.any { it.id == selected }
+                                repairedConfigManager.configurations.any { it.id == selected }
                             }
-                            ?: normalizedConfigManager.configurations.first().id
+                            ?: repairedConfigManager.configurations.first().id
                         val normalizedManager =
-                            normalizedConfigManager.copy(selectedId = normalizedSelectedId)
+                            repairedConfigManager.copy(selectedId = normalizedSelectedId)
 
                         val filteredInvalidConfigs =
                             validConfigs.size != rawManager.configurations.size
                         val configNormalized =
                             normalizedConfigManager.configurations != sanitizedManager.configurations
+                        val targetsRepaired =
+                            repairedConfigManager.configurations != normalizedConfigManager.configurations
                         val normalizedConfigCount = sanitizedManager.configurations.zip(
                             normalizedConfigManager.configurations
                         ).count { (before, after) -> before != after }
+                        val repairedTargetCount = targetRepair.repairedCount
                         val selectedIdAdjusted =
-                            normalizedSelectedId != normalizedConfigManager.selectedId
+                            normalizedSelectedId != repairedConfigManager.selectedId
                         val changed = filteredInvalidConfigs ||
                             rawManager.schemaVersion != RUN_CONFIG_SCHEMA_CURRENT ||
                             configNormalized ||
+                            targetsRepaired ||
                             selectedIdAdjusted
                         if (changed) {
                             if (filteredInvalidConfigs) {
@@ -343,6 +361,11 @@ data class RunConfigurationManager(
                                 Timber.tag(TAG).i(
                                     "Normalized run configs: schema=${rawManager.schemaVersion}, " +
                                         "normalized=$normalizedConfigCount"
+                                )
+                            }
+                            if (targetsRepaired) {
+                                Timber.tag(TAG).i(
+                                    "Repaired missing run config targets: repaired=$repairedTargetCount"
                                 )
                             }
                             if (selectedIdAdjusted) {
@@ -394,24 +417,20 @@ data class RunConfigurationManager(
             )
         }
 
-        private fun createDefaultRunConfiguration(projectPath: String?): RunConfiguration = RunConfiguration(
-            name = "Debug",
-            outputMode = resolveDefaultOutputMode(projectPath)
-        )
+        private fun createDefaultRunConfiguration(projectPath: String?): RunConfiguration {
+            val metadata = resolveProjectMetadata(projectPath)
+            return CMakeRunTargetResolver.createDefaultRunConfiguration(metadata)
+                ?: RunConfiguration(name = "Debug")
+        }
 
-        private fun resolveDefaultOutputMode(projectPath: String?): OutputMode {
+        private fun resolveProjectMetadata(projectPath: String?): ProjectMetadata? {
             val projectRoot = projectPath
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?.let(::File)
                 ?.takeIf { it.exists() }
-                ?: return OutputMode.TERMINAL
-            val apkExportType = ProjectMetadataStore.read(projectRoot)?.apkExportType
-            return if (apkExportType == ProjectApkExportType.SDL3) {
-                OutputMode.SDL
-            } else {
-                OutputMode.TERMINAL
-            }
+                ?: return null
+            return ProjectMetadataStore.read(projectRoot)
         }
 
         private fun normalizeManager(manager: RunConfigurationManager): RunConfigurationManager {

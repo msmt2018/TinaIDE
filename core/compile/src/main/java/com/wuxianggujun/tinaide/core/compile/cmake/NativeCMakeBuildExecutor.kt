@@ -3,11 +3,14 @@ package com.wuxianggujun.tinaide.core.compile.cmake
 import android.content.Context
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
 import com.wuxianggujun.tinaide.core.compile.BuildResult
+import com.wuxianggujun.tinaide.core.compile.CMakeConfigurationIdentity
 import com.wuxianggujun.tinaide.core.compile.CleanResult
 import com.wuxianggujun.tinaide.core.compile.CompileTimeoutConfig
 import com.wuxianggujun.tinaide.core.compile.CompilerType
 import com.wuxianggujun.tinaide.core.compile.ConfigureResult
 import com.wuxianggujun.tinaide.core.compile.MakeCommandOverrides
+import com.wuxianggujun.tinaide.core.compile.NativeRuntimeIdentity
+import com.wuxianggujun.tinaide.core.compile.NativeSysrootPreparer
 import com.wuxianggujun.tinaide.core.compile.toolchain.ToolchainLinker64ShimManager
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.str
@@ -697,6 +700,7 @@ class NativeCMakeBuildExecutor(
         val toolchainId: String? = null,
         val cCompilerPath: String? = null,
         val cxxCompilerPath: String? = null,
+        val sysrootProfileId: String? = null,
         val sysrootApiLevel: Int = MakeCommandOverrides.DEFAULT_SYSROOT_API_LEVEL,
         val useRecommendedTinaExec: Boolean = false,
         val traceToolchainShim: Boolean = false,
@@ -801,7 +805,11 @@ class NativeCMakeBuildExecutor(
 
         // sysroot 路径（Bionic libc 头文件和库）
         val sysrootManager = AndroidSysrootManager(appContext)
-        val sysrootDir = sysrootManager.getSysrootDir()
+        NativeSysrootPreparer.ensureInstalled(appContext, options.sysrootProfileId)?.let { message ->
+            Timber.tag(TAG).w(message)
+            return ConfigureResult.Error(message)
+        }
+        val sysrootDir = sysrootManager.getSysrootDir(profileId = options.sysrootProfileId)
         val apiLevelHeader = File(sysrootDir, "usr/include/android/api-level.h")
         val iostreamHeader = File(sysrootDir, "usr/include/c++/v1/iostream")
 
@@ -841,6 +849,23 @@ class NativeCMakeBuildExecutor(
 
         val arch = AndroidSysrootManager.Companion.Arch.current()
         val sysrootApiLevel = options.sysrootApiLevel
+        val runtimeIdentity = NativeRuntimeIdentity(
+            sysrootProfileId = options.sysrootProfileId,
+            sysrootApiLevel = sysrootApiLevel,
+        )
+        val cmakeIdentity = CMakeConfigurationIdentity.create(
+            runMode = "NATIVE",
+            compilerType = options.compilerType.name,
+            toolchainId = CMakeConfigurationIdentity.cacheToolchainId(options.toolchainId, isNative = true),
+            sysrootProfileId = runtimeIdentity.cmakeProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
+            cppStandard = options.cppStandard,
+            cFlags = options.cFlags,
+            cppFlags = options.cppFlags,
+            ldFlags = options.ldFlags,
+            ldLibs = options.ldLibs,
+            cmakeArgs = combinedExtraCMakeArgs,
+        )
         val apiLibDir = File(sysrootDir, "usr/lib/${arch.triple}/$sysrootApiLevel")
         if (!apiLibDir.isDirectory) {
             val message = buildString {
@@ -856,14 +881,16 @@ class NativeCMakeBuildExecutor(
             sysrootManager.getCompilerFlags(
                 apiLevel = sysrootApiLevel,
                 arch = arch,
-                isCpp = false
+                isCpp = false,
+                profileId = options.sysrootProfileId
             )
         )
         val cxxSysrootSplit = MakeCommandOverrides.splitCompileAndLinkFlags(
             sysrootManager.getCompilerFlags(
                 apiLevel = sysrootApiLevel,
                 arch = arch,
-                isCpp = true
+                isCpp = true,
+                profileId = options.sysrootProfileId
             )
         )
         val cCompileFlags = cSysrootSplit.compileFlags.joinToString(" ")
@@ -1027,6 +1054,9 @@ class NativeCMakeBuildExecutor(
             }
 
             addAll(combinedExtraCMakeArgs)
+            cmakeIdentity.asCMakeCacheEntries().forEach { (key, value) ->
+                add("-D$key:STRING=$value")
+            }
         }
 
         Timber.tag(TAG).i("Configuring CMake project: ${projectDir.name}")

@@ -6,6 +6,8 @@ sealed interface ProjectTemplateSpec {
     val buildSystem: ProjectBuildSystem
     val primaryLanguage: ProjectLanguage
     val isNdkTemplate: Boolean
+    val defaultRunTargetName: String?
+    val defaultSdlTargetName: String?
 
     data class Zip(
         val id: String,
@@ -13,6 +15,8 @@ sealed interface ProjectTemplateSpec {
         override val buildSystem: ProjectBuildSystem,
         override val primaryLanguage: ProjectLanguage = ProjectLanguage.CPP,
         override val isNdkTemplate: Boolean = false,
+        override val defaultRunTargetName: String? = null,
+        override val defaultSdlTargetName: String? = null,
         val variables: Map<String, String> = emptyMap(),
     ) : ProjectTemplateSpec
 }

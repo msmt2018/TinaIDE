@@ -4,10 +4,13 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnostic
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
 import com.wuxianggujun.tinaide.core.compile.BuildResult
+import com.wuxianggujun.tinaide.core.compile.CMakeConfigurationIdentity
 import com.wuxianggujun.tinaide.core.compile.CleanResult
 import com.wuxianggujun.tinaide.core.compile.CompileTimeoutConfig
 import com.wuxianggujun.tinaide.core.compile.CompilerType
 import com.wuxianggujun.tinaide.core.compile.ConfigureResult
+import com.wuxianggujun.tinaide.core.compile.MakeCommandOverrides
+import com.wuxianggujun.tinaide.core.compile.NativeRuntimeIdentity
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
@@ -69,6 +72,8 @@ class CMakeBuildExecutor(
         val compilerType: CompilerType = CompilerType.CLANG,
         val cCompilerPath: String? = null,
         val cxxCompilerPath: String? = null,
+        val sysrootProfileId: String? = null,
+        val sysrootApiLevel: Int = MakeCommandOverrides.DEFAULT_SYSROOT_API_LEVEL,
         val cFlags: String = "",
         val cppFlags: String = "",
         val ldFlags: String = "",
@@ -152,10 +157,27 @@ class CMakeBuildExecutor(
         val projectLdFlags = options.ldFlags
         val projectLdLibs = options.ldLibs
         val projectStandardLibraries = CMakeLinkPolicy.resolveStandardLibraries(projectLdLibs)
+        val runtimeIdentity = NativeRuntimeIdentity(
+            sysrootProfileId = options.sysrootProfileId,
+            sysrootApiLevel = options.sysrootApiLevel,
+        )
         val combinedExtraCMakeArgs = options.extraCMakeArgs
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
+        val cmakeIdentity = CMakeConfigurationIdentity.create(
+            runMode = "PROOT",
+            compilerType = options.compilerType.name,
+            toolchainId = CMakeConfigurationIdentity.cacheToolchainId(null, isNative = false),
+            sysrootProfileId = runtimeIdentity.cmakeProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
+            cppStandard = options.cppStandard,
+            cFlags = options.cFlags,
+            cppFlags = options.cppFlags,
+            ldFlags = options.ldFlags,
+            ldLibs = options.ldLibs,
+            cmakeArgs = combinedExtraCMakeArgs,
+        )
         val packageEnv = buildPackageEnvironment(packagePaths, prootManager)
 
         // 构建 CMake 命令（使用 guest 路径）
@@ -178,11 +200,11 @@ class CMakeBuildExecutor(
 
         val cmakeCommand = buildString {
             append("cmake")
+            append(" --no-warn-unused-cli")
             append(" -S $guestProjectRoot")
             append(" -B $guestBuildDir")
             append(" -DCMAKE_BUILD_TYPE=${options.buildType.cmakeValue}")
             append(" -G \"${options.generator.cmakeValue}\"")
-
             // 设置编译器（只允许来自路径解析器或显式传入的路径）
             append(" -DCMAKE_C_COMPILER=$resolvedCCompiler")
             append(" -DCMAKE_CXX_COMPILER=$resolvedCxxCompiler")
@@ -216,6 +238,9 @@ class CMakeBuildExecutor(
             }
             combinedExtraCMakeArgs.forEach { arg ->
                 append(" $arg")
+            }
+            cmakeIdentity.asCMakeCacheEntries().forEach { (key, value) ->
+                append(" -D$key:STRING=${shellQuotePosix(value)}")
             }
         }
 

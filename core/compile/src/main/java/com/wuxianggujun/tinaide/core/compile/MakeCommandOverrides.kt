@@ -9,7 +9,7 @@ internal object MakeCommandOverrides {
 
     const val DEFAULT_SYSROOT_API_LEVEL: Int = 28
     const val MIN_SYSROOT_API_LEVEL: Int = 21
-    const val MAX_SYSROOT_API_LEVEL: Int = 35
+    const val MAX_SYSROOT_API_LEVEL: Int = 99
 
     fun isValidSysrootApiLevel(apiLevel: Int): Boolean = apiLevel in MIN_SYSROOT_API_LEVEL..MAX_SYSROOT_API_LEVEL
 

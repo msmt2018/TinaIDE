@@ -19,6 +19,7 @@ import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.editor.IEditorTabProvider
 import com.wuxianggujun.tinaide.file.IProjectContext
 import com.wuxianggujun.tinaide.output.IOutputManager
+import com.wuxianggujun.tinaide.project.ProjectMetadataStore
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -254,11 +255,6 @@ class CompileProjectUseCase(
         val preferSharedLibraryForRun = mode == ExecutionMode.RUN && runOutputMode.isSdlGraphical()
         val activeOutputMode = if (mode == ExecutionMode.RUN) runOutputMode else OutputMode.TERMINAL
         val request = operation.resolveRequest(activeOutputMode)
-        val normalizedLaunchEnvironment = resolveLaunchEnvironment(
-            projectRoot = projectRoot,
-            launch = request.launch,
-            launchEnvironment = launchEnvironment,
-        )
 
         val buildVariablesCtx = BuildVariables.BuildContext(
             projectDir = projectRoot,
@@ -295,17 +291,42 @@ class CompileProjectUseCase(
             onProgress = { msg -> log(msg) },
         )
 
-        // CMake + SDL 图形运行必须运行共享库目标；旧配置误选 executable 时自动纠正。
+        var cmakeTargets: List<TargetInfo>? = null
+        if (buildSystem == BuildSystem.CMAKE) {
+            val metadata = ProjectMetadataStore.read(projectRoot)
+            val metadataDefaultTargetName = CMakeRunTargetResolver.defaultTargetName(metadata, config.outputMode)
+            if (!metadataDefaultTargetName.isNullOrBlank()) {
+                val targets = loadCMakeTargets(projectRoot, buildDir, buildSystem, options)
+                cmakeTargets = targets
+                val targetRepair = CMakeRunTargetResolver.repairMissingOrInvalidTarget(
+                    requestedTargetName = effectiveTargetName,
+                    outputMode = config.outputMode,
+                    metadata = metadata,
+                    targets = targets,
+                )
+                if (targetRepair.repaired) {
+                    Timber.tag(TAG).w(
+                        "CMake target is missing or invalid, using metadata default: requested=%s default=%s",
+                        targetRepair.requestedTargetName ?: "<empty>",
+                        targetRepair.targetName,
+                    )
+                    effectiveTargetName = targetRepair.targetName
+                    val requestedDisplay = targetRepair.requestedTargetName
+                        ?: Strings.run_config_default_target.strOr(appContext)
+                    log(
+                        Strings.cmake_run_target_auto_repaired.strOr(
+                            appContext,
+                            targetRepair.targetName.orEmpty(),
+                            requestedDisplay,
+                        )
+                    )
+                }
+            }
+        }
+
+        // CMake + SDL must run a shared-library target; repair legacy executable selections.
         if (buildSystem == BuildSystem.CMAKE && preferSharedLibraryForRun) {
-            val ctxForTargetsQuery = buildContextFactory.create(
-                appContext = appContext,
-                projectRoot = projectRoot,
-                buildDir = buildDir,
-                buildSystem = buildSystem,
-                options = options,
-                target = null,
-            )
-            val targets = strategyRegistry.resolve(buildSystem)?.getTargets(ctxForTargetsQuery).orEmpty()
+            val targets = cmakeTargets ?: loadCMakeTargets(projectRoot, buildDir, buildSystem, options)
             val selectedTarget = effectiveTargetName
                 ?.let { name -> targets.firstOrNull { it.name == name } }
             val sharedTarget = targets.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY }
@@ -339,7 +360,7 @@ class CompileProjectUseCase(
             projectRoot = projectRoot,
             buildContext = buildVariablesCtx.copy(sourceFile = selectedSourceFile),
             config = config,
-            launchEnvironment = normalizedLaunchEnvironment,
+            launchEnvironment = launchEnvironment,
         )
     }
 
@@ -697,33 +718,45 @@ class CompileProjectUseCase(
         buildContext: BuildVariables.BuildContext,
         config: RunConfiguration,
         launchEnvironment: Map<String, String>,
-    ): LaunchSpec = when (descriptor) {
-        is LaunchDescriptor.Sdl -> LaunchSpec.Sdl(
-            libraryPath = descriptor.libraryPath,
-            environment = launchEnvironment,
+    ): LaunchSpec {
+        val nativeRuntimeIdentity = NativeRuntimeIdentity(
+            sysrootProfileId = descriptor.artifact.fingerprint.sysrootProfileId,
+            sysrootApiLevel = descriptor.artifact.fingerprint.sysrootApiLevel,
         )
-        is LaunchDescriptor.Debug -> LaunchSpec.Debug(
-            programPath = descriptor.programPath,
-            workingDirectory = descriptor.workingDir,
-            arguments = config.getArgsList(buildContext),
-            environment = launchEnvironment,
+        val resolvedLaunchEnvironment = resolveLaunchEnvironment(
+            projectRoot = projectRoot,
+            launchEnvironment = launchEnvironment,
+            nativeRuntimeIdentity = nativeRuntimeIdentity,
         )
-        is LaunchDescriptor.Terminal -> {
-            val workingDir = config.getAbsoluteWorkDir(projectRoot.absolutePath, buildContext)
-                .ifBlank { descriptor.workingDir.absolutePath }
-            val args = config.getArgsList(buildContext).ifEmpty { descriptor.args }
-            val command = terminalCommandBuilder.build(
-                workingDir = workingDir,
-                outputPath = descriptor.runnablePath,
-                args = args,
-                projectRoot = projectRoot,
-                extraEnvironment = launchEnvironment,
+        return when (descriptor) {
+            is LaunchDescriptor.Sdl -> LaunchSpec.Sdl(
+                libraryPath = descriptor.libraryPath,
+                environment = resolvedLaunchEnvironment,
             )
-            LaunchSpec.Terminal(
-                command = command,
-                runnablePath = descriptor.runnablePath,
-                workingDirectory = workingDir,
+            is LaunchDescriptor.Debug -> LaunchSpec.Debug(
+                programPath = descriptor.programPath,
+                workingDirectory = descriptor.workingDir,
+                arguments = config.getArgsList(buildContext),
+                environment = resolvedLaunchEnvironment,
             )
+            is LaunchDescriptor.Terminal -> {
+                val workingDir = config.getAbsoluteWorkDir(projectRoot.absolutePath, buildContext)
+                    .ifBlank { descriptor.workingDir.absolutePath }
+                val args = config.getArgsList(buildContext).ifEmpty { descriptor.args }
+                val command = terminalCommandBuilder.build(
+                    workingDir = workingDir,
+                    outputPath = descriptor.runnablePath,
+                    args = args,
+                    projectRoot = projectRoot,
+                    extraEnvironment = launchEnvironment,
+                    nativeRuntimeIdentity = nativeRuntimeIdentity,
+                )
+                LaunchSpec.Terminal(
+                    command = command,
+                    runnablePath = descriptor.runnablePath,
+                    workingDirectory = workingDir,
+                )
+            }
         }
     }
 
@@ -801,20 +834,38 @@ class CompileProjectUseCase(
 
     private fun resolveLaunchEnvironment(
         projectRoot: File,
-        launch: LaunchIntent,
         launchEnvironment: Map<String, String>,
+        nativeRuntimeIdentity: NativeRuntimeIdentity,
     ): Map<String, String> {
         val normalized = LaunchEnvironment.sanitized(launchEnvironment)
-        if (launch is LaunchIntent.None) {
-            return normalized
-        }
 
         val packagePaths = InstalledPackagePathResolver.resolve(appContext, projectRoot)
+        val sysrootRuntimeDirs = NativeRuntimeLibraryPaths.sysrootRuntimeDirs(
+            context = appContext,
+            sysrootProfileId = nativeRuntimeIdentity.sysrootProfileId,
+        )
         return LaunchEnvironment.withPrependedPath(
             environment = normalized,
             variableName = "LD_LIBRARY_PATH",
-            paths = packagePaths.runtimeLibDirs.map { it.absolutePath },
+            paths = (sysrootRuntimeDirs + packagePaths.runtimeLibDirs).map { it.absolutePath },
         )
+    }
+
+    private suspend fun loadCMakeTargets(
+        projectRoot: File,
+        buildDir: File,
+        buildSystem: BuildSystem,
+        options: BuildOptions,
+    ): List<TargetInfo> {
+        val ctxForTargetsQuery = buildContextFactory.create(
+            appContext = appContext,
+            projectRoot = projectRoot,
+            buildDir = buildDir,
+            buildSystem = buildSystem,
+            options = options,
+            target = null,
+        )
+        return strategyRegistry.resolve(buildSystem)?.getTargets(ctxForTargetsQuery).orEmpty()
     }
 
     private fun resolveBuildOptions(

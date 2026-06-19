@@ -267,7 +267,7 @@ internal fun EditorCanvasLayer(
             @Suppress("UNUSED_EXPRESSION")
             state.textVersion
             @Suppress("UNUSED_EXPRESSION")
-            state.highlightVersion
+            state.effectiveStylingVersion
 
             ui.canvasWidthPx = size.width
             ui.canvasHeightPx = size.height

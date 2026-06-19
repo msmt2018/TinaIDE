@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -114,8 +115,7 @@ fun FloatingOverlay(
             exit = fadeOut() + scaleOut(targetScale = 0.8f),
             modifier = Modifier.align(Alignment.Center)
         ) {
-            FloatingPanel(
-                enableFloatingLog = enableFloatingLog,
+            FloatingLogPanel(
                 logLines = logLines,
                 listState = listState,
                 onClearLog = { logLines.clear() },
@@ -210,8 +210,7 @@ private fun FloatingBall(
 }
 
 @Composable
-private fun FloatingPanel(
-    enableFloatingLog: Boolean,
+private fun FloatingLogPanel(
     logLines: List<LogEntry>,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onClearLog: () -> Unit,
@@ -221,8 +220,13 @@ private fun FloatingPanel(
 ) {
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
-    val panelWidth = with(density) { (windowSize.width * 0.85f).toDp() }
-    val panelHeight = with(density) { (windowSize.height * 0.6f).toDp() }
+    val panelWidth = with(density) { (windowSize.width * FLOATING_LOG_PANEL_WIDTH_FRACTION).toDp() }
+    val expandedLogHeight = with(density) { (windowSize.height * FLOATING_LOG_PANEL_HEIGHT_FRACTION).toDp() }
+    val logPanelHeight = if (logLines.isEmpty()) {
+        FloatingLogPanelEmptyHeight.coerceAtMost(expandedLogHeight)
+    } else {
+        expandedLogHeight
+    }
     val panelShape = RoundedCornerShape(TinaShapes.DialogCorner)
 
     TinaOverlayPanelSurface(
@@ -233,96 +237,118 @@ private fun FloatingPanel(
         tonalElevation = 8.dp,
         shadowElevation = 8.dp
     ) {
-        TinaCustomDialogScaffold(
-            modifier = Modifier.padding(16.dp),
-            header = {
-                TinaCustomDialogHeader(
-                    title = if (enableFloatingLog) {
-                        stringResource(Strings.floating_overlay_log_title)
-                    } else {
-                        stringResource(Strings.floating_overlay_exit)
-                    },
-                    trailingContent = {
-                        if (enableFloatingLog) {
-                            FloatingOverlayActionButton(
-                                onClick = onClearLog,
-                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f)
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = stringResource(Strings.floating_overlay_log_clear),
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-
-                        FloatingOverlayActionButton(onClick = onClose) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TinaCustomDialogHeader(
+                title = stringResource(Strings.floating_overlay_log_title),
+                trailingContent = {
+                    if (logLines.isNotEmpty()) {
+                        FloatingOverlayActionButton(
+                            onClick = onClearLog,
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f)
+                        ) {
                             Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(Strings.floating_overlay_exit_confirm_no),
+                                Icons.Default.Delete,
+                                contentDescription = stringResource(Strings.floating_overlay_log_clear),
+                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
+
+                    FloatingOverlayActionButton(onClick = onClose) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(Strings.floating_overlay_exit_confirm_no),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            )
+
+            FloatingLogContent(
+                logLines = logLines,
+                listState = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(logPanelHeight)
+            )
+
+            TinaDialogActionRow {
+                TinaOutlinedButton(
+                    text = stringResource(Strings.floating_overlay_exit),
+                    onClick = onExit,
+                    leadingIcon = Icons.AutoMirrored.Filled.ExitToApp
                 )
-            },
-            footer = {
-                TinaDialogActionRow {
-                    TinaOutlinedButton(
-                        text = stringResource(Strings.floating_overlay_exit),
-                        onClick = onExit,
-                        leadingIcon = Icons.AutoMirrored.Filled.ExitToApp
-                    )
-                }
             }
-        ) {
-            if (enableFloatingLog) {
-                FloatingOverlayLogSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(panelHeight)
-                ) {
-                    if (logLines.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = stringResource(Strings.floating_overlay_log_empty),
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            items(logLines) { entry ->
-                                Text(
-                                    text = entry.message,
-                                    color = when (entry.level) {
-                                        'E' -> Color(0xFFFF6B6B)
-                                        'W' -> Color(0xFFFFD93D)
-                                        else -> Color(0xFFCCCCCC)
-                                    },
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingLogContent(
+    logLines: List<LogEntry>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier = Modifier
+) {
+    FloatingOverlayLogSurface(modifier = modifier) {
+        if (logLines.isEmpty()) {
+            FloatingLogEmptyState()
+        } else {
+            FloatingLogList(
+                logLines = logLines,
+                listState = listState
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingLogEmptyState() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(Strings.floating_overlay_log_empty),
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+@Composable
+private fun FloatingLogList(
+    logLines: List<LogEntry>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        items(logLines) { entry ->
+            Text(
+                text = entry.message,
+                color = when (entry.level) {
+                    'E' -> Color(0xFFFF6B6B)
+                    'W' -> Color(0xFFFFD93D)
+                    else -> Color(0xFFCCCCCC)
+                },
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -371,6 +397,10 @@ data class LogEntry(
 )
 
 private const val MAX_LOG_LINES = 500
+private const val LOGCAT_INITIAL_LINE_COUNT = 200
+private const val FLOATING_LOG_PANEL_WIDTH_FRACTION = 0.85f
+private const val FLOATING_LOG_PANEL_HEIGHT_FRACTION = 0.60f
+private val FloatingLogPanelEmptyHeight = 112.dp
 
 /**
  * 捕获的 logcat 标签列表。
@@ -398,12 +428,11 @@ private suspend fun captureLogcat(logLines: MutableList<LogEntry>) = coroutineSc
     val tagFilters = LOG_TAGS.map { "$it:*" }
     val cmd = mutableListOf(
         "logcat",
-        "--pid",
-        pid.toString(),
+        "--pid=$pid",
         "-v",
         "brief",
         "-T",
-        "1",
+        LOGCAT_INITIAL_LINE_COUNT.toString(),
         "-s"
     ).apply { addAll(tagFilters) }
 

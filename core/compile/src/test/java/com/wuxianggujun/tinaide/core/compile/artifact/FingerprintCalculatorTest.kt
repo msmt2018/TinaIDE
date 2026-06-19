@@ -105,6 +105,51 @@ class FingerprintCalculatorTest {
         assertThat(fp1).isNotEqualTo(fp2)
     }
 
+    @Test
+    fun `tracked input content change invalidates fingerprint`() {
+        val ctx = newContext(defaultOptions())
+        val sourceFile = File(ctx.projectRoot, "main.c").apply {
+            writeText("int main() { return 0; }")
+        }
+        val fp1 = calc.compute(ctx, sampleSpec(sources = listOf(sourceFile)))
+
+        sourceFile.writeText("int main() { return 1; }")
+        val fp2 = calc.compute(ctx, sampleSpec(sources = listOf(sourceFile)))
+
+        assertThat(fp1.trackedInputsHash).isNotEqualTo(fp2.trackedInputsHash)
+        assertThat(fp1).isNotEqualTo(fp2)
+    }
+
+    @Test
+    fun `reconfigure input content change invalidates fingerprint`() {
+        val ctx = newContext(defaultOptions())
+        val sourceFile = File(ctx.projectRoot, "main.c").apply {
+            writeText("int main() { return 0; }")
+        }
+        val cmakeFile = File(ctx.projectRoot, "CMakeLists.txt").apply {
+            writeText("add_executable(app main.c)")
+        }
+        val fp1 = calc.compute(
+            ctx,
+            sampleSpec(
+                sources = listOf(sourceFile),
+                reconfigureSources = listOf(cmakeFile),
+            )
+        )
+
+        cmakeFile.writeText("add_executable(app main.c)\n")
+        val fp2 = calc.compute(
+            ctx,
+            sampleSpec(
+                sources = listOf(sourceFile),
+                reconfigureSources = listOf(cmakeFile),
+            )
+        )
+
+        assertThat(fp1.reconfigureInputsHash).isNotEqualTo(fp2.reconfigureInputsHash)
+        assertThat(fp1).isNotEqualTo(fp2)
+    }
+
     // ---------- helpers ----------
 
     private fun defaultOptions() = BuildOptions(
@@ -139,10 +184,12 @@ class FingerprintCalculatorTest {
         expectedPath: File = File(tempFolder.root, "hello"),
         kind: ArtifactKind = ArtifactKind.EXECUTABLE,
         sources: List<File> = listOf(File(tempFolder.root, "main.c")),
+        reconfigureSources: List<File> = emptyList(),
     ): ArtifactSpec = ArtifactSpec(
         id = ArtifactId(projectId = "test-project", targetName = "hello", variant = "default"),
         expectedPath = expectedPath,
         kind = kind,
         sources = sources,
+        reconfigureSources = reconfigureSources,
     )
 }

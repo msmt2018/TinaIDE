@@ -108,6 +108,39 @@ class DocumentSessionTest {
         }
     }
 
+    @Test
+    fun refreshDirtyStateForSave_shouldRefreshDirtyStateFromActiveBinding() = runTest {
+        val file = Files.createTempFile("document-session-dirty-refresh", ".txt").toFile()
+        file.writeText("template")
+        val session = createSession(file, this)
+        val binding = FakeEditorBinding(
+            text = "template",
+            canUndo = false,
+            canRedo = false
+        )
+
+        try {
+            session.attachEditor(binding)
+            session.markEditorSnapshotClean()
+
+            binding.setText("pasted code")
+
+            assertThat(session.state.value.isDirty).isFalse()
+            assertThat(session.refreshDirtyStateForSave()).isTrue()
+            assertThat(session.state.value.isDirty).isTrue()
+
+            val result = session.save(SaveReason.MANUAL)
+
+            assertThat(result).isInstanceOf(SaveResult.Success::class.java)
+            assertThat((result as SaveResult.Success).target)
+                .isEqualTo(SaveTarget(tabId = "tab-id", file = file))
+            assertThat(file.readText()).isEqualTo("pasted code")
+        } finally {
+            session.stopFileWatcher()
+            file.delete()
+        }
+    }
+
     private fun createSession(
         file: File,
         scope: CoroutineScope = TestScope(StandardTestDispatcher())

@@ -214,11 +214,8 @@ class MakeStrategy(
 
     private fun collectSourceFiles(projectRoot: File): List<File> = TrackedInputCollector.collectMakeInputs(projectRoot, SOURCE_EXTENSIONS)
 
-    private fun captureSourceRef(file: File, projectRoot: File): SourceRef = SourceRef(
-        relativePath = file.toRelativeString(projectRoot),
-        mtime = file.lastModified(),
-        size = file.length(),
-    )
+    private fun captureSourceRef(file: File, projectRoot: File): SourceRef =
+        SourceRef.capture(file, projectRoot)
 
     private fun computeContentHash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

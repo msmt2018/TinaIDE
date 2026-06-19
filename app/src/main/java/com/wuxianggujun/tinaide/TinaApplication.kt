@@ -13,6 +13,7 @@ import com.wuxianggujun.tinaide.core.crash.CrashLogAutoUploader
 import com.wuxianggujun.tinaide.core.crash.NativeCrashHandler
 import com.wuxianggujun.tinaide.core.debug.di.debugModule
 import com.wuxianggujun.tinaide.core.i18n.AppStrings
+import com.wuxianggujun.tinaide.core.logging.LogProcessRegistry
 import com.wuxianggujun.tinaide.core.logging.TinaTimber
 import com.wuxianggujun.tinaide.core.proot.PRootBootstrap
 import com.wuxianggujun.tinaide.core.proot.di.prootModule
@@ -79,6 +80,7 @@ class TinaApplication : Application() {
         // 初始化 xCrash（Native 崩溃捕获）
         // 必须在 attachBaseContext 中尽早调用
         val processName = Application.getProcessName()
+        LogProcessRegistry.recordProcess(this, android.os.Process.myPid(), processName)
         // 主进程和原生运行容器进程弹出崩溃界面。
         // SDL 用户 native 程序运行在隔离进程，崩溃时只结束运行容器，并由 :crash 进程展示日志。
         // 用户项目/插件运行日志属于用户隐私，只本地保存与展示，不上传到 TinaIDE 服务器。

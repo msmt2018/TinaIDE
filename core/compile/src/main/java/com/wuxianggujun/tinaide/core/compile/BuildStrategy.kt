@@ -180,7 +180,8 @@ data class TargetInfo(
     val name: String,
     val type: Type,
     val sources: List<String>,
-    val outputName: String? = null
+    val outputName: String? = null,
+    val dependencies: List<String> = emptyList(),
 ) {
     enum class Type {
         EXECUTABLE,

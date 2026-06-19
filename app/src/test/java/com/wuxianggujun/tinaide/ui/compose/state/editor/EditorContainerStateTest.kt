@@ -13,6 +13,7 @@ import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.session.DocumentSessionState
 import com.wuxianggujun.tinaide.editor.session.SaveReason
 import com.wuxianggujun.tinaide.editor.session.SaveResult
+import com.wuxianggujun.tinaide.editor.session.SaveTarget
 import com.wuxianggujun.tinaide.editor.theme.PluginEditorThemeRegistry
 import com.wuxianggujun.tinaide.plugin.PluginSnippetManager
 import com.wuxianggujun.tinaide.ui.compose.components.EditorStatus
@@ -1199,6 +1200,24 @@ class EditorContainerStateTest {
                 listOf(SaveResult.Success(timestamp = 2L, reason = SaveReason.MANUAL))
             )
         ).isEmpty()
+    }
+
+    @Test
+    fun resolveSuccessfulSaveAllNotificationTargets_shouldPreferTargetsFromSaveResults() {
+        val savedFile = File(context.cacheDir, "Saved.kt")
+
+        val successfulTargets = state.resolveSuccessfulSaveAllNotificationTargets(
+            listOf(
+                SaveResult.Success(
+                    timestamp = 1L,
+                    reason = SaveReason.MANUAL,
+                    target = SaveTarget(tabId = "tab-saved", file = savedFile)
+                )
+            )
+        )
+
+        assertThat(successfulTargets.map { it.tabId }).containsExactly("tab-saved")
+        assertThat(successfulTargets.map { it.file }).containsExactly(savedFile)
     }
 
     @Test

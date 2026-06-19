@@ -281,9 +281,8 @@ class EditorManager(
     }
 
     override suspend fun saveAll(reason: SaveReason): List<SaveResult> {
-        val targets = synchronized(stateLock) {
-            sessions.values.filter { it.state.value.isDirty }
-        }
+        val sessionSnapshot = synchronized(stateLock) { sessions.values.toList() }
+        val targets = sessionSnapshot.filter { it.refreshDirtyStateForSave() }
         if (targets.isEmpty()) {
             return emptyList()
         }

@@ -361,13 +361,7 @@ fun TinaCodeEditorPage(
             buffer = buffer,
             editorState = editorState,
             textSnapshot = textSnapshot
-        ) { canUndo, canRedo, change ->
-            state.updateTabState(
-                tabId = tab.id,
-                isDirty = true,
-                canUndo = canUndo,
-                canRedo = canRedo
-            )
+        ) { _, _, change ->
             state.notifyTinaTextChanged(tab.id, change)
         }
     }
@@ -914,13 +908,13 @@ private class TextBufferSessionBinding(
         if (suppressNotify) return
         val canUndo = buffer.canUndo()
         val canRedo = buffer.canRedo()
-        onBufferEdited(canUndo, canRedo, change)
         state.notifyTabEditorContentChanged(
             tabId = tabId,
             canUndo = canUndo,
             canRedo = canRedo,
             changeCausedByUndoManager = change.fromUndoRedo
         )
+        onBufferEdited(canUndo, canRedo, change)
     }
 
     override fun readText(): String = textSnapshot.readText()

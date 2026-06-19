@@ -57,7 +57,7 @@ internal enum class LogBundleSource(
         includedInLocalExport = true,
         includedInServerUpload = true,
         localExportReason = "Local export may include full logcat for user-controlled troubleshooting.",
-        serverUploadReason = "Server upload keeps only current app process logcat to capture non-Timber diagnostics without global fallback.",
+        serverUploadReason = "Server upload keeps recent TinaIDE process logcat by pid to capture non-Timber diagnostics without global fallback.",
         serverExcludedReason = "Not excluded."
     ),
     APP_INFO(
@@ -236,7 +236,7 @@ internal object LogExportManifestBuilder {
             appendLine("consent_required_privacy_classes=${serverUploadConsentRequiredPrivacyClasses.joinToString(", ") { it.name }}")
             appendLine("excluded_privacy_classes=${excludedPrivacyClasses.joinToString(", ") { it.name }.ifBlank { "NONE" }}")
             appendLine("timber_role=primary_structured_tinaide_diagnostic_source")
-            appendLine("logcat_role=supplemental_current_app_process_source")
+            appendLine("logcat_role=supplemental_tinaide_process_sources_by_pid")
             appendLine("user_runtime_tombstone_filter=${!policy.includeUserRuntimeTombstones}")
             appendLine()
             appendLine("[sources]")
