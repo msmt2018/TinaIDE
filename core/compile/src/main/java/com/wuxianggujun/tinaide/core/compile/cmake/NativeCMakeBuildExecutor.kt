@@ -2,6 +2,8 @@ package com.wuxianggujun.tinaide.core.compile.cmake
 
 import android.content.Context
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
+import com.wuxianggujun.tinaide.core.compile.BuildProcessRunner
+import com.wuxianggujun.tinaide.core.compile.BuildResourceCleaner
 import com.wuxianggujun.tinaide.core.compile.BuildResult
 import com.wuxianggujun.tinaide.core.compile.CMakeConfigurationIdentity
 import com.wuxianggujun.tinaide.core.compile.CleanResult
@@ -21,10 +23,8 @@ import com.wuxianggujun.tinaide.core.util.AndroidSystemLinker
 import com.wuxianggujun.tinaide.core.util.DiagnosticLogFormatter
 import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
 import java.io.File
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.concurrent.thread
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 /**
@@ -1499,7 +1499,9 @@ class NativeCMakeBuildExecutor(
         onOutputLine: ((String) -> Unit)? = null,
         useToolchainShimEnvironment: Boolean = true,
         useRecommendedTinaExec: Boolean = true
-    ): CommandResult = try {
+    ): CommandResult {
+        val commandTempDir = BuildResourceCleaner.createCommandTempDir(appContext.cacheDir, "native-cmake")
+        return try {
         // 使用 NativeExecutableRunner 构建命令，自动处理 linker64 启动逻辑
         val executable = command[0]
         val args = command.drop(1)
@@ -1514,7 +1516,7 @@ class NativeCMakeBuildExecutor(
                 this,
                 nativeLibDir,
                 toolchainManager.getBinDir(toolchainId).absolutePath,
-                tmpDir = appContext.cacheDir.absolutePath,
+                tmpDir = commandTempDir.absolutePath,
                 homeDir = appContext.filesDir.absolutePath
             )
             if (!useRecommendedTinaExec) {
@@ -1555,75 +1557,49 @@ class NativeCMakeBuildExecutor(
             toolchainBinDir = toolchainManager.getBinDir(toolchainId).absolutePath
         )
 
-        val startedAt = System.currentTimeMillis()
-        val process = processBuilder.start()
-        val output = StringBuilder()
-        val outputLock = Any()
-        val readerDone = CountDownLatch(1)
-        val readerError = AtomicReference<Throwable?>(null)
+        val result = BuildProcessRunner.run(
+            processBuilder = processBuilder,
+            commandLabel = "native-cmake:${File(executable).name}",
+            timeoutMs = timeout,
+            onOutputLine = { line ->
+                onOutputLine?.invoke(line)
+                Timber.tag(TAG).v(line)
+            },
+        )
 
-        // 持续读取输出，确保 onOutputLine 在进程运行期间就能收到日志。
-        thread(
-            name = "NativeCMakeBuildExecutor-output",
-            isDaemon = true
-        ) {
-            try {
-                process.inputStream.bufferedReader().use { reader ->
-                    reader.lineSequence().forEach { line ->
-                        synchronized(outputLock) {
-                            appendCommandOutputLine(output, line, onOutputLine)
-                        }
-                        Timber.tag(TAG).v(line)
-                    }
-                }
-            } catch (t: Throwable) {
-                readerError.set(t)
-            } finally {
-                readerDone.countDown()
-            }
-        }
-
-        // 与输出读取并行等待进程结束，超时后可以真正中断构建。
-        val processExit = waitForProcessExit(process, timeout)
-        if (!readerDone.await(2, TimeUnit.SECONDS)) {
-            Timber.tag(TAG).w("Timed out waiting for native cmake output reader to finish")
-        }
-        readerError.get()?.let { error ->
-            Timber.tag(TAG).w(error, "Native cmake output reader failed")
-        }
-        val finalOutput = synchronized(outputLock) { output.toString() }
-        val durationMs = System.currentTimeMillis() - startedAt
         val resultSummary = buildNativeCommandResultSummary(
             executable = executable,
             fullCommand = fullCommand,
             workingDir = workingDir,
             timeoutMs = timeout,
-            durationMs = durationMs,
-            finished = processExit.finished,
-            exitCode = processExit.exitCode,
-            output = finalOutput
+            durationMs = result.durationMs,
+            finished = !result.timedOut,
+            exitCode = result.exitCode,
+            output = result.output
         )
-        if (processExit.finished && processExit.exitCode == 0) {
+        if (!result.timedOut && result.exitCode == 0) {
             Timber.tag(TAG).d(resultSummary)
         } else {
             Timber.tag(TAG).w(resultSummary)
         }
-        if (!processExit.finished) {
+        if (result.timedOut) {
             Timber.tag(TAG).w("Native cmake command timed out after %d ms", timeout)
         }
-        if (processExit.exitCode != 0) {
+        if (result.exitCode != 0) {
             NativeExecutableRunner.logFailureDiagnostics(
                 tag = TAG,
                 executable = executable,
-                output = finalOutput,
+                output = result.output,
                 toolchainBinDir = toolchainManager.getBinDir().absolutePath
             )
         }
 
         CommandResult(
-            exitCode = processExit.exitCode,
-            output = finalOutput
+            exitCode = result.exitCode,
+            output = result.output
         )
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         Timber.tag(TAG).e(e, "Failed to execute native command")
         NativeExecutableRunner.logFailureDiagnostics(
@@ -1636,6 +1612,9 @@ class NativeCMakeBuildExecutor(
             exitCode = -1,
             output = "Exception: ${e.message}"
         )
+    } finally {
+        BuildResourceCleaner.cleanupCommandTempDir(commandTempDir)
+    }
     }
 
     private fun applyExtraEnvironment(

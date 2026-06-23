@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.network.server.ServerConfigResponse
 
 internal data class DeveloperDiagnosticsControlsState(
+    val buildDiagnosticsLogControlEnabled: Boolean,
     val lspCompileCommandsSelectionLogControlEnabled: Boolean,
     val lspClangdStartupLogControlEnabled: Boolean,
     val editorTouchDiagnosticsControlEnabled: Boolean,
@@ -76,6 +77,7 @@ internal object DeveloperOptionsSectionSupport {
         val diagnosticsControlsEnabled = diagnosticsEnabled
         val touchSubControlsEnabled = diagnosticsEnabled && editorTouchDiagnosticsEnabled
         return DeveloperDiagnosticsControlsState(
+            buildDiagnosticsLogControlEnabled = diagnosticsControlsEnabled,
             lspCompileCommandsSelectionLogControlEnabled = diagnosticsControlsEnabled,
             lspClangdStartupLogControlEnabled = diagnosticsControlsEnabled,
             editorTouchDiagnosticsControlEnabled = diagnosticsControlsEnabled,

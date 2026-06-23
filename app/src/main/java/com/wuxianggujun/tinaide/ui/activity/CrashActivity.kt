@@ -37,7 +37,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -52,7 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import com.wuxianggujun.tinaide.core.crash.CrashLogUploadScheduler
+import androidx.lifecycle.lifecycleScope
+import com.wuxianggujun.tinaide.core.crash.CrashLogAutoUploader
 import com.wuxianggujun.tinaide.core.crash.CrashUploadState
 import com.wuxianggujun.tinaide.core.crash.CrashUploadStatusTextResolver
 import com.wuxianggujun.tinaide.core.crash.CrashUploadStatusTextSpec
@@ -69,6 +73,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.system.exitProcess
+import kotlinx.coroutines.launch
 
 /**
  * 崩溃信息展示页面（纯 Compose 实现）
@@ -78,7 +83,7 @@ class CrashActivity : ComponentActivity() {
 
     private var crashReport: String = ""
     private var crashSource: String = SOURCE_APP
-    private var crashUploadSnapshot: CrashUploadState.Snapshot? = null
+    private var crashUploadSnapshot by mutableStateOf<CrashUploadState.Snapshot?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeInitializer(this).applyNightMode()
@@ -93,9 +98,13 @@ class CrashActivity : ComponentActivity() {
         crashSource = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_APP
 
         if (crashSource == SOURCE_APP) {
-            // 用户可能不会再次启动 App：直接入队上传任务，避免 tombstone 写入与扫描之间的竞态。
-            CrashLogUploadScheduler.schedule(applicationContext)
             crashUploadSnapshot = CrashUploadState.getLastUploadSnapshot(applicationContext)
+            // 用户可能不会再次启动 App：在崩溃页进程里立即补传，并保留 JobScheduler 兜底重试。
+            CrashLogAutoUploader.uploadFromCrashScreen(applicationContext, lifecycleScope) {
+                lifecycleScope.launch {
+                    crashUploadSnapshot = CrashUploadState.getLastUploadSnapshot(applicationContext)
+                }
+            }
         }
 
         setContent {

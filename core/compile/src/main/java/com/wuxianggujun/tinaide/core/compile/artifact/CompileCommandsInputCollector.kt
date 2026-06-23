@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.core.compile.artifact
 
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -18,10 +19,22 @@ internal object CompileCommandsInputCollector {
         buildDir: File,
         targetNames: Set<String>,
     ): CompileCommandsInputs? {
-        val databaseFile = File(buildDir, COMPILE_COMMANDS_FILE).takeIf { it.isFile } ?: return null
+        val databaseFile = File(buildDir, COMPILE_COMMANDS_FILE)
+        if (!databaseFile.isFile) {
+            BuildDiagnosticsLog.d {
+                "compile_commands input collect: database missing path=${databaseFile.absolutePath} targets=${targetNames.summary()}"
+            }
+            return null
+        }
+
         val entries = runCatching {
             json.decodeFromString<List<CompileCommandEntry>>(databaseFile.readText(Charsets.UTF_8))
-        }.getOrNull().orEmpty()
+        }.getOrElse { throwable ->
+            BuildDiagnosticsLog.w(throwable) {
+                "compile_commands input collect: parse failed path=${databaseFile.absolutePath}"
+            }
+            return null
+        }
 
         val resolvedEntries = entries
             .mapNotNull { entry ->
@@ -33,7 +46,13 @@ internal object CompileCommandsInputCollector {
             }
             .filter { it.source.isFile }
 
-        if (resolvedEntries.isEmpty()) return null
+        if (resolvedEntries.isEmpty()) {
+            BuildDiagnosticsLog.w {
+                "compile_commands input collect: no resolvable source entries path=${databaseFile.absolutePath} " +
+                    "entryCount=${entries.size}"
+            }
+            return null
+        }
 
         val targetMatchedEntries = targetNames
             .takeIf { it.isNotEmpty() }
@@ -41,6 +60,11 @@ internal object CompileCommandsInputCollector {
             .orEmpty()
 
         val selectedEntries = targetMatchedEntries.ifEmpty { resolvedEntries }
+        BuildDiagnosticsLog.i {
+            "compile_commands input collect: path=${databaseFile.absolutePath} entries=${entries.size} " +
+                "resolved=${resolvedEntries.size} targets=${targetNames.summary()} targetMatched=${targetMatchedEntries.size} " +
+                "selected=${selectedEntries.size} selectedSources=${selectedEntries.map { it.source }.summaryRelativeTo(projectRoot)}"
+        }
         return CompileCommandsInputs(
             databaseFile = databaseFile,
             sources = selectedEntries.map { it.source },
@@ -88,6 +112,18 @@ internal object CompileCommandsInputCollector {
             ?.getOrNull(1)
             ?.takeIf { it.isNotBlank() }
     }
+
+    private fun Set<String>.summary(): String =
+        if (isEmpty()) "<none>" else sorted().joinToString(separator = "|", limit = 8)
+
+    private fun List<File>.summaryRelativeTo(projectRoot: File): String =
+        if (isEmpty()) {
+            "<none>"
+        } else {
+            take(8).joinToString(separator = "|") { file ->
+                file.relativeToOrSelf(projectRoot).path.replace(File.separatorChar, '/')
+            } + if (size > 8) "|...(+${size - 8})" else ""
+        }
 
     data class CompileCommandsInputs(
         val databaseFile: File,

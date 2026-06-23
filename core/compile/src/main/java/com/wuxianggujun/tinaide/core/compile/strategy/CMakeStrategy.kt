@@ -4,6 +4,7 @@ import android.content.Context
 import com.wuxianggujun.tinaide.cmake.CMake
 import com.wuxianggujun.tinaide.cmake.CMakeDoc
 import com.wuxianggujun.tinaide.cmake.analysis.CMakeAnalyzer
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.compile.BuildOptions
 import com.wuxianggujun.tinaide.core.compile.BuildResult
 import com.wuxianggujun.tinaide.core.compile.BuildSystem
@@ -82,12 +83,21 @@ class CMakeStrategy(
 
     override suspend fun describeOutput(ctx: BuildContext): ArtifactSpec? {
         val all = loadTargets(ctx.projectRoot, ctx.buildDir)
+        BuildDiagnosticsLog.i {
+            "cmake describeOutput targets loaded project=${ctx.projectRoot.absolutePath} " +
+                "requested=${ctx.target.orEmpty()} preferSharedLibraryForRun=${ctx.options.preferSharedLibraryForRun} " +
+                "count=${all.size} targets=${all.diagnosticsSummary()}"
+        }
         if (all.isEmpty()) {
             Timber.tag(TAG).w("describeOutput: no targets in %s", ctx.projectRoot.absolutePath)
+            BuildDiagnosticsLog.w { "cmake describeOutput failed: no targets project=${ctx.projectRoot.absolutePath}" }
             return null
         }
         val selected = selectTarget(all, ctx.target, ctx.options) ?: run {
             Timber.tag(TAG).w("describeOutput: cannot resolve target=%s", ctx.target)
+            BuildDiagnosticsLog.w {
+                "cmake describeOutput failed: cannot resolve target requested=${ctx.target.orEmpty()} targets=${all.diagnosticsSummary()}"
+            }
             return null
         }
 
@@ -102,15 +112,16 @@ class CMakeStrategy(
         val sourceFiles = selected.sources
             .map { relative -> File(ctx.projectRoot, relative) }
             .filter { it.isFile }
+        val targetClosure = resolveTargetClosure(selected, all)
         val compileInputs = TrackedInputCollector.collectCMakeCompileInputs(
             projectRoot = ctx.projectRoot,
             buildDir = ctx.buildDir,
-            targetNames = resolveTargetClosure(selected, all),
+            targetNames = targetClosure,
             targetSources = sourceFiles,
         )
         val reconfigureInputs = TrackedInputCollector.collectCMakeReconfigureInputs(ctx.projectRoot)
 
-        return ArtifactSpec(
+        val spec = ArtifactSpec(
             id = ArtifactId(
                 projectId = ctx.projectId,
                 targetName = selected.name,
@@ -121,6 +132,12 @@ class CMakeStrategy(
             sources = compileInputs,
             reconfigureSources = reconfigureInputs,
         )
+        BuildDiagnosticsLog.i {
+            "cmake describeOutput selected=${selected.diagnosticsSummary()} targetClosure=${targetClosure.sorted().joinToString("|")} " +
+                "kind=$kind expected=${spec.expectedPath.absolutePath} targetSourceFiles=${sourceFiles.size} " +
+                "compileInputs=${compileInputs.size} reconfigureInputs=${reconfigureInputs.size}"
+        }
+        return spec
     }
 
     override suspend fun execute(
@@ -465,6 +482,10 @@ class CMakeStrategy(
             ?: spec.expectedPath.takeIf { it.isFile }
         if (artifactFile == null) {
             val reason = "CMake reported success but artifact missing (expected ${spec.expectedPath.absolutePath})"
+            BuildDiagnosticsLog.w {
+                "cmake wrap artifact failed: reported success but artifact missing " +
+                    "reported=${success.outputPath.orEmpty()} expected=${spec.expectedPath.absolutePath}"
+            }
             emitter.emit(BuildEvent.Build.CompileFailed(reason, emptyList()))
             return ExecutionOutcome.Failure(reason)
         }
@@ -484,6 +505,11 @@ class CMakeStrategy(
             compiledAt = System.currentTimeMillis(),
             buildTimeMs = elapsedMs,
         )
+        BuildDiagnosticsLog.i {
+            "cmake wrap artifact success target=${artifact.id.targetName} artifact=${artifact.absolutePath} " +
+                "kind=${artifact.kind} elapsedMs=$elapsedMs sources=${artifact.sources.size} " +
+                "contentHash=${artifact.contentHash.take(12)} trackedHash=${artifact.fingerprint.trackedInputsHash.take(12)}"
+        }
         emitter.emit(BuildEvent.Build.CompileCompleted(artifact))
         return ExecutionOutcome.Success(artifact, success.message)
     }
@@ -505,17 +531,28 @@ class CMakeStrategy(
 
     private suspend fun refreshTrackedInputSpec(ctx: BuildContext, spec: ArtifactSpec): ArtifactSpec {
         val all = loadTargets(ctx.projectRoot, ctx.buildDir)
-        val selected = all.firstOrNull { it.name == spec.id.targetName } ?: return spec
+        val selected = all.firstOrNull { it.name == spec.id.targetName } ?: run {
+            BuildDiagnosticsLog.w {
+                "cmake refresh tracked inputs skipped: target missing target=${spec.id.targetName} targets=${all.diagnosticsSummary()}"
+            }
+            return spec
+        }
         val sourceFiles = selected.sources
             .map { relative -> File(ctx.projectRoot, relative) }
             .filter { it.isFile }
+        val targetClosure = resolveTargetClosure(selected, all)
         val compileInputs = TrackedInputCollector.collectCMakeCompileInputs(
             projectRoot = ctx.projectRoot,
             buildDir = ctx.buildDir,
-            targetNames = resolveTargetClosure(selected, all),
+            targetNames = targetClosure,
             targetSources = sourceFiles,
         )
         val reconfigureInputs = TrackedInputCollector.collectCMakeReconfigureInputs(ctx.projectRoot)
+        BuildDiagnosticsLog.i {
+            "cmake refresh tracked inputs target=${selected.name} targetClosure=${targetClosure.sorted().joinToString("|")} " +
+                "oldCompileInputs=${spec.sources.size} newCompileInputs=${compileInputs.size} " +
+                "oldReconfigureInputs=${spec.reconfigureSources.size} newReconfigureInputs=${reconfigureInputs.size}"
+        }
         return spec.copy(
             sources = compileInputs,
             reconfigureSources = reconfigureInputs,
@@ -523,16 +560,24 @@ class CMakeStrategy(
     }
 
     private fun selectTarget(all: List<TargetInfo>, requested: String?, options: BuildOptions): TargetInfo? {
-        if (!requested.isNullOrBlank()) return all.firstOrNull { it.name == requested }
-        return if (options.preferSharedLibraryForRun) {
-            all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY && !it.isAuxiliaryTarget() }
-                ?: all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY }
+        val selected = if (!requested.isNullOrBlank()) {
+            all.firstOrNull { it.name == requested }
         } else {
-            all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE && !it.isAuxiliaryTarget() }
-                ?: all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE }
+            if (options.preferSharedLibraryForRun) {
+                all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY && !it.isAuxiliaryTarget() }
+                    ?: all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY }
+            } else {
+                all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE && !it.isAuxiliaryTarget() }
+                    ?: all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE }
+            }
+                ?: all.firstOrNull { it.type != TargetInfo.Type.OTHER }
+                ?: all.firstOrNull()
         }
-            ?: all.firstOrNull { it.type != TargetInfo.Type.OTHER }
-            ?: all.firstOrNull()
+        BuildDiagnosticsLog.i {
+            "cmake selectTarget requested=${requested.orEmpty()} preferSharedLibraryForRun=${options.preferSharedLibraryForRun} " +
+                "selected=${selected?.diagnosticsSummary().orEmpty()} candidates=${all.diagnosticsSummary()}"
+        }
+        return selected
     }
 
     private fun TargetInfo.isAuxiliaryTarget(): Boolean {
@@ -544,6 +589,19 @@ class CMakeStrategy(
             normalized.endsWith("_tests") ||
             normalized.endsWith("-tests")
     }
+
+    private fun List<TargetInfo>.diagnosticsSummary(limit: Int = 12): String =
+        if (isEmpty()) {
+            "<none>"
+        } else {
+            take(limit).joinToString(separator = ";") { it.diagnosticsSummary() } +
+                if (size > limit) ";...(+${size - limit})" else ""
+        }
+
+    private fun TargetInfo.diagnosticsSummary(): String =
+        "$name:$type:aux=${isAuxiliaryTarget()}:sources=${sources.size}:deps=${
+            dependencies.joinToString(separator = "|", limit = 4)
+        }:output=${outputName.orEmpty()}"
 
     private fun mapKind(type: TargetInfo.Type): ArtifactKind = when (type) {
         TargetInfo.Type.EXECUTABLE -> ArtifactKind.EXECUTABLE

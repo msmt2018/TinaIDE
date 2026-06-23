@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.core.compile.artifact
 
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
 import java.io.File
 
@@ -47,16 +48,27 @@ internal object TrackedInputCollector {
     ): List<File> {
         val compileCommandsInputs = CompileCommandsInputCollector.collect(projectRoot, buildDir, targetNames)
         return if (compileCommandsInputs != null) {
-            mergeUniqueFiles(
+            val merged = mergeUniqueFiles(
                 targetSources +
                     compileCommandsInputs.databaseFile +
                     compileCommandsInputs.sources
             )
+            BuildDiagnosticsLog.i {
+                "tracked inputs cmake: using compile_commands database=${compileCommandsInputs.databaseFile.absolutePath} " +
+                    "targetSources=${targetSources.size} compileCommandSources=${compileCommandsInputs.sources.size} " +
+                    "merged=${merged.size}"
+            }
+            merged
         } else {
             val projectSources = walkProjectFiles(projectRoot) { file ->
                 file.extension.lowercase() in CMAKE_SOURCE_EXTENSIONS
             }
-            mergeUniqueFiles(targetSources + projectSources)
+            val merged = mergeUniqueFiles(targetSources + projectSources)
+            BuildDiagnosticsLog.i {
+                "tracked inputs cmake: compile_commands unavailable, fallback project scan " +
+                    "targetSources=${targetSources.size} projectSources=${projectSources.size} merged=${merged.size}"
+            }
+            merged
         }
     }
 

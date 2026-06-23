@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.ui
 
 import android.content.Context
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.compile.CompileProjectUseCase
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
@@ -239,19 +240,34 @@ class CompileActionsHelper(
         actionLabel: String,
         progressToast: String? = null,
     ) {
-        if (!ensureAllEditorsSaved(actionLabel)) return
+        BuildDiagnosticsLog.i {
+            "ui compile action requested action=${operation.action} mode=${operation.mode} label=$actionLabel"
+        }
+        if (!ensureAllEditorsSaved(actionLabel)) {
+            BuildDiagnosticsLog.w {
+                "ui compile action cancelled before dispatch: action=${operation.action} mode=${operation.mode}"
+            }
+            return
+        }
 
         processController.reset()
         lastExecutionMode = operation.mode
         prepareForCompile()
         uiBridge.setCompiling(true)
         progressToast?.let { emitToast(it, ToastType.INFO) }
+        BuildDiagnosticsLog.i {
+            "ui compile action dispatching action=${operation.action} mode=${operation.mode}"
+        }
         commandRunner.compile(operation)
     }
 
     private suspend fun runCMakeMaintenance(action: CompileProjectUseCase.Action) {
         val uiText = action.resolveUiText(context)
-        if (!ensureAllEditorsSaved(uiText.menuLabel)) return
+        BuildDiagnosticsLog.i { "ui cmake maintenance requested action=$action label=${uiText.menuLabel}" }
+        if (!ensureAllEditorsSaved(uiText.menuLabel)) {
+            BuildDiagnosticsLog.w { "ui cmake maintenance cancelled before dispatch: action=$action" }
+            return
+        }
 
         processController.reset()
         prepareForCompile()
@@ -274,10 +290,30 @@ class CompileActionsHelper(
      * 确保所有编辑器已保存
      */
     private suspend fun ensureAllEditorsSaved(actionName: String): Boolean {
+        val openTabs = editorManager.getOpenTabs()
+        BuildDiagnosticsLog.i {
+            "saveAll start action=$actionName openTabs=${openTabs.size} " +
+                "activeTab=${editorManager.getActiveTabId().orEmpty()} activeFile=${editorManager.getActiveFile()?.absolutePath.orEmpty()}"
+        }
+        val startMs = System.currentTimeMillis()
         val results = editorManager.saveAll(SaveReason.MANUAL)
-        if (results.isEmpty()) return true
+        val elapsedMs = System.currentTimeMillis() - startMs
+        if (results.isEmpty()) {
+            BuildDiagnosticsLog.i { "saveAll done action=$actionName elapsedMs=$elapsedMs result=no-dirty-tabs" }
+            return true
+        }
+        val successes = results.filterIsInstance<SaveResult.Success>()
         val failures = results.filterIsInstance<SaveResult.Failure>()
+        val noOps = results.count { it is SaveResult.NoOp }
+        BuildDiagnosticsLog.i {
+            "saveAll done action=$actionName elapsedMs=$elapsedMs total=${results.size} " +
+                "success=${successes.size} failure=${failures.size} noOp=$noOps " +
+                "savedTargets=${successes.joinToString(limit = 8) { it.target?.file?.absolutePath ?: "<unknown>" }}"
+        }
         if (failures.isNotEmpty()) {
+            BuildDiagnosticsLog.w {
+                "saveAll failed action=$actionName firstFailure=${failures.first().message} failureCount=${failures.size}"
+            }
             emitToast(
                 Strings.toast_save_failed_cancelled.strOr(context, actionName, failures.first().message),
                 ToastType.ERROR

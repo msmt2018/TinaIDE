@@ -32,6 +32,7 @@ data class EditorSettings(
 
 data class DeveloperDiagnosticsSettings(
     val diagnosticsEnabled: Boolean,
+    val buildDiagnosticsLogEnabled: Boolean,
     val lspCompileCommandsSelectionLogEnabled: Boolean,
     val lspClangdStartupLogEnabled: Boolean,
     val editorTouchDiagnosticsEnabled: Boolean,
@@ -116,6 +117,14 @@ object Prefs {
         get() = sharedPrefs.getBoolean("dev_diagnostics_enabled", false)
         set(value) {
             sharedPrefs.edit().putBoolean("dev_diagnostics_enabled", value).apply()
+            notifyDeveloperDiagnosticsSettingsChanged()
+        }
+
+    /** 记录构建保存、目标选择、增量缓存、compile_commands 与启动产物摘要日志（开发者选项）。 */
+    var devBuildDiagnosticsLogEnabled: Boolean
+        get() = sharedPrefs.getBoolean("dev_build_diagnostics_log_enabled", false)
+        set(value) {
+            sharedPrefs.edit().putBoolean("dev_build_diagnostics_log_enabled", value).apply()
             notifyDeveloperDiagnosticsSettingsChanged()
         }
 
@@ -394,6 +403,7 @@ object Prefs {
 
     private fun readDeveloperDiagnosticsSettings(): DeveloperDiagnosticsSettings = DeveloperDiagnosticsSettings(
         diagnosticsEnabled = devDiagnosticsEnabled,
+        buildDiagnosticsLogEnabled = devBuildDiagnosticsLogEnabled,
         lspCompileCommandsSelectionLogEnabled = devLspCompileCommandsSelectionLogEnabled,
         lspClangdStartupLogEnabled = devLspClangdStartupLogEnabled,
         editorTouchDiagnosticsEnabled = editorTouchDiagnosticsEnabled,

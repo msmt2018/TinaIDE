@@ -9,7 +9,7 @@ import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
 import java.io.File
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 /**
@@ -382,7 +382,9 @@ class NativeMakeBuildStrategy(
         timeout: Long,
         extraEnvironment: Map<String, String> = emptyMap(),
         onOutput: ((String) -> Unit)? = null
-    ): CommandResult = try {
+    ): CommandResult {
+        val commandTempDir = BuildResourceCleaner.createCommandTempDir(context.cacheDir, "native-make")
+        return try {
         // 使用 NativeExecutableRunner 构建命令，自动处理 linker64 启动逻辑
         val executable = command[0]
         val args = command.drop(1)
@@ -397,7 +399,7 @@ class NativeMakeBuildStrategy(
                 this,
                 nativeLibDir,
                 toolchainManager.getBinDir().absolutePath,
-                tmpDir = context.cacheDir.absolutePath,
+                tmpDir = commandTempDir.absolutePath,
                 homeDir = context.filesDir.absolutePath
             )
             NativeExecutableRunner.applyRecommendedTinaExec(
@@ -418,42 +420,36 @@ class NativeMakeBuildStrategy(
             toolchainBinDir = toolchainManager.getBinDir().absolutePath
         )
 
-        val process = processBuilder.start()
-        val output = StringBuilder()
-
-        // 读取输出
-        process.inputStream.bufferedReader().use { reader ->
-            reader.lineSequence().forEach { line ->
-                output.appendLine(line)
+        val result = BuildProcessRunner.run(
+            processBuilder = processBuilder,
+            commandLabel = "native-make:${File(executable).name}",
+            timeoutMs = timeout,
+            onOutputLine = { line ->
                 onOutput?.invoke(line)
                 Timber.tag(TAG).v(line)
-            }
-        }
+            },
+        )
 
+        // 读取输出
         // 等待进程结束
-        val finished = process.waitFor(timeout, TimeUnit.MILLISECONDS)
-        val exitCode = if (finished) {
-            process.exitValue()
-        } else {
-            process.destroy()
-            -1
-        }
-        if (!finished) {
+        if (result.timedOut) {
             Timber.tag(TAG).w("Native make command timed out after %d ms", timeout)
         }
-        if (exitCode != 0) {
+        if (result.exitCode != 0) {
             NativeExecutableRunner.logFailureDiagnostics(
                 tag = TAG,
                 executable = executable,
-                output = output.toString(),
+                output = result.output,
                 toolchainBinDir = toolchainManager.getBinDir().absolutePath
             )
         }
 
         CommandResult(
-            exitCode = exitCode,
-            output = output.toString()
+            exitCode = result.exitCode,
+            output = result.output
         )
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         Timber.tag(TAG).e(e, "Failed to execute native command")
         NativeExecutableRunner.logFailureDiagnostics(
@@ -466,6 +462,9 @@ class NativeMakeBuildStrategy(
             exitCode = -1,
             output = "Exception: ${e.message}"
         )
+    } finally {
+        BuildResourceCleaner.cleanupCommandTempDir(commandTempDir)
+    }
     }
 
     private fun applyExtraEnvironment(

@@ -90,6 +90,8 @@
   <string name="dev_options_diagnostics">诊断日志</string>
   <string name="dev_options_diagnostics_enabled">启用诊断日志</string>
   <string name="dev_options_diagnostics_enabled_desc">总开关：关闭后不会输出额外诊断日志（用于减少性能开销/日志量）</string>
+  <string name="dev_options_build_diagnostics_log">构建诊断日志</string>
+  <string name="dev_options_build_diagnostics_log_desc">记录保存、运行目标、增量缓存、compile_commands 和启动产物摘要，用于定位源码修改后仍复用旧产物的问题</string>
   <string name="dev_options_lsp_compile_commands_selection_log">编译数据库选择日志</string>
   <string name="dev_options_lsp_compile_commands_selection_log_desc">记录 compile_commands 的查找、复用和生成摘要，用于确认 LSP 实际吃的是哪一份编译数据库</string>
   <string name="dev_options_lsp_clangd_startup_log">clangd 启动日志</string>

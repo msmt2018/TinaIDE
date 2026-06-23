@@ -10,6 +10,8 @@ import com.wuxianggujun.tinaide.plugin.PluginManifest
 import com.wuxianggujun.tinaide.plugin.PluginNetworkHostRules
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -70,6 +72,7 @@ class ScriptPluginRuntime(
     private val allowedHosts = PluginNetworkHostRules.normalizeDeclaredHosts(manifest.networkHosts)
     private val logManager = PluginLogManager.getInstance(context)
 
+    @Volatile
     private var _isInitialized = false
     override val isInitialized: Boolean get() = _isInitialized
 
@@ -77,30 +80,39 @@ class ScriptPluginRuntime(
     private val fileOpLimiter = RateLimiter(config.maxFileOpsPerMinute, 60_000L)
     private val networkLimiter = RateLimiter(config.maxNetworkRequestsPerMinute, 60_000L)
 
+    private val luaLock = ReentrantLock()
+
+    @Volatile
     private var luaState: Lua? = null
 
     override suspend fun initialize(): Result<Unit> = withContext(Dispatchers.Default) {
-        var createdLua: Lua? = null
-        try {
-            Timber.tag(TAG).d("Initializing Lua plugin: $pluginId")
-
-            val lua = Lua54().apply {
-                createdLua = this
-                openLibraries()
-                configureSandbox()
+        luaLock.withLock {
+            if (_isInitialized && luaState != null) {
+                return@withLock Result.success(Unit)
             }
-            luaState = lua
 
-            _isInitialized = true
-            Timber.tag(TAG).i("Lua plugin initialized: $pluginId")
-            Result.success(Unit)
-        } catch (t: Throwable) {
-            t.rethrowIfFatalForPluginBoundary()
-            createdLua?.closeQuietly()
-            luaState = null
-            _isInitialized = false
-            Timber.tag(TAG).e(t, "Failed to initialize Lua plugin: $pluginId")
-            Result.failure(t)
+            var createdLua: Lua? = null
+            try {
+                Timber.tag(TAG).d("Initializing Lua plugin: $pluginId")
+
+                val lua = Lua54().apply {
+                    createdLua = this
+                    openLibraries()
+                    configureSandbox()
+                }
+                luaState = lua
+
+                _isInitialized = true
+                Timber.tag(TAG).i("Lua plugin initialized: $pluginId")
+                Result.success(Unit)
+            } catch (t: Throwable) {
+                t.rethrowIfFatalForPluginBoundary()
+                createdLua?.closeQuietly()
+                luaState = null
+                _isInitialized = false
+                Timber.tag(TAG).e(t, "Failed to initialize Lua plugin: $pluginId")
+                Result.failure(t)
+            }
         }
     }
 
@@ -131,21 +143,18 @@ class ScriptPluginRuntime(
     }
 
     override suspend fun execute(script: String): PluginExecutionResult = withContext(Dispatchers.Default) {
-        val lua = luaState
-        if (!_isInitialized || lua == null) {
-            return@withContext PluginExecutionResult.Error("Plugin not initialized")
-        }
-
         if (!apiCallLimiter.tryAcquire()) {
             return@withContext PluginExecutionResult.Error("API rate limit exceeded")
         }
 
         try {
             withTimeout(config.maxExecutionTimeMs) {
-                Timber.tag(TAG).d("Executing Lua script in plugin: $pluginId")
-                lua.run(script)
-                val result = if (lua.top > 0) lua.get().toJavaObject() else null
-                PluginExecutionResult.Success(result)
+                withInitializedLuaState { lua ->
+                    Timber.tag(TAG).d("Executing Lua script in plugin: $pluginId")
+                    lua.run(script)
+                    val result = if (lua.top > 0) lua.get().toJavaObject() else null
+                    PluginExecutionResult.Success(result)
+                }
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             Timber.tag(TAG).w("Lua script execution timed out: $pluginId")
@@ -161,32 +170,29 @@ class ScriptPluginRuntime(
     }
 
     override suspend fun callFunction(name: String, vararg args: Any?): PluginExecutionResult = withContext(Dispatchers.Default) {
-        val lua = luaState
-        if (!_isInitialized || lua == null) {
-            return@withContext PluginExecutionResult.Error("Plugin not initialized")
-        }
-
         if (!apiCallLimiter.tryAcquire()) {
             return@withContext PluginExecutionResult.Error("API rate limit exceeded")
         }
 
         try {
             withTimeout(config.maxExecutionTimeMs) {
-                Timber.tag(TAG).d("Calling Lua function $name in plugin: $pluginId")
+                withInitializedLuaState { lua ->
+                    Timber.tag(TAG).d("Calling Lua function $name in plugin: $pluginId")
 
-                lua.getGlobal(name)
-                if (lua.isNil(-1)) {
-                    lua.pop(1)
-                    return@withTimeout PluginExecutionResult.Error("Function '$name' not found")
+                    lua.getGlobal(name)
+                    if (lua.isNil(-1)) {
+                        lua.pop(1)
+                        return@withInitializedLuaState PluginExecutionResult.Error("Function '$name' not found")
+                    }
+
+                    args.forEach { arg ->
+                        lua.pushAny(arg)
+                    }
+
+                    lua.pCall(args.size, 1)
+                    val result = if (lua.top > 0) lua.get().toJavaObject() else null
+                    PluginExecutionResult.Success(result)
                 }
-
-                args.forEach { arg ->
-                    lua.pushAny(arg)
-                }
-
-                lua.pCall(args.size, 1)
-                val result = if (lua.top > 0) lua.get().toJavaObject() else null
-                PluginExecutionResult.Success(result)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             Timber.tag(TAG).w("Lua function call timed out: $pluginId.$name")
@@ -202,14 +208,14 @@ class ScriptPluginRuntime(
     }
 
     override fun registerGlobal(name: String, value: Any?) {
-        luaState?.let { lua ->
+        withLuaState { lua ->
             lua.pushAny(value)
             lua.setGlobal(name)
         }
     }
 
     fun registerFunction(name: String, function: (Lua) -> Int) {
-        luaState?.let { lua ->
+        withLuaState { lua ->
             lua.push { L: Lua ->
                 function(L)
             }
@@ -217,18 +223,31 @@ class ScriptPluginRuntime(
         }
     }
 
-    fun getLuaState(): Lua? = luaState
+    internal fun <T> withLuaState(block: (Lua) -> T): T? = luaLock.withLock {
+        val lua = luaState
+        if (!_isInitialized || lua == null) {
+            null
+        } else {
+            block(lua)
+        }
+    }
 
     override fun destroy() {
         Timber.tag(TAG).d("Destroying Lua plugin: $pluginId")
-        try {
-            luaState?.close()
+        luaLock.withLock {
+            val lua = luaState
             luaState = null
             _isInitialized = false
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Failed to destroy Lua plugin: $pluginId")
+            try {
+                lua?.close()
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to destroy Lua plugin: $pluginId")
+            }
         }
     }
+
+    private fun withInitializedLuaState(block: (Lua) -> PluginExecutionResult): PluginExecutionResult =
+        withLuaState(block) ?: PluginExecutionResult.Error("Plugin not initialized")
 
     fun checkPermission(permission: PluginPermission): Boolean = resolvePermissionAccess(permission).granted
 

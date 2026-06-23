@@ -17,6 +17,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isFalse()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isFalse()
         assertThat(state.lspClangdStartupLogControlEnabled).isFalse()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isFalse()
         assertThat(state.gestureTraceControlEnabled).isFalse()
@@ -35,6 +36,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isTrue()
         assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
         assertThat(state.gestureTraceControlEnabled).isTrue()
@@ -53,6 +55,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isTrue()
         assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
         assertThat(state.gestureTraceControlEnabled).isTrue()

@@ -65,6 +65,7 @@ internal fun DeveloperOptionsSection(
 
     val diagnosticsSettings by Prefs.devDiagnosticsSettingsFlow.collectAsState()
     val diagnosticsEnabled = diagnosticsSettings.diagnosticsEnabled
+    val buildDiagnosticsLogEnabled = diagnosticsSettings.buildDiagnosticsLogEnabled
     val lspCompileCommandsSelectionLogEnabled =
         diagnosticsSettings.lspCompileCommandsSelectionLogEnabled
     val lspClangdStartupLogEnabled = diagnosticsSettings.lspClangdStartupLogEnabled
@@ -206,6 +207,17 @@ internal fun DeveloperOptionsSection(
             checked = diagnosticsEnabled,
             onCheckedChange = {
                 Prefs.devDiagnosticsEnabled = it
+            },
+            showDivider = true
+        )
+
+        SettingsSwitchItem(
+            title = stringResource(Strings.dev_options_build_diagnostics_log),
+            subtitle = stringResource(Strings.dev_options_build_diagnostics_log_desc),
+            checked = buildDiagnosticsLogEnabled,
+            enabled = diagnosticsControlsState.buildDiagnosticsLogControlEnabled,
+            onCheckedChange = {
+                Prefs.devBuildDiagnosticsLogEnabled = it
             },
             showDivider = true
         )

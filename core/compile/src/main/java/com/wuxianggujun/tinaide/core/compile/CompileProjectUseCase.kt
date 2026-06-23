@@ -215,6 +215,9 @@ class CompileProjectUseCase(
             projectRoot.absolutePath,
             buildDir.absolutePath,
         )
+        BuildDiagnosticsLog.i {
+            "compile execute start action=$action mode=$mode project=${projectRoot.absolutePath} buildDir=${buildDir.absolutePath}"
+        }
 
         val currentFile = getCurrentEditingFile()?.also {
             log(Strings.compile_current_file.strOr(appContext, it.name))
@@ -255,6 +258,12 @@ class CompileProjectUseCase(
         val preferSharedLibraryForRun = mode == ExecutionMode.RUN && runOutputMode.isSdlGraphical()
         val activeOutputMode = if (mode == ExecutionMode.RUN) runOutputMode else OutputMode.TERMINAL
         val request = operation.resolveRequest(activeOutputMode)
+        BuildDiagnosticsLog.i {
+            "run config resolved action=$action mode=$mode buildSystem=$buildSystem " +
+                "runOutputMode=$runOutputMode activeOutputMode=$activeOutputMode " +
+                "requestedTarget=${targetName.orEmpty()} configTarget=${config.targetName} " +
+                "preferSharedLibraryForRun=$preferSharedLibraryForRun"
+        }
 
         val buildVariablesCtx = BuildVariables.BuildContext(
             projectDir = projectRoot,
@@ -298,6 +307,11 @@ class CompileProjectUseCase(
             if (!metadataDefaultTargetName.isNullOrBlank()) {
                 val targets = loadCMakeTargets(projectRoot, buildDir, buildSystem, options)
                 cmakeTargets = targets
+                BuildDiagnosticsLog.i {
+                    "cmake target repair check requested=${effectiveTargetName.orEmpty()} " +
+                        "metadataDefault=$metadataDefaultTargetName outputMode=${config.outputMode} " +
+                        "targets=${targets.diagnosticsSummary()}"
+                }
                 val targetRepair = CMakeRunTargetResolver.repairMissingOrInvalidTarget(
                     requestedTargetName = effectiveTargetName,
                     outputMode = config.outputMode,
@@ -310,6 +324,10 @@ class CompileProjectUseCase(
                         targetRepair.requestedTargetName ?: "<empty>",
                         targetRepair.targetName,
                     )
+                    BuildDiagnosticsLog.w {
+                        "cmake target repaired requested=${targetRepair.requestedTargetName.orEmpty()} " +
+                            "effective=${targetRepair.targetName.orEmpty()} outputMode=${config.outputMode}"
+                    }
                     effectiveTargetName = targetRepair.targetName
                     val requestedDisplay = targetRepair.requestedTargetName
                         ?: Strings.run_config_default_target.strOr(appContext)
@@ -330,13 +348,22 @@ class CompileProjectUseCase(
             val selectedTarget = effectiveTargetName
                 ?.let { name -> targets.firstOrNull { it.name == name } }
             val sharedTarget = targets.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY }
+            BuildDiagnosticsLog.i {
+                "cmake sdl target check requested=${effectiveTargetName.orEmpty()} " +
+                    "selected=${selectedTarget?.diagnosticsSummary().orEmpty()} " +
+                    "firstShared=${sharedTarget?.diagnosticsSummary().orEmpty()}"
+            }
             if (sharedTarget == null) {
                 val errorMsg = Strings.sdl_runtime_no_shared_library_target.strOr(appContext)
+                BuildDiagnosticsLog.w { "cmake sdl target check failed: no shared-library target" }
                 log(errorMsg)
                 return@withContext Result.Error(action, errorMsg, null)
             }
             if (selectedTarget == null || selectedTarget.type != TargetInfo.Type.SHARED_LIBRARY) {
                 effectiveTargetName = sharedTarget.name
+                BuildDiagnosticsLog.i {
+                    "cmake sdl target auto-selected shared library target=${sharedTarget.name}"
+                }
                 log(Strings.sdl_runtime_auto_selected_shared_library_target.strOr(appContext, sharedTarget.name))
             }
         }
@@ -349,6 +376,15 @@ class CompileProjectUseCase(
             options = options,
             target = effectiveTargetName,
         )
+        BuildDiagnosticsLog.i {
+            "build context prepared action=$action mode=$mode buildSystem=$buildSystem " +
+                "target=${effectiveTargetName.orEmpty()} requestBuild=${request.build::class.simpleName} " +
+                "requestLaunch=${request.launch::class.simpleName} " +
+                "toolchainId=${options.toolchainId.orEmpty()} sysrootProfile=${options.sysrootProfileId.orEmpty()} " +
+                "sysrootApi=${options.sysrootApiLevel} runMode=${options.resolvedRunMode} " +
+                "cmakeBuildType=${options.cmakeBuildType.cmakeValue} cmakeGenerator=${options.cmakeGenerator.cmakeValue} " +
+                "buildForRun=${options.buildForRun} preferSharedLibraryForRun=${options.preferSharedLibraryForRun}"
+        }
         val orchestrator = orchestratorProvider()
 
         return@withContext runOrchestratorAndMap(
@@ -612,6 +648,12 @@ class CompileProjectUseCase(
                     report.artifact.absolutePath,
                     artifactKind,
                 )
+                BuildDiagnosticsLog.i {
+                    "compile built-only success action=$action artifact=${report.artifact.absolutePath} " +
+                        "kind=$artifactKind target=${report.artifact.id.targetName} " +
+                        "contentHash=${report.artifact.contentHash.shortHash()} " +
+                        "trackedHash=${report.artifact.fingerprint.trackedInputsHash.shortHash()}"
+                }
                 Result.Success(
                     Report(
                         action = action,
@@ -637,6 +679,12 @@ class CompileProjectUseCase(
                     artifactKind,
                     launch::class.simpleName,
                 )
+                BuildDiagnosticsLog.i {
+                    "compile success action=$action mode=$mode artifact=${report.artifact.absolutePath} " +
+                        "kind=$artifactKind target=${report.artifact.id.targetName} launch=${launch::class.simpleName} " +
+                        "contentHash=${report.artifact.contentHash.shortHash()} " +
+                        "trackedHash=${report.artifact.fingerprint.trackedInputsHash.shortHash()}"
+                }
                 Result.Success(
                     Report(
                         action = action,
@@ -659,6 +707,7 @@ class CompileProjectUseCase(
                     action,
                     report.reason,
                 )
+                BuildDiagnosticsLog.w { "compile failed action=$action reason=${report.reason}" }
                 Result.Error(action, report.reason, null)
             }
             is BuildReport.LaunchFailed -> {
@@ -669,6 +718,10 @@ class CompileProjectUseCase(
                     report.reason,
                     report.artifact.absolutePath,
                 )
+                BuildDiagnosticsLog.w {
+                    "compile launch failed action=$action artifact=${report.artifact.absolutePath} " +
+                        "target=${report.artifact.id.targetName} cached=${report.artifactWasCached} reason=${report.reason}"
+                }
                 Result.Error(action, report.reason, null)
             }
             is BuildReport.Invalid -> {
@@ -678,6 +731,7 @@ class CompileProjectUseCase(
                     action,
                     report.reason,
                 )
+                BuildDiagnosticsLog.w { "compile invalid action=$action reason=${report.reason}" }
                 Result.Error(action, report.reason, null)
             }
         }
@@ -819,6 +873,31 @@ class CompileProjectUseCase(
             else -> Unit
         }
     }
+
+    private fun List<TargetInfo>.diagnosticsSummary(limit: Int = 12): String =
+        if (isEmpty()) {
+            "<none>"
+        } else {
+            take(limit).joinToString(separator = ";") { it.diagnosticsSummary() } +
+                if (size > limit) ";...(+${size - limit})" else ""
+        }
+
+    private fun TargetInfo.diagnosticsSummary(): String =
+        "$name:$type:aux=${name.isAuxiliaryTargetName()}:sources=${sources.size}:deps=${
+            dependencies.joinToString(separator = "|", limit = 4)
+        }"
+
+    private fun String.isAuxiliaryTargetName(): Boolean {
+        val normalized = trim().lowercase()
+        return normalized == "test" ||
+            normalized == "tests" ||
+            normalized.endsWith("_test") ||
+            normalized.endsWith("-test") ||
+            normalized.endsWith("_tests") ||
+            normalized.endsWith("-tests")
+    }
+
+    private fun String.shortHash(): String = take(12)
 
     private fun getCurrentEditingFile(): File? = try {
         editorManagerProvider()?.getActiveFile()

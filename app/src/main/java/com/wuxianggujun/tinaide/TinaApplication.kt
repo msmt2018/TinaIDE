@@ -68,19 +68,9 @@ class TinaApplication : Application() {
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
 
-        // 初始化 Timber 日志框架（尽早初始化以捕获所有日志）
-        TinaTimber.initialize(
-            context = this,
-            isDebug = BuildConfig.DEBUG,
-            logDir = com.wuxianggujun.tinaide.storage.ProjectPaths.ensureDir(
-                com.wuxianggujun.tinaide.storage.ProjectPaths.getLogsRoot(this)
-            ),
-        )
-
         // 初始化 xCrash（Native 崩溃捕获）
         // 必须在 attachBaseContext 中尽早调用
         val processName = Application.getProcessName()
-        LogProcessRegistry.recordProcess(this, android.os.Process.myPid(), processName)
         // 主进程和原生运行容器进程弹出崩溃界面。
         // SDL 用户 native 程序运行在隔离进程，崩溃时只结束运行容器，并由 :crash 进程展示日志。
         // 用户项目/插件运行日志属于用户隐私，只本地保存与展示，不上传到 TinaIDE 服务器。
@@ -105,6 +95,16 @@ class TinaApplication : Application() {
             }
         )
         NativeCrashHandler.install(this)
+
+        // 初始化 Timber 日志框架（尽早初始化以捕获所有日志）
+        TinaTimber.initialize(
+            context = this,
+            isDebug = BuildConfig.DEBUG,
+            logDir = com.wuxianggujun.tinaide.storage.ProjectPaths.ensureDir(
+                com.wuxianggujun.tinaide.storage.ProjectPaths.getLogsRoot(this)
+            ),
+        )
+        LogProcessRegistry.recordProcess(this, android.os.Process.myPid(), processName)
     }
 
     override fun onCreate() {
