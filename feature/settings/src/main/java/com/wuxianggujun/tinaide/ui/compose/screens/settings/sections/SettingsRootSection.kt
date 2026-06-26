@@ -25,7 +25,6 @@ private val CompilerIconColor = Color(0xFFF5A623)
 private val ProjectIconColor = Color(0xFF4CAF50)
 private val StorageIconColor = Color(0xFF4A90D9)
 private val TerminalIconColor = Color(0xFF4A90D9)
-private val AiIconColor = Color(0xFF6366F1)
 private val GitIconColor = Color(0xFF34A853)
 private val AppearanceIconColor = Color(0xFFE91E63)
 private val KeyboardIconColor = Color(0xFF9C27B0)
@@ -118,14 +117,6 @@ internal fun SettingsRootSection(onNavigateTo: (SettingsRoute) -> Unit) {
             title = stringResource(Strings.settings_title_terminal),
             subtitle = stringResource(Strings.settings_desc_terminal),
             onClick = { onNavigateTo(SettingsRoute.Terminal) },
-            showDivider = true
-        )
-        SettingsMenuItemWithIcon(
-            imageVector = TinaTabIcons.Ai,
-            iconBackgroundColor = AiIconColor,
-            title = stringResource(Strings.settings_title_ai),
-            subtitle = stringResource(Strings.settings_desc_ai),
-            onClick = { onNavigateTo(SettingsRoute.Ai) },
             showDivider = true
         )
         SettingsMenuItemWithIcon(

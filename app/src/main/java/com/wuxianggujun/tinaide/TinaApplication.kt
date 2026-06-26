@@ -5,7 +5,6 @@ import android.app.Application
 import android.app.Application.ActivityLifecycleCallbacks
 import android.content.Context
 import com.itsaky.androidide.treesitter.TreeSitter
-import com.wuxianggujun.tinaide.ai.di.aiModule
 import com.wuxianggujun.tinaide.core.compile.di.compileModule
 import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.config.di.configModule
@@ -161,7 +160,6 @@ class TinaApplication : Application() {
                 debugModule,
                 prootModule,
                 compileModule,
-                aiModule,
                 appModule,
                 appViewModelModule,
             )

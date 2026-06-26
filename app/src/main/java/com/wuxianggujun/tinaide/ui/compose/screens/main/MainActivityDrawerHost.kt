@@ -33,7 +33,6 @@ internal fun MainActivityDrawerHost(
                 actionsDelegate = dependencies.actionsDelegate,
                 gitUiState = uiState.gitUiState,
                 gitDialogState = dependencies.gitDialogState,
-                currentAiChatViewModel = dependencies.currentAiChatViewModel,
                 hostCommandExecutor = dependencies.hostCommandExecutor,
                 drawerState = dependencies.drawerState,
                 uiScope = dependencies.uiScope,

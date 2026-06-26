@@ -44,7 +44,6 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionHea
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionTitle
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AboutSettingsSection
-import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AiSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AppearanceSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.CompilerSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.DeveloperOptionsSection
@@ -76,7 +75,6 @@ sealed class SettingsRoute(val route: String, val title: Int) {
     data object Storage : SettingsRoute("storage", Strings.settings_title_storage)
     data object StorageCleanup : SettingsRoute("storage_cleanup", Strings.settings_title_storage_cleanup)
     data object Terminal : SettingsRoute("terminal", Strings.settings_title_terminal)
-    data object Ai : SettingsRoute("ai", Strings.settings_title_ai)
     data object Git : SettingsRoute("git", Strings.settings_title_git)
     data object Appearance : SettingsRoute("appearance", Strings.settings_title_appearance)
     data object Keyboard : SettingsRoute("keyboard", Strings.settings_title_keyboard)
@@ -425,7 +423,6 @@ fun SettingsScreen(
                     SettingsScrollableContent.Terminal -> TerminalSettingsSection(
                         linuxEnvironmentEnabled = settingsState.linuxEnvironmentEnabled
                     )
-                    SettingsScrollableContent.Ai -> AiSettingsSection()
                     SettingsScrollableContent.Appearance -> AppearanceSettingsSection(settingsViewModel)
                     SettingsScrollableContent.Keyboard -> KeyboardSettingsSection()
                     SettingsScrollableContent.Developer -> DeveloperOptionsSection(

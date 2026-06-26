@@ -313,7 +313,6 @@ dependencies {
     implementation(project(":core:editor-lsp"))
 
     // ===== 功能层 =====
-    implementation(project(":feature:ai"))
     implementation(project(":feature:editor"))
     implementation(project(":feature:help"))
     implementation(project(":feature:output"))

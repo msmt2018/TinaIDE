@@ -3,7 +3,6 @@
     <cloud-backup>
         <include domain="sharedpref" path="." />
 
-        <exclude domain="sharedpref" path="ai_channel_api_keys.xml" />
         <exclude domain="sharedpref" path="git_credentials.xml" />
         <exclude domain="sharedpref" path="plugin_permissions.xml" />
         <exclude domain="sharedpref" path="tina_server_config.xml" />
@@ -13,7 +12,6 @@
     <device-transfer>
         <include domain="sharedpref" path="." />
 
-        <exclude domain="sharedpref" path="ai_channel_api_keys.xml" />
         <exclude domain="sharedpref" path="git_credentials.xml" />
         <exclude domain="sharedpref" path="plugin_permissions.xml" />
         <exclude domain="sharedpref" path="tina_server_config.xml" />

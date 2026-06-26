@@ -1,7 +1,6 @@
 package com.wuxianggujun.tinaide.ui.compose.screens.main
 
 import androidx.compose.runtime.Composable
-import com.wuxianggujun.tinaide.ai.viewmodel.AiChatViewModel
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
 import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.symbol.ProjectSymbolIndexService
@@ -28,7 +27,6 @@ internal fun MainActivityDrawerSection(
     editorContainerState: EditorContainerState,
     dialogState: DialogState,
     gitDialogState: GitDialogState,
-    currentAiChatViewModel: AiChatViewModel,
     drawerState: SwipeableDrawerState,
     buildUiState: MainActivityBuildUiState,
     hostCommandExecutor: HostCommandExecutor?,
@@ -54,7 +52,6 @@ internal fun MainActivityDrawerSection(
         editorContainerState = editorContainerState,
         dialogState = dialogState,
         gitDialogState = gitDialogState,
-        currentAiChatViewModel = currentAiChatViewModel,
         drawerState = drawerState,
         buildUiState = buildUiState,
         hostCommandExecutor = hostCommandExecutor,

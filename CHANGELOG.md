@@ -37,6 +37,42 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.8] - 2026-06-27
+
+### Added
+
+- 新增 RikkaHub 外部 AI 入口：TinaIDE 开源版通过编辑器侧边栏打开已安装的 RikkaHub debug/release 包，AI 聊天、模型和渠道配置由 RikkaHub 承担。
+- 重做 Hex Viewer：采用分块读取和缓存，不再把大文件一次性读入内存；支持 ASCII/UTF-8/十六进制通配搜索、offset 跳转历史、选区 Inspector、多格式导出、offset 书签、staged patch 队列和 radare2 `wx` patch 脚本复制。
+- 新增 Hex 二进制分析面板：支持文件指纹、字节分布、重复字节段、magic signature、字符串提取、熵图、DEX 结构、APK/ZIP 结构、ELF 元数据和可跳转 analysis signals。
+- 新增 ELF/SO 分析线索：解析 Program Header、Section、Dynamic Symbols、依赖、Notes/Build ID、hardening、风险提示、relocation、PLT/GOT linkage、动态链接器步骤、JNI 注册线索和 Native API 导入分类。
+- 新增 APK 分析线索：解析 central directory、local header 一致性、entry name 风险、Signing Block、二进制 Manifest、resources.arsc、内嵌 DEX 摘要和 `lib/**/*.so` native 摘要。
+- 新增混淆与保护器提示：覆盖 OLLVM marker、反调试、反注入/动态插桩、高熵低字符串密度、符号剥离，以及常见 Android 加壳/保护器字符串线索。
+
+### Changed
+
+- TinaIDE 开源版移除内置 AI 聊天、渠道、会话仓储和工具调用系统，设置页、帮助文档和侧边栏入口同步改为 RikkaHub 使用方式。
+- RikkaHub 作为 `external/rikkahub` included build 纳入工程，主应用只保留 launcher 和包可见性声明，避免继续维护两套 AI 实现。
+- 调整 RikkaHub 和 Tree-sitter included build 的构建兼容性：补充国内 Maven/NPM 镜像、缺少 `google-services.json` 时跳过 Firebase 插件、Windows pnpm 构建支持，以及 Kotlin compilerOptions JVM target 写法。
+- 更新项目架构、模块说明、开发指南和 App 内帮助内容，明确 RikkaHub 边界、`feature:viewer` 的二进制查看职责和第三方许可保留要求。
+
+### Removed
+
+- 删除 `feature:ai` 模块、AI 数据库实体/DAO、AI 配置模型、AI 设置页、AI 抽屉面板、AI 工具回调与相关测试。
+- 删除旧版低效 Hex 行模型测试，改由新的 Hex byte row、文件数据管理、搜索、选区 Inspector、导出和二进制分析测试覆盖。
+
+### Documentation
+
+- 新增 `docs/guides/Hex-Viewer-Design.md`，记录 Hex Viewer 的 r2droid 风格设计取舍、当前能力边界、后续扩展建议和开源致谢。
+- 新增 `docs/third-party-notices/r2droid-MIT-LICENSE.txt`，保留 r2droid 的 MIT License 文本并在文档中致谢。
+
+### Verification
+
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryAnalysisTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+
 ## [0.18.7] - 2026-06-23
 
 ### Added

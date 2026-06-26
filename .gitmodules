@@ -9,3 +9,6 @@
 [submodule "external/termux-proot"]
 	path = external/termux-proot
 	url = https://github.com/wuxianggujun/Android-Proot-Builder.git
+[submodule "external/rikkahub"]
+	path = external/rikkahub
+	url = https://github.com/wuxianggujun/rikkahub.git

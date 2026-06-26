@@ -101,9 +101,9 @@
 
 私有身份、商业功能、私有后端和管理端不随公开仓库分发。
 
-### AI 使用方式
+### RikkaHub 使用方式
 
-AI 通过 Custom BYOK 渠道使用。请在 AI 设置中配置自己的服务商地址、模型和 API Key。
+TinaIDE 已移除内置 AI。AI 聊天、模型和渠道配置由 RikkaHub 提供，请从编辑器侧边栏打开 RikkaHub 后在 RikkaHub 内完成配置。
 
 ### 插件市场
 

@@ -123,7 +123,7 @@ fun CodeBlock(
                         color = labelColor
                     )
                     Text(
-                        text = "($lineCount ${stringResource(Strings.ai_code_lines)})",
+                        text = "($lineCount ${stringResource(Strings.code_block_lines)})",
                         style = MaterialTheme.typography.labelSmall,
                         color = labelColor.copy(alpha = 0.6f)
                     )
@@ -137,7 +137,7 @@ fun CodeBlock(
                         Icon(
                             imageVector = if (isHighlightMode) Icons.Outlined.CodeOff else Icons.Outlined.Code,
                             contentDescription = stringResource(
-                                if (isHighlightMode) Strings.ai_code_hide else Strings.ai_code_view
+                                if (isHighlightMode) Strings.code_block_hide else Strings.code_block_view
                             ),
                             modifier = Modifier.size(18.dp),
                             tint = if (isHighlightMode) editorScheme.syntax.keyword else labelColor
@@ -149,7 +149,7 @@ fun CodeBlock(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(Strings.ai_copy_code),
+                            contentDescription = stringResource(Strings.code_block_copy),
                             modifier = Modifier.size(18.dp),
                             tint = labelColor
                         )
@@ -160,7 +160,7 @@ fun CodeBlock(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.AddCircleOutline,
-                            contentDescription = stringResource(Strings.ai_insert_code),
+                            contentDescription = stringResource(Strings.code_block_insert),
                             modifier = Modifier.size(18.dp),
                             tint = editorScheme.syntax.keyword
                         )
@@ -174,7 +174,7 @@ fun CodeBlock(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.SaveAlt,
-                            contentDescription = stringResource(Strings.ai_code_save),
+                            contentDescription = stringResource(Strings.code_block_save),
                             modifier = Modifier.size(18.dp),
                             tint = labelColor
                         )
@@ -329,9 +329,9 @@ private fun HighlightedCodeContent(
         ) {
             Text(
                 text = if (isExpanded) {
-                    stringResource(Strings.ai_code_collapse)
+                    stringResource(Strings.code_block_collapse)
                 } else {
-                    stringResource(Strings.ai_code_expand, lineCount - 20)
+                    stringResource(Strings.code_block_expand, lineCount - 20)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = editorScheme.syntax.keyword

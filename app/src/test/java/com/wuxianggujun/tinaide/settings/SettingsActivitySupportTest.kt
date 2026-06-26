@@ -129,7 +129,6 @@ class SettingsActivitySupportTest {
             SettingsRoute.Storage,
             SettingsRoute.StorageCleanup,
             SettingsRoute.Terminal,
-            SettingsRoute.Ai,
             SettingsRoute.Git,
             SettingsRoute.Appearance,
             SettingsRoute.Keyboard,

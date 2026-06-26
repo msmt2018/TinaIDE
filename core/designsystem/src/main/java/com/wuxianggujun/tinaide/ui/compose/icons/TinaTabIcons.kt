@@ -18,6 +18,6 @@ object TinaTabIcons {
     val Git: ImageVector
         get() = Icons.Default.AccountTree
 
-    val Ai: ImageVector
+    val RikkaHub: ImageVector
         get() = Icons.Default.SmartToy
 }

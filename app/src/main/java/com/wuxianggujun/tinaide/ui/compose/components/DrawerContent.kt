@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,9 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.wuxianggujun.tinaide.ai.api.MessageContext
-import com.wuxianggujun.tinaide.ai.viewmodel.AiChatViewModel
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
 import com.wuxianggujun.tinaide.core.git.GitStatus
 import com.wuxianggujun.tinaide.core.i18n.Strings
@@ -51,9 +50,6 @@ import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.ui.compose.icons.TinaTabIcons
 import java.io.File
 
-/**
- * 按功能分组侧滑栏回调，避免调用侧继续膨胀。
- */
 internal class DrawerFileCallbacks(
     val onFileClick: (File) -> Unit,
     val onContextAction: (FileContextAction) -> Unit,
@@ -77,18 +73,6 @@ internal class DrawerGitCallbacks(
     val onClearCommitMessageHistory: () -> Unit = {},
 )
 
-internal class DrawerAiCallbacks(
-    val onInsertCode: (String) -> Unit = {},
-    val onGetCurrentFile: () -> MessageContext.CurrentFile? = { null },
-    val onGetSelectedCode: () -> MessageContext.SelectedCode? = { null },
-    val onOpenSettings: () -> Unit = {},
-)
-
-/**
- * 侧滑栏内容组件
- *
- * 包含文件树和 Git 面板的切换
- */
 @Composable
 internal fun DrawerContent(
     projectName: String,
@@ -101,30 +85,25 @@ internal fun DrawerContent(
     gitCallbacks: DrawerGitCallbacks,
     modifier: Modifier = Modifier,
     hostCommandExecutor: HostCommandExecutor? = null,
-    aiChatViewModel: AiChatViewModel? = null,
-    aiCallbacks: DrawerAiCallbacks = DrawerAiCallbacks()
+    onOpenRikkaHub: () -> Unit = {},
 ) {
     var drawerTab by remember { mutableStateOf(DrawerTab.FILES) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // 头部（AI Tab 使用自己的工具栏，不显示通用头部）
-        if (drawerTab != DrawerTab.AI) {
-            DrawerHeader(
-                drawerTab = drawerTab,
-                projectName = projectName,
-                gitStatus = gitStatus,
-                gitIsLoading = gitIsLoading,
-                onAddFileClick = {
-                    val targetDir = fileTreeState.selectedDirectoryPath?.let(::File)
-                    fileCallbacks.onAddFileClick(targetDir)
-                },
-                onGitRefresh = gitCallbacks.onRefresh
-            )
+        DrawerHeader(
+            drawerTab = drawerTab,
+            projectName = projectName,
+            gitStatus = gitStatus,
+            gitIsLoading = gitIsLoading,
+            onAddFileClick = {
+                val targetDir = fileTreeState.selectedDirectoryPath?.let(::File)
+                fileCallbacks.onAddFileClick(targetDir)
+            },
+            onGitRefresh = gitCallbacks.onRefresh
+        )
 
-            HorizontalDivider()
-        }
+        HorizontalDivider()
 
-        // 内容区域
         when (drawerTab) {
             DrawerTab.FILES -> {
                 FileTree(
@@ -132,12 +111,13 @@ internal fun DrawerContent(
                     pluginManager = pluginManager,
                     hostCommandExecutor = hostCommandExecutor,
                     onFileClick = fileCallbacks.onFileClick,
-                    onFileLongClick = { /* 长按已由上下文菜单处理 */ },
+                    onFileLongClick = { },
                     onContextAction = fileCallbacks.onContextAction,
                     gitStatusMap = gitStatusMap,
                     modifier = Modifier.weight(1f)
                 )
             }
+
             DrawerTab.GIT -> {
                 DrawerGitPanelContent(
                     status = gitStatus,
@@ -157,29 +137,17 @@ internal fun DrawerContent(
                     modifier = Modifier.weight(1f)
                 )
             }
-            DrawerTab.AI -> {
-                if (aiChatViewModel != null) {
-                    DrawerAiPanel(
-                        viewModel = aiChatViewModel,
-                        onInsertCode = aiCallbacks.onInsertCode,
-                        onGetCurrentFile = aiCallbacks.onGetCurrentFile,
-                        onGetSelectedCode = aiCallbacks.onGetSelectedCode,
-                        onOpenSettings = aiCallbacks.onOpenSettings,
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    // ViewModel 未注入时显示带设置入口的占位界面
-                    AiPlaceholderContent(
-                        onOpenSettings = aiCallbacks.onOpenSettings,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+
+            DrawerTab.RIKKAHUB -> {
+                RikkaHubPanel(
+                    onOpenRikkaHub = onOpenRikkaHub,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
         HorizontalDivider()
 
-        // 底部 Tab 切换
         DrawerTabBar(
             selectedTab = drawerTab,
             onTabSelected = { tab ->
@@ -189,66 +157,46 @@ internal fun DrawerContent(
     }
 }
 
-/**
- * AI 未配置时的占位界面
- * 包含顶部工具栏和设置入口，保持与 DrawerAiPanel 一致的布局
- */
 @Composable
-private fun AiPlaceholderContent(
-    onOpenSettings: () -> Unit,
+private fun RikkaHubPanel(
+    onOpenRikkaHub: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        // 顶部工具栏（与 DrawerAiPanel 的 AiPanelToolbar 保持一致）
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = stringResource(Strings.ai_assistant),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
+            Icon(
+                imageVector = TinaTabIcons.RikkaHub,
+                contentDescription = null,
+                modifier = Modifier.size(44.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-
-            IconButton(onClick = onOpenSettings) {
+            Text(
+                text = stringResource(Strings.rikkahub_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(Strings.rikkahub_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            OutlinedButton(onClick = onOpenRikkaHub) {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = stringResource(Strings.ai_settings),
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
                 )
-            }
-        }
-
-        HorizontalDivider()
-
-        // 占位内容
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = stringResource(Strings.ai_error_no_config),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = stringResource(Strings.ai_settings))
-                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = stringResource(Strings.rikkahub_open))
             }
         }
     }
@@ -274,7 +222,6 @@ private fun DrawerHeader(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 项目图标（仅在文件标签页显示）
         if (drawerTab == DrawerTab.FILES) {
             ProjectIcon(
                 projectName = projectName,
@@ -283,11 +230,10 @@ private fun DrawerHeader(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
-        // 标题
         val headerTitle = when (drawerTab) {
             DrawerTab.FILES -> projectName
             DrawerTab.GIT -> stringResource(Strings.drawer_title_source_control)
-            DrawerTab.AI -> stringResource(Strings.drawer_title_ai)
+            DrawerTab.RIKKAHUB -> stringResource(Strings.rikkahub_title)
         }
         Text(
             text = headerTitle,
@@ -296,7 +242,6 @@ private fun DrawerHeader(
             modifier = Modifier.weight(1f)
         )
 
-        // 操作按钮
         when (drawerTab) {
             DrawerTab.FILES -> {
                 IconButton(
@@ -309,8 +254,8 @@ private fun DrawerHeader(
                     )
                 }
             }
+
             DrawerTab.GIT -> {
-                // Git 标签页只显示刷新按钮，其他操作在面板内部
                 IconButton(
                     onClick = onGitRefresh,
                     enabled = !gitIsLoading,
@@ -330,43 +275,32 @@ private fun DrawerHeader(
                     }
                 }
             }
-            DrawerTab.AI -> {
-                // AI 标签页的操作按钮在 DrawerAiPanel 内部工具栏处理
-            }
+
+            DrawerTab.RIKKAHUB -> Unit
         }
     }
 }
 
-/**
- * Material Design 3 风格的底部导航栏
- *
- * 使用 NavigationBar 组件替代原有的 Surface + Row 实现，
- * 具有以下优势：
- * - 使用 MD3 的 pill-shaped indicator（药丸形指示器）
- * - 自动处理系统导航栏的安全区域
- * - 更现代的视觉效果，与系统小白条不冲突
- */
 @Composable
 private fun DrawerTabBar(
     selectedTab: DrawerTab,
     onTabSelected: (DrawerTab) -> Unit
 ) {
     val selectedIconBackgroundShape = RoundedCornerShape(12.dp)
-    // 禁用 tab item 的 ripple / pressed state layer（点击“黑影”）
     CompositionLocalProvider(LocalRippleConfiguration provides null) {
         NavigationBar(
             modifier = Modifier.fillMaxWidth(),
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface,
             tonalElevation = 0.dp,
-            windowInsets = WindowInsets(0) // 不自动添加 insets，由外部控制
+            windowInsets = WindowInsets(0)
         ) {
             DrawerTab.entries.forEach { tab ->
                 val selected = selectedTab == tab
                 val icon = when (tab) {
                     DrawerTab.FILES -> TinaTabIcons.Files
                     DrawerTab.GIT -> TinaTabIcons.Git
-                    DrawerTab.AI -> TinaTabIcons.Ai
+                    DrawerTab.RIKKAHUB -> TinaTabIcons.RikkaHub
                 }
                 val tabTitle = stringResource(tab.titleRes)
 
@@ -403,7 +337,6 @@ private fun DrawerTabBar(
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                        // 隐藏默认 pill indicator，使用上面自绘的“正方形圆角”背景
                         indicatorColor = Color.Transparent,
                         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant

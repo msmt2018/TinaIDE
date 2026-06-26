@@ -20,7 +20,6 @@ internal enum class SettingsScrollableContent {
     Project,
     Storage,
     Terminal,
-    Ai,
     Appearance,
     Keyboard,
     Developer,
@@ -86,7 +85,6 @@ internal object SettingsScreenSupport {
         SettingsRoute.Project -> SettingsScrollableContent.Project
         SettingsRoute.Storage -> SettingsScrollableContent.Storage
         SettingsRoute.Terminal -> SettingsScrollableContent.Terminal
-        SettingsRoute.Ai -> SettingsScrollableContent.Ai
         SettingsRoute.Appearance -> SettingsScrollableContent.Appearance
         SettingsRoute.Keyboard -> SettingsScrollableContent.Keyboard
         SettingsRoute.Developer -> SettingsScrollableContent.Developer

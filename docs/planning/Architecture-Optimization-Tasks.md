@@ -43,8 +43,6 @@
 - `app/src/main/java/com/wuxianggujun/tinaide/ui/ProjectManagerViewModel.kt`
 - `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/FileTreeDialogs.kt`
 - `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/main/project/ProjectScreen.kt`
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/executor/filesystem/DefaultFileSystemCallbacks.kt`
-- `app/src/main/java/com/wuxianggujun/tinaide/ai/integration/FileSystemCallbacksImpl.kt`
 
 ### P0-2：编辑器/LSP 链路仍有阻塞点
 
@@ -339,8 +337,8 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
   - `FileChangeListener` 增加重命名事件，`FileManager` 的重命名/移动事件不再退化为 delete + create。
   - 编辑器支持删除文件/目录时关闭受影响 tab；脏 tab 触发未保存确认；目录删除覆盖子文件。
   - 编辑器支持重命名/移动文件或目录后 retarget 已打开 tab、底层 session、recent files 与 LSP 绑定。
-  - AI 文件删除/移动集成回调改为委托 `IFileOperations`，并保留编辑器同步兜底。
-  - 新增/扩展 `EditorContainerStateTest` 与 `FileSystemCallbacksImplTest` 覆盖删除、目录删除、脏 tab、重命名/移动和 AI 委托链路。
+  - 文件删除/移动逻辑委托 `IFileOperations`，并保留编辑器同步兜底。
+  - 新增/扩展 `EditorContainerStateTest` 覆盖删除、目录删除、脏 tab、重命名/移动链路。
 - 已推进 P0-2 的低风险部分：LSP/运行时等待点。
   - `NativeClangdConnectionProvider` 的启动探测从固定 `Thread.sleep` 改为 `Process.waitFor(timeout)`。
   - `PRootManager` 的退出等待从手动 sleep 轮询改为 `Process.waitFor(timeout)`。
@@ -348,7 +346,7 @@ rg "deleteRecursively|\\.delete\\(|renameTo\\(" app feature core
 - 本轮验证：
 
 ```powershell
-.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
 ```
 
 结果：`BUILD SUCCESSFUL`。
@@ -510,7 +508,7 @@ py tools/checks/check_direct_file_operations.py
   - 本步不改变导航 API、打开文件逻辑、光标跳转逻辑和 UI 行为。
 - 本轮补充验证：
 ```powershell
-.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
 ```
 
 结果：`BUILD SUCCESSFUL`。
@@ -522,7 +520,7 @@ py tools/checks/check_direct_file_operations.py
   - 本步不调整 tab 生命周期、split editor 规则、LSP 路由接口和 UI 行为，只做职责边界拆分。
 - 本轮补充验证：
 ```powershell
-.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
 ```
 
 结果：`BUILD SUCCESSFUL`。
@@ -534,7 +532,7 @@ py tools/checks/check_direct_file_operations.py
   - 参数对象在 `setContent` 外创建，避免 Compose 重组时重复创建依赖分组。
 - 本轮补充验证：
 ```powershell
-.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --tests "com.wuxianggujun.tinaide.ai.integration.FileSystemCallbacksImplTest" --console=plain
+.\gradlew :app:testArm64DebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.state.editor.EditorContainerStateTest" --console=plain
 ```
 
 结果：`BUILD SUCCESSFUL`。

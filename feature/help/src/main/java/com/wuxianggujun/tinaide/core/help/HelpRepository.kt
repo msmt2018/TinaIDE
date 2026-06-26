@@ -264,22 +264,13 @@ class HelpRepository(private val context: Context) {
             order = 0
         ),
         HelpDocument(
-            id = "ai-settings",
-            title = Strings.help_doc_ai_settings_title.strOr(context),
-            category = HelpCategory.ADVANCED,
-            keywords = keywords(Arrays.help_keywords_ai_settings),
-            fileName = "ai-settings.md",
-            summary = Strings.help_doc_ai_settings_summary.strOr(context),
-            order = 1
-        ),
-        HelpDocument(
             id = "appearance-settings",
             title = Strings.help_doc_appearance_settings_title.strOr(context),
             category = HelpCategory.ADVANCED,
             keywords = keywords(Arrays.help_keywords_appearance_settings),
             fileName = "appearance-settings.md",
             summary = Strings.help_doc_appearance_settings_summary.strOr(context),
-            order = 2
+            order = 1
         ),
         HelpDocument(
             id = "keyboard-settings",
@@ -288,7 +279,7 @@ class HelpRepository(private val context: Context) {
             keywords = keywords(Arrays.help_keywords_keyboard_settings),
             fileName = "keyboard-settings.md",
             summary = Strings.help_doc_keyboard_settings_summary.strOr(context),
-            order = 3
+            order = 2
         ),
         HelpDocument(
             id = "plugins-settings",

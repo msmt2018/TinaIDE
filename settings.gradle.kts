@@ -44,10 +44,9 @@ fun isLocalTestOrHelpTask(taskName: String): Boolean {
 fun isTreeSitterIndependentLocalTestRequest(): Boolean =
     requestedGradleTasks.isNotEmpty() &&
         requestedGradleTasks.all { taskName ->
-            isLocalTestOrHelpTask(taskName) &&
+                    isLocalTestOrHelpTask(taskName) &&
                 (
-                    isTaskUnderModule(taskName, ":core:plugin") ||
-                        isTaskUnderModule(taskName, ":feature:ai")
+                    isTaskUnderModule(taskName, ":core:plugin")
                     )
         }
 
@@ -134,6 +133,14 @@ if (shouldIncludeTreeSitterComposite) {
     logger.lifecycle("Skipping tina-android-tree-sitter included build for isolated local tests.")
 }
 
+val rikkahubBuildDir = file("external/rikkahub")
+if (rikkahubBuildDir.isDirectory) {
+    ensureIncludedBuildLocalProperties(rikkahubBuildDir)
+    includeBuild(rikkahubBuildDir)
+} else {
+    logger.lifecycle("Skipping RikkaHub included build because external/rikkahub is missing.")
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     val preferOfficialRepositories = System.getenv("CI").equals("true", ignoreCase = true)
@@ -190,7 +197,6 @@ include(":core:editor-view")
 include(":core:editor-lsp")
 
 // ===== 功能层 =====
-include(":feature:ai")
 include(":feature:editor")
 include(":feature:help")
 include(":feature:output")
