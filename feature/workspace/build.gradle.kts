@@ -11,12 +11,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:config"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:ndk"))
-    implementation(project(":core:proot"))
-    implementation(project(":core:storage"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:ndk"))
+    implementation(project.dependencies.project(":core:proot"))
+    implementation(project.dependencies.project(":core:storage"))
     implementation(libs.androidx.activity)
     implementation(libs.activity.compose)
     implementation(libs.koin.android)
@@ -27,6 +27,6 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel)
-    implementation(project(":immersionbar-local"))
-    implementation(project(":immersionbar-ktx-local"))
+    implementation(project.dependencies.project(":immersionbar-local"))
+    implementation(project.dependencies.project(":immersionbar-ktx-local"))
 }

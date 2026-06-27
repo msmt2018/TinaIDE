@@ -32,7 +32,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":tools:template-common"))
-    implementation(project(":termux-terminal:terminal-view"))
+    implementation(project.dependencies.project(":tools:template-common"))
+    implementation(project.dependencies.project(":termux-terminal:terminal-view"))
     implementation(libs.kotlin.stdlib)
 }

@@ -7,7 +7,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:i18n"))
+    implementation(project.dependencies.project(":core:i18n"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.bouncycastle.prov)

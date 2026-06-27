@@ -12,13 +12,13 @@ android {
 }
 
 dependencies {
-    api(project(":core:common"))
-    api(project(":core:config"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:lsp"))
-    implementation(project(":core:network"))
-    implementation(project(":core:project"))
-    implementation(project(":core:proot"))
+    api(project.dependencies.project(":core:common"))
+    api(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:lsp"))
+    implementation(project.dependencies.project(":core:network"))
+    implementation(project.dependencies.project(":core:project"))
+    implementation(project.dependencies.project(":core:proot"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)

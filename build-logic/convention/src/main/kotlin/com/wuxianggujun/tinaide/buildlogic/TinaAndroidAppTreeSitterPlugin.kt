@@ -85,7 +85,7 @@ class TinaAndroidAppTreeSitterPlugin : Plugin<Project> {
             pluginManager.withPlugin("com.android.application") {
                 extensions.configure<ApplicationExtension> {
                     // AGP 9 disallows Provider-backed source directories on SourceSet APIs.
-                    sourceSets.getByName("main").java.srcDir(generatedRegistryDirFile)
+                    sourceSets.getByName("main").java.directories.add(generatedRegistryDirFile.absolutePath)
                 }
                 tasks.named("preBuild").configure { dependsOn(generateRegistryTask) }
                 listOf(

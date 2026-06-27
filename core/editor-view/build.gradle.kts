@@ -17,12 +17,12 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:text-engine"))
-    implementation(project(":core:config"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:editor-lsp"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:text-engine"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:editor-lsp"))
 
     implementation(libs.kotlinx.coroutines)
     implementation(libs.timber)
@@ -44,5 +44,5 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     implementation(libs.tree.sitter)
-    api(project(":core:tree-sitter"))
+    api(project.dependencies.project(":core:tree-sitter"))
 }

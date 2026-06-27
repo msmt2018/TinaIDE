@@ -11,11 +11,11 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:project"))
-    implementation(project(":core:storage"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:project"))
+    implementation(project.dependencies.project(":core:storage"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.extended)

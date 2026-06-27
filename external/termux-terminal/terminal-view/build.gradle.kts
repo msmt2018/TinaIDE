@@ -25,6 +25,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.annotation)
-    api(project(":termux-terminal:terminal-emulator"))
+    api(project.dependencies.project(":termux-terminal:terminal-emulator"))
     testImplementation(libs.junit)
 }

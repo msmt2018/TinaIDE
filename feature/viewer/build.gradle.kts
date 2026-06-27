@@ -11,8 +11,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
     implementation(libs.kotlinx.coroutines)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)

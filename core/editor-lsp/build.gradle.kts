@@ -6,9 +6,9 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:text-engine"))
-    implementation(project(":core:lsp"))
-    implementation(project(":core:common"))
+    implementation(project.dependencies.project(":core:text-engine"))
+    implementation(project.dependencies.project(":core:lsp"))
+    implementation(project.dependencies.project(":core:common"))
 
     implementation(libs.kotlinx.coroutines)
     implementation(libs.timber)

@@ -7,8 +7,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:text-engine"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:text-engine"))
     implementation(libs.timber)
 
     // Tree-sitter core

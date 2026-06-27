@@ -11,10 +11,10 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:packages"))
-    implementation(project(":core:proot"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:packages"))
+    implementation(project.dependencies.project(":core:proot"))
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
     implementation(libs.timber)

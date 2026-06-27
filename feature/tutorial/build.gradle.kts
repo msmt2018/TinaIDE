@@ -12,9 +12,9 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:i18n"))
-    implementation(project(":core:common"))
-    implementation(project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:designsystem"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.datastore.preferences)

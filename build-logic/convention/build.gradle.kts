@@ -14,7 +14,6 @@ kotlin {
 dependencies {
     compileOnly(libs.plugins.android.application.toDep())
     compileOnly(libs.plugins.android.library.toDep())
-    compileOnly(libs.plugins.kotlin.android.toDep())
     compileOnly(libs.plugins.compose.compiler.toDep())
 }
 

@@ -11,8 +11,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:config"))
-    implementation(project(":core:i18n"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:i18n"))
     implementation(libs.activity.compose)
     implementation(libs.kotlinx.coroutines)
     implementation(platform(libs.compose.bom))

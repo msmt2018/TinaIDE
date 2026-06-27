@@ -8,9 +8,9 @@ android {
 }
 
 dependencies {
-    api(project(":core:model"))
-    implementation(project(":core:common"))
-    implementation(project(":core:i18n"))
+    api(project.dependencies.project(":core:model"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:i18n"))
     implementation(libs.timber)
     implementation(libs.kotlinx.serialization.json)
 }

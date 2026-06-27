@@ -58,17 +58,8 @@ if (shouldIncludeTreeSitterComposite) {
     ensureIncludedBuildLocalProperties(file("external/tina-android-tree-sitter"))
 }
 
-enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
-
 pluginManagement {
     includeBuild("build-logic")
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id == "com.google.devtools.ksp") {
-                useModule("com.google.devtools.ksp:symbol-processing-gradle-plugin:${requested.version}")
-            }
-        }
-    }
     val preferOfficialRepositories = System.getenv("CI").equals("true", ignoreCase = true)
     repositories {
         if (preferOfficialRepositories) {

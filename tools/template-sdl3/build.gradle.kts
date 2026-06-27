@@ -36,7 +36,7 @@ android {
     sourceSets {
         getByName("main") {
             // AGP 9 disallows Provider-backed source directories on SourceSet APIs.
-            java.srcDir(generatedSdlDir)
+            java.directories.add(generatedSdlDir.absolutePath)
         }
     }
 
@@ -46,7 +46,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":tools:template-common"))
+    implementation(project.dependencies.project(":tools:template-common"))
 }
 
 tasks.withType<JavaCompile>().configureEach {

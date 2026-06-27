@@ -1,7 +1,7 @@
 plugins {
     id("tina.android.library")
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.android.legacy.kapt)
 }
 
 android {
@@ -12,9 +12,9 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:project"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:project"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.androidx.core.ktx)
@@ -28,5 +28,5 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    kapt(libs.room.compiler)
 }

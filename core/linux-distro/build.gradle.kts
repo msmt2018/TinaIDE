@@ -8,7 +8,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
+    implementation(project.dependencies.project(":core:common"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)

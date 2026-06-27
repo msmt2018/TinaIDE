@@ -32,5 +32,5 @@ android {
 }
 
 dependencies {
-    implementation(project(":tools:template-common"))
+    implementation(project.dependencies.project(":tools:template-common"))
 }

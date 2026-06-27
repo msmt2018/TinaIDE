@@ -7,5 +7,5 @@ android {
 }
 
 dependencies {
-    implementation(project(":tina-exec:runtime"))
+    implementation(project.dependencies.project(":tina-exec:runtime"))
 }
