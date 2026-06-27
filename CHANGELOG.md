@@ -50,6 +50,9 @@
 
 ### Changed
 
+- Gradle/AGP 构建脚本迁移到 AGP built-in Kotlin 路径，移除 `android.builtInKotlin=false`、`android.newDsl=false`、旧 `org.jetbrains.kotlin.android` 和 KSP 插件配置，Room compiler 改用 AGP `legacy-kapt` 兼容路径，减少 Android Studio Sync/Build 阶段的弃用告警。
+- 主工程、RikkaHub included build 和 tree-sitter included build 统一更新 Gradle 9/AGP 9 DSL：项目依赖改为明确的 `DependencyHandler.project(":path")` 调用，`srcDir(...)` 改为 `directories.add(...)`，并移除不再需要的 configuration-on-demand 与 type-safe project accessors 预览配置。
+
 - TinaIDE 开源版移除内置 AI 聊天、渠道、会话仓储和工具调用系统，设置页、帮助文档和侧边栏入口同步改为 RikkaHub 使用方式。
 - RikkaHub 作为 `external/rikkahub` included build 纳入工程，并通过 `rikkahub-embedded` library 打包进 TinaIDE，避免继续维护两套 AI 实现。
 - 调整 RikkaHub 和 Tree-sitter included build 的构建兼容性：补充国内 Maven/NPM 镜像、缺少 `google-services.json` 时跳过 Firebase 插件、Windows pnpm 构建支持，以及 Kotlin compilerOptions JVM target 写法。
@@ -66,6 +69,8 @@
 - 新增 `docs/third-party-notices/r2droid-MIT-LICENSE.txt`，保留 r2droid 的 MIT License 文本并在文档中致谢。
 
 ### Verification
+
+- 已执行 `./gradlew help --warning-mode all --build-cache --console=plain`。
 
 - 已执行 `py tools/i18n/check_all.py`。
 - 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
