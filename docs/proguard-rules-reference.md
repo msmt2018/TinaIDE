@@ -121,7 +121,7 @@ R8 对代码执行三项操作：
 | **Kotlin Serialization** | 编译器生成序列化器，不依赖反射字段名 |
 | **Jetpack Compose** | Compose 编译器插件 + R8 内置完整支持 |
 | **AndroidX (core/lifecycle/activity/room/work/datastore)** | 自带 consumer-rules.pro |
-| **Room** | KSP 编译时生成 Dao_Impl，不依赖运行时反射 |
+| **Room** | AGP `legacy-kapt` 编译时运行 Room compiler 生成 `Dao_Impl`，不依赖运行时反射 |
 | **Koin** | 编译时类型解析（`by inject<T>()`），无运行时反射发现 |
 | **OkHttp** | 自带 consumer-rules.pro |
 | **Coil 3** | 自带 consumer-rules.pro |
