@@ -7,6 +7,8 @@ val copySDLSources = tasks.register<Copy>("copySDLSources") {
     into(layout.buildDirectory.dir("generated/sdl/org/libsdl/app"))
 }
 
+val generatedSdlDir = layout.buildDirectory.dir("generated/sdl").get().asFile
+
 android {
     namespace = "com.tinaide.template.sdl3"
     compileSdk = 36
@@ -33,7 +35,8 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDir(layout.buildDirectory.dir("generated/sdl"))
+            // AGP 9 disallows Provider-backed source directories on SourceSet APIs.
+            java.srcDir(generatedSdlDir)
         }
     }
 

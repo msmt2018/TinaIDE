@@ -80,9 +80,12 @@ class TinaAndroidAppTreeSitterPlugin : Plugin<Project> {
                 })
             }
 
+            val generatedRegistryDirFile = generatedRegistryDir.get().asFile
+
             pluginManager.withPlugin("com.android.application") {
                 extensions.configure<ApplicationExtension> {
-                    sourceSets.getByName("main").java.srcDir(generatedRegistryDir)
+                    // AGP 9 disallows Provider-backed source directories on SourceSet APIs.
+                    sourceSets.getByName("main").java.srcDir(generatedRegistryDirFile)
                 }
                 tasks.named("preBuild").configure { dependsOn(generateRegistryTask) }
                 listOf(
