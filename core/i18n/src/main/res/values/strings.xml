@@ -2486,9 +2486,9 @@
   <string name="drawer_tab_rikkahub_title">RikkaHub</string>
 
   <string name="rikkahub_title">RikkaHub</string>
-  <string name="rikkahub_desc">TinaIDE 已移除内置 AI，聊天、模型和渠道配置改由 RikkaHub 提供。</string>
+  <string name="rikkahub_desc">TinaIDE 已内嵌 RikkaHub，聊天、模型和渠道配置由 RikkaHub 提供。</string>
   <string name="rikkahub_open">打开 RikkaHub</string>
-  <string name="rikkahub_not_installed">未找到 RikkaHub，请先安装 RikkaHub APK。</string>
+  <string name="rikkahub_open_failed">无法打开内嵌 RikkaHub，请查看日志。</string>
   <string name="code_block_copy">复制代码</string>
   <string name="code_block_insert">插入到编辑器</string>
   <string name="code_block_lines">行</string>

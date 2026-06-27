@@ -8,6 +8,7 @@ import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.compile.BuildOptions
 import com.wuxianggujun.tinaide.core.compile.BuildResult
 import com.wuxianggujun.tinaide.core.compile.BuildSystem
+import com.wuxianggujun.tinaide.core.compile.CleanResult
 import com.wuxianggujun.tinaide.core.compile.CMakeBuildTypeOption
 import com.wuxianggujun.tinaide.core.compile.CMakeConfigurationIdentity
 import com.wuxianggujun.tinaide.core.compile.CMakeGeneratorOption
@@ -59,6 +60,22 @@ class CMakeStrategy(
 
     companion object {
         private const val TAG = "CMakeStrategy"
+
+        internal fun shouldCleanBeforeBuild(reason: String?): Boolean {
+            val normalized = reason.normalizedBuildReason()
+            if (normalized.isEmpty()) return false
+            return normalized == "force rebuild requested" ||
+                normalized == "no cached artifact" ||
+                normalized == "cached artifact file missing" ||
+                normalized.startsWith("fingerprint changed:") ||
+                normalized.startsWith("tracked input changed") ||
+                normalized.startsWith("tracked input missing")
+        }
+
+        internal fun shouldForceReconfigureForReason(reason: String?): Boolean =
+            "reconfigureInputsHash" in reason.normalizedBuildReason()
+
+        private fun String?.normalizedBuildReason(): String = orEmpty().trim()
     }
 
     private val sharedTimeoutConfig: CompileTimeoutConfig = timeoutConfig ?: CompileTimeoutConfig(context)
@@ -154,7 +171,14 @@ class CMakeStrategy(
 
         // 1. 需要时重新 configure(CMakeCache 变旧 / 参数变更 / 元数据变更)
         lastResolvedRunMode = options.resolvedRunMode
-        if (needsReconfigure(ctx.projectRoot, ctx.buildDir, optionsWithProgress)) {
+        val forceReconfigure = shouldForceReconfigureForReason(ctx.buildReason)
+        if (forceReconfigure) {
+            BuildDiagnosticsLog.i {
+                "cmake force reconfigure before build reason=${ctx.buildReason.orEmpty()} " +
+                    "target=${spec.id.targetName}"
+            }
+        }
+        if (forceReconfigure || needsReconfigure(ctx.projectRoot, ctx.buildDir, optionsWithProgress)) {
             emitter.emit(BuildEvent.Build.ConfigureStarted(spec.id.targetName))
             onProgress(Strings.cmake_progress_reconfiguring.strOr(context))
             val cfgStart = System.currentTimeMillis()
@@ -164,6 +188,10 @@ class CMakeStrategy(
                 return reportFailure(emitter, cfgResult.message, emptyList(), cfgResult.message)
             }
             emitter.emit(BuildEvent.Build.ConfigureCompleted(System.currentTimeMillis() - cfgStart))
+        }
+
+        cleanExistingOutputBeforeBuild(ctx, spec, optionsWithProgress)?.let { message ->
+            return reportFailure(emitter, message, emptyList(), message)
         }
 
         // 2. build
@@ -187,7 +215,7 @@ class CMakeStrategy(
         } else {
             // 完整清理:委托给对应执行器以享有各自的清理语义
             if (isNativeMode(lastResolvedRunMode)) {
-                nativeExecutor.clean(ctx.buildDir)
+                nativeExecutor.clean(ctx.buildDir, ctx.options.toolchainId)
             } else {
                 prootExecutor.clean(ctx.buildDir)
             }
@@ -310,6 +338,42 @@ class CMakeStrategy(
         parallelJobs = resolveParallelJobs(options.parallelJobs),
         progress = options.onProgress ?: {},
     )
+
+    private suspend fun cleanExistingOutputBeforeBuild(
+        ctx: BuildContext,
+        spec: ArtifactSpec,
+        options: BuildOptions,
+    ): String? {
+        if (!shouldCleanBeforeBuild(ctx.buildReason)) return null
+
+        val target = spec.id.targetName.takeIf { it.isNotBlank() } ?: ctx.target.orEmpty()
+        BuildDiagnosticsLog.i {
+            "cmake prebuild clean start target=$target reason=${ctx.buildReason.orEmpty()} " +
+                "artifact=${spec.expectedPath.absolutePath}"
+        }
+        val result = if (isNativeMode(options.resolvedRunMode)) {
+            nativeExecutor.clean(ctx.buildDir, options.toolchainId)
+        } else {
+            prootExecutor.clean(ctx.buildDir)
+        }
+        return when (result) {
+            CleanResult.Success -> {
+                BuildDiagnosticsLog.i {
+                    "cmake prebuild clean success target=$target artifact=${spec.expectedPath.absolutePath}"
+                }
+                null
+            }
+            is CleanResult.Error -> {
+                val message = result.message.ifBlank {
+                    Strings.compile_cmake_clear_build_dir_failed.strOr(context)
+                }
+                BuildDiagnosticsLog.w {
+                    "cmake prebuild clean failed target=$target reason=${ctx.buildReason.orEmpty()} message=$message"
+                }
+                message
+            }
+        }
+    }
 
     // ---------- needsReconfigure ----------
 

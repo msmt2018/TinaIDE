@@ -103,7 +103,7 @@
 
 ### RikkaHub 使用方式
 
-TinaIDE 已移除内置 AI。AI 聊天、模型和渠道配置由 RikkaHub 提供，请从编辑器侧边栏打开 RikkaHub 后在 RikkaHub 内完成配置。
+TinaIDE 已移除自研 AI。AI 聊天、模型和渠道配置由内嵌 RikkaHub 提供，请从编辑器侧边栏打开 RikkaHub 后在 RikkaHub 内完成配置。
 
 ### 插件市场
 

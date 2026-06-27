@@ -25,4 +25,5 @@ data class BuildContext(
     val options: BuildOptions,
     val projectId: String,
     val target: String? = null,
+    val buildReason: String? = null,
 )

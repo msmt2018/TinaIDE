@@ -1,5 +1,6 @@
 import com.android.build.gradle.LibraryExtension
 import com.wuxianggujun.tinaide.buildlogic.TinaVersions
+import com.wuxianggujun.tinaide.buildlogic.TinaToolchainAssetsVerification
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -16,11 +17,16 @@ class TinaAndroidLibraryPlugin : Plugin<Project> {
             pluginManager.apply("com.android.library")
             pluginManager.apply("org.jetbrains.kotlin.android")
 
+            val nativeAbis = resolveNativeAbis()
+
             extensions.configure<LibraryExtension> {
                 compileSdk = TinaVersions.COMPILE_SDK
                 defaultConfig {
                     minSdk = TinaVersions.MIN_SDK
                     consumerProguardFiles("consumer-rules.pro")
+                    ndk {
+                        abiFilters += nativeAbis
+                    }
                 }
                 compileOptions {
                     sourceCompatibility = JavaVersion.toVersion(TinaVersions.JVM_TARGET)
@@ -43,6 +49,16 @@ class TinaAndroidLibraryPlugin : Plugin<Project> {
                 add("testImplementation", libs.findLibrary("tests-mockk").get())
                 add("testImplementation", libs.findLibrary("tests-kotlinx-coroutines").get())
             }
+        }
+    }
+
+    private fun Project.resolveNativeAbis(): Set<String> {
+        if (TinaToolchainAssetsVerification.resolveBuildAllAbiRequested(this)) {
+            return setOf("arm64-v8a", "x86_64")
+        }
+        return when (TinaToolchainAssetsVerification.resolveLocalDevAbi(this)) {
+            "x86_64" -> setOf("x86_64")
+            else -> setOf("arm64-v8a")
         }
     }
 }

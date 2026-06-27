@@ -41,7 +41,7 @@
 
 ### Added
 
-- 新增 RikkaHub 外部 AI 入口：TinaIDE 开源版通过编辑器侧边栏打开已安装的 RikkaHub debug/release 包，AI 聊天、模型和渠道配置由 RikkaHub 承担。
+- 新增内嵌 RikkaHub AI 入口：TinaIDE 开源版通过编辑器侧边栏直接打开 APK 内部的 RikkaHub 界面，AI 聊天、模型和渠道配置由 RikkaHub 承担。
 - 重做 Hex Viewer：采用分块读取和缓存，不再把大文件一次性读入内存；支持 ASCII/UTF-8/十六进制通配搜索、offset 跳转历史、选区 Inspector、多格式导出、offset 书签、staged patch 队列和 radare2 `wx` patch 脚本复制。
 - 新增 Hex 二进制分析面板：支持文件指纹、字节分布、重复字节段、magic signature、字符串提取、熵图、DEX 结构、APK/ZIP 结构、ELF 元数据和可跳转 analysis signals。
 - 新增 ELF/SO 分析线索：解析 Program Header、Section、Dynamic Symbols、依赖、Notes/Build ID、hardening、风险提示、relocation、PLT/GOT linkage、动态链接器步骤、JNI 注册线索和 Native API 导入分类。
@@ -51,7 +51,7 @@
 ### Changed
 
 - TinaIDE 开源版移除内置 AI 聊天、渠道、会话仓储和工具调用系统，设置页、帮助文档和侧边栏入口同步改为 RikkaHub 使用方式。
-- RikkaHub 作为 `external/rikkahub` included build 纳入工程，主应用只保留 launcher 和包可见性声明，避免继续维护两套 AI 实现。
+- RikkaHub 作为 `external/rikkahub` included build 纳入工程，并通过 `rikkahub-embedded` library 打包进 TinaIDE，避免继续维护两套 AI 实现。
 - 调整 RikkaHub 和 Tree-sitter included build 的构建兼容性：补充国内 Maven/NPM 镜像、缺少 `google-services.json` 时跳过 Firebase 插件、Windows pnpm 构建支持，以及 Kotlin compilerOptions JVM target 写法。
 - 更新项目架构、模块说明、开发指南和 App 内帮助内容，明确 RikkaHub 边界、`feature:viewer` 的二进制查看职责和第三方许可保留要求。
 

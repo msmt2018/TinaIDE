@@ -41,7 +41,7 @@ val buildProotFromSource = providers.gradleProperty("tina.buildProotFromSource")
 
 android {
     namespace = "com.wuxianggujun.tinaide"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.wuxianggujun.tinaide"
@@ -331,6 +331,12 @@ dependencies {
 
     // Kotlin Serialization
     implementation(libs.kotlinx.serialization.json)
+
+    // Embedded RikkaHub UI and runtime. Resolved from external/rikkahub via composite build.
+    implementation("me.rerere.rikkahub:rikkahub-embedded") {
+        exclude(group = "com.termux.termux-app", module = "terminal-emulator")
+        exclude(group = "com.termux.termux-app", module = "terminal-view")
+    }
 
     // LuaJava Android native runtime. core:plugin owns the Java API dependency;
     // the app must package liblua54.so for script/hybrid plugins.

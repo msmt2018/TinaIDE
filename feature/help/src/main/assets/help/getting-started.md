@@ -1,6 +1,6 @@
 # 快速开始
 
-TinaIDE 开源版聚焦本地 Android/C/C++ 开发、插件、包管理和终端。AI 聊天、模型和渠道配置已交给 RikkaHub。
+TinaIDE 开源版聚焦本地 Android/C/C++ 开发、插件、包管理和终端。AI 聊天、模型和渠道配置已交给内嵌 RikkaHub。
 
 ## 主要入口
 
@@ -13,4 +13,4 @@ TinaIDE 开源版聚焦本地 Android/C/C++ 开发、插件、包管理和终端
 
 开源版不内置私有身份和商业功能。反馈、日志、插件、包下载、收藏和下载历史仍可使用。
 
-如需 AI 能力，请在编辑器侧边栏打开 RikkaHub，并在 RikkaHub 内配置服务商、模型和 API Key。
+如需 AI 能力，请在编辑器侧边栏打开内嵌 RikkaHub，并在 RikkaHub 内配置服务商、模型和 API Key。

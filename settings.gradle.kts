@@ -136,7 +136,11 @@ if (shouldIncludeTreeSitterComposite) {
 val rikkahubBuildDir = file("external/rikkahub")
 if (rikkahubBuildDir.isDirectory) {
     ensureIncludedBuildLocalProperties(rikkahubBuildDir)
-    includeBuild(rikkahubBuildDir)
+    includeBuild(rikkahubBuildDir) {
+        dependencySubstitution {
+            substitute(module("me.rerere.rikkahub:rikkahub-embedded")).using(project(":embedded"))
+        }
+    }
 } else {
     logger.lifecycle("Skipping RikkaHub included build because external/rikkahub is missing.")
 }

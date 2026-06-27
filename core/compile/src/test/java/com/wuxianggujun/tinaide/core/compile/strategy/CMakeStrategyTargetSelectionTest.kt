@@ -72,6 +72,28 @@ class CMakeStrategyTargetSelectionTest {
         assertThat(spec?.kind).isEqualTo(ArtifactKind.SHARED_LIBRARY)
     }
 
+    @Test
+    fun `fingerprint change cleans before cmake build`() {
+        assertThat(CMakeStrategy.shouldCleanBeforeBuild("fingerprint changed: trackedInputsHash"))
+            .isTrue()
+    }
+
+    @Test
+    fun `empty build reason does not clean before cmake build`() {
+        assertThat(CMakeStrategy.shouldCleanBeforeBuild(null))
+            .isFalse()
+        assertThat(CMakeStrategy.shouldCleanBeforeBuild(""))
+            .isFalse()
+    }
+
+    @Test
+    fun `reconfigure fingerprint change forces cmake configure`() {
+        assertThat(CMakeStrategy.shouldForceReconfigureForReason("fingerprint changed: reconfigureInputsHash"))
+            .isTrue()
+        assertThat(CMakeStrategy.shouldForceReconfigureForReason("fingerprint changed: trackedInputsHash"))
+            .isFalse()
+    }
+
     private fun strategy(): CMakeStrategy = CMakeStrategy(context = mockk<Context>(relaxed = true))
 
     private fun newContext(projectRoot: File, options: BuildOptions): BuildContext = BuildContext(

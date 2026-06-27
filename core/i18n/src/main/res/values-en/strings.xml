@@ -1900,9 +1900,9 @@
   <string name="drawer_tab_rikkahub_title">RikkaHub</string>
 
   <string name="rikkahub_title">RikkaHub</string>
-  <string name="rikkahub_desc">TinaIDE built-in AI has been removed. Chat, models, and channel settings are now handled by RikkaHub.</string>
+  <string name="rikkahub_desc">RikkaHub is embedded in TinaIDE. Chat, models, and channel settings are handled by RikkaHub.</string>
   <string name="rikkahub_open">Open RikkaHub</string>
-  <string name="rikkahub_not_installed">RikkaHub is not installed. Install the RikkaHub APK first.</string>
+  <string name="rikkahub_open_failed">Unable to open embedded RikkaHub. Check logs for details.</string>
   <string name="code_block_copy">Copy code</string>
   <string name="code_block_insert">Insert to editor</string>
   <string name="code_block_lines">lines</string>
