@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Close
@@ -105,6 +107,8 @@ fun HexViewerScreen(
     var selectionInspector by remember(filePath) { mutableStateOf<HexSelectionInspector?>(null) }
     var binaryAnalysis by remember(filePath) { mutableStateOf<HexBinaryAnalysis?>(null) }
     var isAnalysisLoading by remember(filePath) { mutableStateOf(false) }
+    var showSearchPanel by remember(filePath) { mutableStateOf(initialHexSearchPanelExpanded()) }
+    var showAnalysisDialog by remember(filePath) { mutableStateOf(false) }
 
     fun scrollToOffset(offset: Long) {
         val targetOffset = dataManager.coerceOffset(offset)
@@ -321,43 +325,40 @@ fun HexViewerScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         HexHeader()
-        HexSearchPanel(
+        HexTopActionBar(
             state = state,
-            onQueryChange = { query ->
-                state = state.copy(searchQuery = query, searchError = null)
-            },
-            onRunSearch = { runSearch() },
-            onPreviousResult = {
-                if (state.searchResults.isNotEmpty()) {
-                    val previousIndex = if (state.searchResultIndex <= 0) {
-                        state.searchResults.lastIndex
-                    } else {
-                        state.searchResultIndex - 1
-                    }
-                    goToSearchResult(previousIndex)
-                }
-            },
-            onNextResult = {
-                if (state.searchResults.isNotEmpty()) {
-                    val nextIndex = if (state.searchResultIndex >= state.searchResults.lastIndex) {
-                        0
-                    } else {
-                        state.searchResultIndex + 1
-                    }
-                    goToSearchResult(nextIndex)
-                }
-            }
+            analysis = binaryAnalysis,
+            isAnalysisLoading = isAnalysisLoading,
+            isSearchExpanded = showSearchPanel,
+            onToggleSearch = { showSearchPanel = !showSearchPanel },
+            onOpenAnalysis = { showAnalysisDialog = true }
         )
-        if (state.fileSize > 0L) {
-            HexAnalysisPanel(
-                analysis = binaryAnalysis,
-                isLoading = isAnalysisLoading,
-                onGotoOffset = { goToOffset(it) },
-                onMarkOffsets = { offsets ->
-                    state = state.copy(
-                        bookmarkedOffsets = markHexBookmarks(state.bookmarkedOffsets, offsets),
-                        error = null
-                    )
+        if (showSearchPanel) {
+            HexSearchPanel(
+                state = state,
+                onQueryChange = { query ->
+                    state = state.copy(searchQuery = query, searchError = null)
+                },
+                onRunSearch = { runSearch() },
+                onPreviousResult = {
+                    if (state.searchResults.isNotEmpty()) {
+                        val previousIndex = if (state.searchResultIndex <= 0) {
+                            state.searchResults.lastIndex
+                        } else {
+                            state.searchResultIndex - 1
+                        }
+                        goToSearchResult(previousIndex)
+                    }
+                },
+                onNextResult = {
+                    if (state.searchResults.isNotEmpty()) {
+                        val nextIndex = if (state.searchResultIndex >= state.searchResults.lastIndex) {
+                            0
+                        } else {
+                            state.searchResultIndex + 1
+                        }
+                        goToSearchResult(nextIndex)
+                    }
                 }
             )
         }
@@ -596,6 +597,24 @@ fun HexViewerScreen(
             )
         }
 
+        if (showAnalysisDialog) {
+            HexAnalysisDialog(
+                analysis = binaryAnalysis,
+                isLoading = isAnalysisLoading,
+                onDismiss = { showAnalysisDialog = false },
+                onGotoOffset = { offset ->
+                    showAnalysisDialog = false
+                    goToOffset(offset)
+                },
+                onMarkOffsets = { offsets ->
+                    state = state.copy(
+                        bookmarkedOffsets = markHexBookmarks(state.bookmarkedOffsets, offsets),
+                        error = null
+                    )
+                }
+            )
+        }
+
         if (state.isEditMode && state.fileSize > 0L) {
             HexKeyboard(
                 onNibbleClick = { nibble ->
@@ -736,6 +755,113 @@ private fun HexHeader() {
             }
         }
     }
+}
+
+@Composable
+private fun HexTopActionBar(
+    state: HexViewerState,
+    analysis: HexBinaryAnalysis?,
+    isAnalysisLoading: Boolean,
+    isSearchExpanded: Boolean,
+    onToggleSearch: () -> Unit,
+    onOpenAnalysis: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextButton(onClick = onToggleSearch) {
+                Text(
+                    stringResource(
+                        if (isSearchExpanded) {
+                            Strings.content_desc_collapse
+                        } else {
+                            Strings.hex_search_label
+                        }
+                    )
+                )
+            }
+            TextButton(
+                onClick = onOpenAnalysis,
+                enabled = state.fileSize > 0L
+            ) {
+                Text(stringResource(Strings.hex_analysis_title))
+            }
+
+            when {
+                isAnalysisLoading -> {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(Strings.hex_analysis_loading),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                analysis != null -> {
+                    Text(
+                        text = stringResource(Strings.hex_analysis_file_kind, hexFileKindLabel(analysis.fileKind)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (state.searchResults.isNotEmpty()) {
+                Text(
+                    text = stringResource(
+                        Strings.hex_search_results_count,
+                        state.searchResultIndex + 1,
+                        state.searchResults.size
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HexAnalysisDialog(
+    analysis: HexBinaryAnalysis?,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onGotoOffset: (Long) -> Unit,
+    onMarkOffsets: (List<Long>) -> Unit
+) {
+    TinaAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { TinaDialogTitleText(stringResource(Strings.hex_analysis_title)) },
+        text = {
+            TinaDialogContentColumn(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                HexAnalysisPanel(
+                    analysis = analysis,
+                    isLoading = isLoading,
+                    onGotoOffset = onGotoOffset,
+                    onMarkOffsets = onMarkOffsets
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TinaTextButton(
+                text = stringResource(Strings.btn_close),
+                onClick = onDismiss
+            )
+        }
+    )
 }
 
 @Composable
@@ -5420,9 +5546,15 @@ private fun HexFooter(
     var showGotoDialog by remember { mutableStateOf(false) }
     var showPatchDetailsDialog by remember { mutableStateOf(false) }
     var showBookmarksDialog by remember { mutableStateOf(false) }
+    var areFooterToolsExpanded by remember { mutableStateOf(initialHexFooterToolsExpanded()) }
     val horizontalScrollState = rememberScrollState()
     val selectionRange = state.selectionRange
     val isSelectedBookmarked = isHexBookmarked(state.bookmarkedOffsets, state.selectedOffset)
+    val hasPatchActivity = state.stagedPatches.isNotEmpty() || state.redoPatches.isNotEmpty()
+    val showFooterDetails = shouldShowHexFooterDetails(
+        isUserExpanded = areFooterToolsExpanded,
+        hasPatchActivity = hasPatchActivity
+    )
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -5503,47 +5635,60 @@ private fun HexFooter(
                 ) {
                     Text(stringResource(Strings.hex_bookmark_list))
                 }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = if (selectionRange == null) {
-                        stringResource(Strings.hex_selection_empty)
-                    } else {
+                TextButton(onClick = { areFooterToolsExpanded = !areFooterToolsExpanded }) {
+                    Text(
                         stringResource(
-                            Strings.hex_selection_range,
-                            selectionRange.firstOffset,
-                            selectionRange.lastOffset,
-                            selectionRange.byteCount
+                            if (areFooterToolsExpanded) {
+                                Strings.content_desc_collapse
+                            } else {
+                                Strings.action_more
+                            }
                         )
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                TextButton(onClick = onMarkSelectionStart, enabled = canEdit) {
-                    Text(stringResource(Strings.hex_mark_start))
-                }
-                TextButton(onClick = onMarkSelectionEnd, enabled = canEdit) {
-                    Text(stringResource(Strings.hex_mark_end))
-                }
-                TextButton(onClick = onClearSelection, enabled = selectionRange != null) {
-                    Text(stringResource(Strings.hex_clear_selection))
-                }
-                TextButton(onClick = onInspectSelection, enabled = canEdit) {
-                    Text(stringResource(Strings.hex_inspect_selection))
-                }
-                TextButton(onClick = onExportSelection, enabled = canEdit) {
-                    Text(stringResource(Strings.hex_export_selection))
+                    )
                 }
             }
 
-            if (state.stagedPatches.isNotEmpty() || state.redoPatches.isNotEmpty()) {
+            if (showFooterDetails) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = if (selectionRange == null) {
+                            stringResource(Strings.hex_selection_empty)
+                        } else {
+                            stringResource(
+                                Strings.hex_selection_range,
+                                selectionRange.firstOffset,
+                                selectionRange.lastOffset,
+                                selectionRange.byteCount
+                            )
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = onMarkSelectionStart, enabled = canEdit) {
+                        Text(stringResource(Strings.hex_mark_start))
+                    }
+                    TextButton(onClick = onMarkSelectionEnd, enabled = canEdit) {
+                        Text(stringResource(Strings.hex_mark_end))
+                    }
+                    TextButton(onClick = onClearSelection, enabled = selectionRange != null) {
+                        Text(stringResource(Strings.hex_clear_selection))
+                    }
+                    TextButton(onClick = onInspectSelection, enabled = canEdit) {
+                        Text(stringResource(Strings.hex_inspect_selection))
+                    }
+                    TextButton(onClick = onExportSelection, enabled = canEdit) {
+                        Text(stringResource(Strings.hex_export_selection))
+                    }
+                }
+            }
+
+            if (showFooterDetails && hasPatchActivity) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

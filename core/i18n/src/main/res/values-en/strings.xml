@@ -52,7 +52,7 @@
   <string name="settings_desc_packages">Manage installed Linux and Android libraries</string>
 
   <string name="settings_title_about">About</string>
-  <string name="settings_desc_about">Version info, GitHub, open source licenses</string>
+  <string name="settings_desc_about">Version info, GitHub, QQ group, support, open source licenses</string>
 
   <!-- Git SSH -->
   <string name="settings_cat_git_ssh">Git SSH</string>
@@ -1059,10 +1059,14 @@
   <string name="error_cannot_open_link">Cannot open link</string>
   <string name="settings_github">GitHub</string>
   <string name="settings_github_desc">View source code, submit issues</string>
+  <string name="settings_qq_group">QQ Group</string>
+  <string name="settings_qq_group_desc">Join the TinaIDE community group</string>
   <string name="about_donation_title">Support TinaIDE</string>
   <string name="about_donation_desc">If TinaIDE helps you, scan a code to support project maintenance.</string>
   <string name="about_donation_wechat">WeChat</string>
   <string name="about_donation_alipay">Alipay</string>
+  <string name="about_donation_afdian">Afdian</string>
+  <string name="about_donation_afdian_desc">Open Afdian in your browser to support project maintenance</string>
   <string name="settings_cat_legal">Legal</string>
   <string name="settings_open_source_licenses">Open Source Components &amp; Licenses</string>
   <string name="settings_licenses_desc">View the open source components and licenses used by this app</string>
@@ -2437,6 +2441,7 @@ kept=%3$d bytes
   <string name="about_export_logs_failed">Export logs failed</string>
   <string name="about_user_report_log">User reported log</string>
   <string name="about_clear_logs_failed">Clear failed</string>
+  <string name="about_qq_group_not_configured">QQ group join link is not configured</string>
 
 <!-- Editor Settings Section - LSP Connection -->
   <string name="editor_lsp_connection_success">Connection successful! Latency: %1$d ms</string>

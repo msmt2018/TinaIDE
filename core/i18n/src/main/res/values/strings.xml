@@ -78,7 +78,7 @@
   <string name="settings_desc_packages">管理已安装的 Linux 与 Android 开发库</string>
 
   <string name="settings_title_about">关于</string>
-  <string name="settings_desc_about">版本信息、GitHub、开源许可</string>
+  <string name="settings_desc_about">版本信息、GitHub、QQ 群、赞赏、开源许可</string>
 
   <string name="settings_title_developer">开发者选项</string>
   <string name="settings_desc_developer">测试工具、调试功能</string>
@@ -1289,10 +1289,14 @@
   <string name="error_cannot_open_link">无法打开链接</string>
   <string name="settings_github">GitHub</string>
   <string name="settings_github_desc">查看源代码、提交 Issue</string>
+  <string name="settings_qq_group">QQ 群</string>
+  <string name="settings_qq_group_desc">加入 TinaIDE 交流群</string>
   <string name="about_donation_title">赞赏支持</string>
   <string name="about_donation_desc">如果 TinaIDE 对你有帮助，可以扫码支持项目维护。</string>
   <string name="about_donation_wechat">微信赞赏</string>
   <string name="about_donation_alipay">支付宝赞赏</string>
+  <string name="about_donation_afdian">爱发电</string>
+  <string name="about_donation_afdian_desc">打开爱发电网页支持项目维护</string>
   <string name="settings_cat_legal">法律信息</string>
   <string name="settings_open_source_licenses">开源组件与许可证</string>
   <string name="settings_licenses_desc">查看当前应用使用的开源组件与许可证</string>
@@ -3490,6 +3494,7 @@ kept=%3$d bytes
   <string name="about_export_logs_failed">导出日志失败</string>
   <string name="about_user_report_log">用户上报日志</string>
   <string name="about_clear_logs_failed">清理失败</string>
+  <string name="about_qq_group_not_configured">QQ 群加群链接未配置</string>
 
 <!-- Editor Settings Section - LSP Connection -->
   <string name="editor_lsp_connection_success">连接成功！延迟：%1$d ms</string>

@@ -185,4 +185,38 @@ class AboutSettingsSectionSupportTest {
         assertThat(AboutSettingsSectionSupport.shouldStartLogsClear(false)).isTrue()
         assertThat(AboutSettingsSectionSupport.shouldStartLogsClear(true)).isFalse()
     }
+
+    @Test
+    fun resolveQqGroupOpenUrls_shouldReturnEmptyWhenNotConfigured() {
+        val urls = AboutSettingsSectionSupport.resolveQqGroupOpenUrls(
+            groupNumber = "",
+            joinUrl = "",
+        )
+
+        assertThat(urls).isEmpty()
+    }
+
+    @Test
+    fun resolveQqGroupOpenUrls_shouldPreferQqGroupCardAndKeepFallbackUrl() {
+        val urls = AboutSettingsSectionSupport.resolveQqGroupOpenUrls(
+            groupNumber = "123456789",
+            joinUrl = "https://qm.qq.com/q/example",
+        )
+
+        assertThat(urls).containsExactly(
+            "mqqapi://card/show_pslcard?src_type=internal&version=1" +
+                "&uin=123456789&card_type=group&source=qrcode",
+            "https://qm.qq.com/q/example",
+        ).inOrder()
+    }
+
+    @Test
+    fun resolveQqGroupOpenUrls_shouldIgnoreInvalidConfigValues() {
+        val urls = AboutSettingsSectionSupport.resolveQqGroupOpenUrls(
+            groupNumber = "123&bad=true",
+            joinUrl = "file:///sdcard/bad",
+        )
+
+        assertThat(urls).isEmpty()
+    }
 }

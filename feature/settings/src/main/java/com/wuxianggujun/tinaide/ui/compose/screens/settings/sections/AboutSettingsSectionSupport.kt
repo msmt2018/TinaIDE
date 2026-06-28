@@ -39,6 +39,15 @@ internal data class AboutCrashUploadStatusSpec(
 internal object AboutSettingsSectionSupport {
     private const val DEVELOPER_OPTIONS_TAP_THRESHOLD = 5
     private const val DEVELOPER_OPTIONS_TAP_RESET_WINDOW_MILLIS = 3000L
+    private const val QQ_GROUP_CARD_URL_TEMPLATE =
+        "mqqapi://card/show_pslcard?src_type=internal&version=1&uin=%s&card_type=group&source=qrcode"
+    private val qqGroupNumberPattern = Regex("^\\d+$")
+    private val supportedQqGroupJoinUrlPrefixes = listOf(
+        "https://",
+        "http://",
+        "mqqapi://",
+        "mqqopensdkapi://",
+    )
 
     fun resolveDeveloperOptionsTap(
         serverAllowsDeveloperOptions: Boolean,
@@ -141,4 +150,26 @@ internal object AboutSettingsSectionSupport {
     fun shouldStartLogsUpload(isUploadingLogs: Boolean): Boolean = !isUploadingLogs
 
     fun shouldStartLogsClear(isClearingLogs: Boolean): Boolean = !isClearingLogs
+
+    fun resolveQqGroupOpenUrls(
+        groupNumber: String,
+        joinUrl: String,
+    ): List<String> {
+        val normalizedGroupNumber = groupNumber.trim()
+        val normalizedJoinUrl = joinUrl.trim()
+
+        return buildList {
+            if (qqGroupNumberPattern.matches(normalizedGroupNumber)) {
+                add(QQ_GROUP_CARD_URL_TEMPLATE.format(normalizedGroupNumber))
+            }
+            if (
+                normalizedJoinUrl.isNotEmpty() &&
+                supportedQqGroupJoinUrlPrefixes.any { prefix ->
+                    normalizedJoinUrl.startsWith(prefix, ignoreCase = true)
+                }
+            ) {
+                add(normalizedJoinUrl)
+            }
+        }
+    }
 }

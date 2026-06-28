@@ -53,6 +53,9 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 private const val GITHUB_URL = "https://github.com/wuxianggujun/TinaIDE"
+private const val AFDIAN_URL = "https://ifdian.net/a/wuxianggujun"
+private const val QQ_GROUP_NUMBER = "557484133"
+private const val QQ_GROUP_JOIN_URL = ""
 
 @Composable
 internal fun AboutSettingsSection(
@@ -88,6 +91,13 @@ internal fun AboutSettingsSection(
     }
 
     val cannotOpenLinkError = stringResource(Strings.error_cannot_open_link)
+    val qqGroupNotConfiguredError = stringResource(Strings.about_qq_group_not_configured)
+    val qqGroupOpenUrls = remember {
+        AboutSettingsSectionSupport.resolveQqGroupOpenUrls(
+            groupNumber = QQ_GROUP_NUMBER,
+            joinUrl = QQ_GROUP_JOIN_URL,
+        )
+    }
 
     val toastExportingLogs = stringResource(Strings.toast_exporting_logs)
     val toastLogsExportedTemplate = stringResource(Strings.toast_logs_exported)
@@ -153,9 +163,26 @@ internal fun AboutSettingsSection(
             title = stringResource(Strings.settings_github),
             subtitle = stringResource(Strings.settings_github_desc),
             onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL))
-                runCatching { context.startActivity(intent) }
-                    .onFailure { Toast.makeText(context, cannotOpenLinkError, Toast.LENGTH_SHORT).show() }
+                if (!context.openFirstAvailableExternalUrl(listOf(GITHUB_URL))) {
+                    Toast.makeText(context, cannotOpenLinkError, Toast.LENGTH_SHORT).show()
+                }
+            },
+            showDivider = true
+        )
+
+        SettingsClickableItem(
+            title = stringResource(Strings.settings_qq_group),
+            subtitle = stringResource(Strings.settings_qq_group_desc),
+            onClick = {
+                when {
+                    qqGroupOpenUrls.isEmpty() -> {
+                        Toast.makeText(context, qqGroupNotConfiguredError, Toast.LENGTH_SHORT).show()
+                    }
+
+                    !context.openFirstAvailableExternalUrl(qqGroupOpenUrls) -> {
+                        Toast.makeText(context, cannotOpenLinkError, Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             showDivider = false
         )
@@ -191,6 +218,17 @@ internal fun AboutSettingsSection(
                 )
             }
         }
+
+        SettingsClickableItem(
+            title = stringResource(Strings.about_donation_afdian),
+            subtitle = stringResource(Strings.about_donation_afdian_desc),
+            onClick = {
+                if (!context.openFirstAvailableExternalUrl(listOf(AFDIAN_URL))) {
+                    Toast.makeText(context, cannotOpenLinkError, Toast.LENGTH_SHORT).show()
+                }
+            },
+            showDivider = false,
+        )
     }
 
     // 诊断与调试
@@ -455,10 +493,21 @@ internal fun AboutSettingsSection(
     Spacer(modifier = Modifier.height(16.dp))
 }
 
-private fun android.content.Context.resolveAboutMessage(spec: AboutMessageSpec): String = if (spec.formatArgs.isEmpty()) {
-    getString(spec.messageRes)
-} else {
-    getString(spec.messageRes, *spec.formatArgs.toTypedArray())
+private fun android.content.Context.resolveAboutMessage(spec: AboutMessageSpec): String =
+    if (spec.formatArgs.isEmpty()) {
+        getString(spec.messageRes)
+    } else {
+        getString(spec.messageRes, *spec.formatArgs.toTypedArray())
+    }
+
+private fun android.content.Context.openFirstAvailableExternalUrl(urls: List<String>): Boolean {
+    urls.forEach { url ->
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        if (runCatching { startActivity(intent) }.isSuccess) {
+            return true
+        }
+    }
+    return false
 }
 
 @Composable
