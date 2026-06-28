@@ -105,6 +105,8 @@
 
 TinaIDE 已移除自研 AI。AI 聊天、模型和渠道配置由内嵌 RikkaHub 提供，请从编辑器侧边栏打开 RikkaHub 后在 RikkaHub 内完成配置。
 
+开发者本地编译时，如果 Gradle Problems report 中出现 `Using a Project object as a dependency notation has been deprecated`，需要先用 `--warning-mode all` 或 deprecation trace 确认来源。若调用栈指向 AGP `VariantDependenciesBuilder.createTestComponents`，这是 Android Gradle Plugin 内部告警，不影响 RikkaHub embedded Kotlin 编译结果。
+
 ### 插件市场
 
 开源版市场读取 GitHub Registry。客户端负责浏览、安装和更新插件，不包含私有账号互动和审核流程。

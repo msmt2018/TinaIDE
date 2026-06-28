@@ -67,6 +67,7 @@
 
 - 新增 `docs/guides/Hex-Viewer-Design.md`，记录 Hex Viewer 的 r2droid 风格设计取舍、当前能力边界、后续扩展建议和开源致谢。
 - 新增 `docs/third-party-notices/r2droid-MIT-LICENSE.txt`，保留 r2droid 的 MIT License 文本并在文档中致谢。
+- 更新 RikkaHub 接入文档与 App 内已知问题说明，补充 `:rikkahub:embedded:compileDebugKotlin` 静态验证命令、子模块提交顺序，以及 AGP 9.2.1 内部 project dependency notation 弃用告警的判断口径。
 
 ### Verification
 
@@ -77,6 +78,7 @@
 - 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
 - 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryAnalysisTest" --console=plain`。
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+- 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --offline --build-cache --console=plain --warning-mode all`；未运行真机测试。
 
 ## [0.18.7] - 2026-06-23
 
