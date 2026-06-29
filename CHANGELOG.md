@@ -43,6 +43,8 @@
 
 - 新增内嵌 RikkaHub AI 入口：TinaIDE 开源版通过编辑器侧边栏直接打开 APK 内部的 RikkaHub 界面，AI 聊天、模型和渠道配置由 RikkaHub 承担。
 - 重做 Hex Viewer：采用分块读取和缓存，不再把大文件一次性读入内存；支持 ASCII/UTF-8/十六进制通配搜索、offset 跳转历史、选区 Inspector、多格式导出、offset 书签、staged patch 队列和 radare2 `wx` patch 脚本复制。
+- 新增 Hex Viewer 二进制分析工作台布局：宽屏可把分析结果停靠到右侧，窄屏自动回退到弹窗，主十六进制网格继续占满剩余空间，避免工具按钮和分析结果挤占编辑器。
+- 新增 Rizin/radare2 命令弹窗：可从当前 offset、选区和 staged patch 队列生成 `s`、`px`、`wx` 脚本，当前仅复制脚本文本，后续可接插件式执行器。
 - 新增 Hex 二进制分析面板：支持文件指纹、字节分布、重复字节段、magic signature、字符串提取、熵图、DEX 结构、APK/ZIP 结构、ELF 元数据和可跳转 analysis signals。
 - 新增 ELF/SO 分析线索：解析 Program Header、Section、Dynamic Symbols、依赖、Notes/Build ID、hardening、风险提示、relocation、PLT/GOT linkage、动态链接器步骤、JNI 注册线索和 Native API 导入分类。
 - 新增 APK 分析线索：解析 central directory、local header 一致性、entry name 风险、Signing Block、二进制 Manifest、resources.arsc、内嵌 DEX 摘要和 `lib/**/*.so` native 摘要。
@@ -52,6 +54,7 @@
 
 - Gradle/AGP 构建脚本迁移到 AGP built-in Kotlin 路径，移除 `android.builtInKotlin=false`、`android.newDsl=false`、旧 `org.jetbrains.kotlin.android` 和 KSP 插件配置，Room compiler 改用 AGP `legacy-kapt` 兼容路径，减少 Android Studio Sync/Build 阶段的弃用告警。
 - 主工程、RikkaHub included build 和 tree-sitter included build 统一更新 Gradle 9/AGP 9 DSL：项目依赖改为明确的 `DependencyHandler.project(":path")` 调用，`srcDir(...)` 改为 `directories.add(...)`，并移除不再需要的 configuration-on-demand 与 type-safe project accessors 预览配置。
+- 修复 tree-sitter included build 在 AGP 9 下继续读取旧 `BaseExtension` 导致 `:app:compileArm64DebugKotlin` 配置失败的问题，改用公开的 `ApplicationExtension` / `LibraryExtension` DSL。
 
 - TinaIDE 开源版移除内置 AI 聊天、渠道、会话仓储和工具调用系统，设置页、帮助文档和侧边栏入口同步改为 RikkaHub 使用方式。
 - RikkaHub 作为 `external/rikkahub` included build 纳入工程，并通过 `rikkahub-embedded` library 打包进 TinaIDE，避免继续维护两套 AI 实现。
@@ -65,7 +68,7 @@
 
 ### Documentation
 
-- 新增 `docs/guides/Hex-Viewer-Design.md`，记录 Hex Viewer 的 r2droid 风格设计取舍、当前能力边界、后续扩展建议和开源致谢。
+- 新增并更新 `docs/guides/Hex-Viewer-Design.md`，记录 Hex Viewer 的 r2droid 风格设计取舍、二进制分析工作台布局、Rizin/radare2 命令入口、当前能力边界、后续扩展建议和开源致谢。
 - 新增 `docs/third-party-notices/r2droid-MIT-LICENSE.txt`，保留 r2droid 的 MIT License 文本并在文档中致谢。
 - 更新 RikkaHub 接入文档与 App 内已知问题说明，补充 `:rikkahub:embedded:compileDebugKotlin` 静态验证命令、子模块提交顺序，以及 AGP 9.2.1 内部 project dependency notation 弃用告警的判断口径。
 
@@ -77,6 +80,7 @@
 - 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
 - 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
 - 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryAnalysisTest" --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexViewerLayoutPolicyTest" --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexByteRowTest" --console=plain`。
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
 - 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --offline --build-cache --console=plain --warning-mode all`；未运行真机测试。
 

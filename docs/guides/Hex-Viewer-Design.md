@@ -1,6 +1,6 @@
 # Hex Viewer 设计说明
 
-> 更新日期：2026-06-26
+> 更新日期：2026-06-29
 
 本文记录 TinaIDE Hex Viewer 的当前设计、功能边界和开源致谢。
 
@@ -26,6 +26,8 @@ TinaIDE 的 Hex Viewer 目标是成为项目内二进制文件的基础查看与
 - 导出：支持 Hex dump、C array、Kotlin `ByteArray`、Base64 和 ASCII。
 - Offset 书签：支持从当前 offset 或长按菜单切换书签，书签列表按 offset 排序，支持高亮、跳转和单条移除；Magic signature、重复字节段、熵块、OLLVM/obfuscation findings、analysis signals、ELF risk findings 和 DEX invoke/string/field references 支持单条或批量标记，便于在分析结果、patch 和可疑区域之间来回定位。
 - Patch 队列：支持 staged patch、Undo、Redo、明细列表、复制 radare2 `wx` patch 脚本、按 offset 跳转、单条丢弃、Discard 和 Save。
+- 二进制分析工作台：主 Hex 内容区保持独立占满剩余空间，搜索面板、footer 工具和分析结果默认不挤占编辑区；宽屏可把分析栏停靠到右侧，窄屏仍使用弹窗展示分析结果。
+- Rizin/radare2 命令入口：支持生成当前 offset 导航脚本、选区 dump 脚本、staged patch 脚本和完整工作台脚本，当前只复制脚本文本，不在 App 内直接执行外部逆向工具。
 - 二进制分析面板：支持文件类型识别、ELF 摘要、字符串预览/完整列表、熵摘要和基础信号提示。
 
 ## 二进制分析能力
@@ -72,6 +74,8 @@ TinaIDE 的 Hex Viewer 目标是成为项目内二进制文件的基础查看与
 
 ## 本轮增量
 
+- Hex Viewer 工作台布局改为“主内容 + 可停靠分析栏”：主十六进制网格继续使用剩余高度和宽度，分析栏只在宽屏打开时占用右侧固定宽度，窄屏点击分析会自动回退到弹窗，避免操作按钮或分析结果遮住编辑区。
+- 新增工作台命令弹窗：从当前 offset、选区和 patch 队列生成 Rizin/radare2 可读脚本，覆盖 `s`、`px` 和 `wx` 这类常用定位/查看/patch 流程；当前阶段只生成脚本，后续再通过插件式执行器接入真实外部工具。
 - 混淆启发式继续扩展到常见 Android 加壳/保护器线索，例如 360 Jiagu、Bangcle、Ijiami、SecNeo、Legu、DexProtector、UPX、VMProtect、Arxan 以及常见 `libshell` / `libprotect` / `libdexhelper` 字符串。该能力同时覆盖单独打开 `.so` 的 ELF 分析，以及 APK 内嵌 `lib/**/*.so` 的轻量 native 摘要。
 - 这类结果仍按“启发式提示”处理，只说明样本里存在相关 marker 或字符串证据，不把结论写死为“已加壳”或“已虚拟化”。
 

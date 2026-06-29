@@ -120,6 +120,38 @@ class HexByteRowTest {
     }
 
     @Test
+    fun formatHexWorkbenchScript_shouldIncludeNavigationSelectionAndPatches() {
+        val script = formatHexWorkbenchScript(
+            selectedOffset = 0x100L,
+            selectionRange = HexSelectionRange(startOffset = 0x120L, endOffset = 0x123L),
+            patches = listOf(
+                HexPatch(0x20L, 0x02, 0xA5.toByte()),
+                HexPatch(0x10L, 0x01, 0x0F)
+            )
+        )
+
+        assertThat(script).isEqualTo(
+            """
+            s 0x00000100
+            px 256 @ 0x00000100
+            px 4 @ 0x00000120
+            wx 0F @ 0x00000010
+            wx A5 @ 0x00000020
+            """.trimIndent()
+        )
+    }
+
+    @Test
+    fun formatHexNavigationScript_shouldUseSafePreviewLength() {
+        assertThat(formatHexNavigationScript(offset = 0x20L, previewByteCount = 0)).isEqualTo(
+            """
+            s 0x00000020
+            px 1 @ 0x00000020
+            """.trimIndent()
+        )
+    }
+
+    @Test
     fun bookmarkHelpers_shouldSortDeduplicateToggleAndRemoveOffsets() {
         val sorted = sortHexBookmarks(listOf(0x30L, 0x10L, 0x30L, 0x20L))
         val added = toggleHexBookmark(sorted, 0x18L)

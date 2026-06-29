@@ -179,6 +179,36 @@ internal fun formatHexPatchScript(patches: List<HexPatch>): String = sortHexPatc
     "wx %02X @ 0x%08X".format(Locale.US, patch.newByte.toInt() and 0xFF, patch.offset)
 }
 
+internal fun formatHexNavigationScript(
+    offset: Long,
+    previewByteCount: Int = HEX_WORKBENCH_PREVIEW_BYTES
+): String {
+    val safePreviewByteCount = previewByteCount.coerceAtLeast(1)
+    return listOf(
+        "s 0x%08X".format(Locale.US, offset),
+        "px %d @ 0x%08X".format(Locale.US, safePreviewByteCount, offset)
+    ).joinToString(separator = "\n")
+}
+
+internal fun formatHexSelectionDumpScript(selectionRange: HexSelectionRange): String =
+    "px %d @ 0x%08X".format(
+        Locale.US,
+        selectionRange.byteCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        selectionRange.firstOffset
+    )
+
+internal fun formatHexWorkbenchScript(
+    selectedOffset: Long,
+    selectionRange: HexSelectionRange?,
+    patches: List<HexPatch>
+): String = buildList {
+    add(formatHexNavigationScript(selectedOffset))
+    selectionRange?.let { add(formatHexSelectionDumpScript(it)) }
+    formatHexPatchScript(patches)
+        .takeIf { it.isNotBlank() }
+        ?.let { add(it) }
+}.joinToString(separator = "\n")
+
 internal fun undoLastHexPatch(
     stagedPatches: List<HexPatch>,
     redoPatches: List<HexPatch>
@@ -216,3 +246,5 @@ private fun parseUnsignedOffset(text: String): Long = when {
     text.startsWith("0x", ignoreCase = true) -> text.substring(2).toLong(16)
     else -> text.toLong()
 }
+
+private const val HEX_WORKBENCH_PREVIEW_BYTES = 256

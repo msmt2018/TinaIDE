@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -108,7 +109,9 @@ fun HexViewerScreen(
     var binaryAnalysis by remember(filePath) { mutableStateOf<HexBinaryAnalysis?>(null) }
     var isAnalysisLoading by remember(filePath) { mutableStateOf(false) }
     var showSearchPanel by remember(filePath) { mutableStateOf(initialHexSearchPanelExpanded()) }
+    var showAnalysisPanel by remember(filePath) { mutableStateOf(initialHexAnalysisPanelExpanded()) }
     var showAnalysisDialog by remember(filePath) { mutableStateOf(false) }
+    var showWorkbenchCommandsDialog by remember(filePath) { mutableStateOf(false) }
 
     fun scrollToOffset(offset: Long) {
         val targetOffset = dataManager.coerceOffset(offset)
@@ -330,8 +333,10 @@ fun HexViewerScreen(
             analysis = binaryAnalysis,
             isAnalysisLoading = isAnalysisLoading,
             isSearchExpanded = showSearchPanel,
+            isAnalysisPanelOpen = showAnalysisPanel,
             onToggleSearch = { showSearchPanel = !showSearchPanel },
-            onOpenAnalysis = { showAnalysisDialog = true }
+            onToggleAnalysisPanel = { showAnalysisPanel = !showAnalysisPanel },
+            onOpenCommands = { showWorkbenchCommandsDialog = true }
         )
         if (showSearchPanel) {
             HexSearchPanel(
@@ -363,63 +368,114 @@ fun HexViewerScreen(
             )
         }
 
-        when {
-            state.isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            val canDockAnalysisPanel = shouldDockHexAnalysisPanel(maxWidth.value.toInt())
+            val showDockedAnalysisPanel = shouldShowHexDockedAnalysisPanel(
+                isUserExpanded = showAnalysisPanel,
+                canDock = canDockAnalysisPanel,
+                hasContent = state.fileSize > 0L
+            )
+            val shouldOpenAnalysisDialog = shouldOpenHexAnalysisDialog(
+                isUserExpanded = showAnalysisPanel,
+                canDock = canDockAnalysisPanel,
+                hasContent = state.fileSize > 0L
+            )
+
+            LaunchedEffect(shouldOpenAnalysisDialog) {
+                if (shouldOpenAnalysisDialog) {
+                    showAnalysisDialog = true
+                    showAnalysisPanel = false
                 }
             }
-            state.fileSize <= 0L -> {
+
+            Row(modifier = Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                        .fillMaxHeight()
                 ) {
-                    Text(
-                        text = stringResource(Strings.hex_empty_file),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    when {
+                        state.isLoading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        state.fileSize <= 0L -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(Strings.hex_empty_file),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        else -> {
+                            HexContent(
+                                dataManager = dataManager,
+                                listState = listState,
+                                cacheVersion = cacheVersion,
+                                selectedOffset = state.selectedOffset,
+                                selectionRange = state.selectionRange,
+                                pendingNibble = state.pendingNibble,
+                                patchMap = remember(state.stagedPatches) {
+                                    state.stagedPatches.associateBy { it.offset }
+                                },
+                                bookmarkedOffsets = remember(state.bookmarkedOffsets) {
+                                    state.bookmarkedOffsets.toSet()
+                                },
+                                onCacheVersionChanged = { cacheVersion++ },
+                                onOffsetSelected = { offset ->
+                                    val selectedOffset = dataManager.coerceOffset(offset)
+                                    state = state.copy(
+                                        selectedOffset = selectedOffset,
+                                        currentOffset = selectedOffset,
+                                        pendingNibble = "",
+                                        error = null
+                                    )
+                                },
+                                onByteLongPressed = { target ->
+                                    val selectedOffset = dataManager.coerceOffset(target.offset)
+                                    contextTarget = target.copy(offset = selectedOffset)
+                                    state = state.copy(
+                                        selectedOffset = selectedOffset,
+                                        currentOffset = selectedOffset,
+                                        pendingNibble = "",
+                                        error = null
+                                    )
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+
+                if (showDockedAnalysisPanel) {
+                    VerticalDivider()
+                    HexDockedAnalysisPanel(
+                        state = state,
+                        analysis = binaryAnalysis,
+                        isLoading = isAnalysisLoading,
+                        onClose = { showAnalysisPanel = false },
+                        onOpenCommands = { showWorkbenchCommandsDialog = true },
+                        onGotoOffset = { offset -> goToOffset(offset) },
+                        onMarkOffsets = { offsets ->
+                            state = state.copy(
+                                bookmarkedOffsets = markHexBookmarks(state.bookmarkedOffsets, offsets),
+                                error = null
+                            )
+                        }
                     )
                 }
-            }
-            else -> {
-                HexContent(
-                    dataManager = dataManager,
-                    listState = listState,
-                    cacheVersion = cacheVersion,
-                    selectedOffset = state.selectedOffset,
-                    selectionRange = state.selectionRange,
-                    pendingNibble = state.pendingNibble,
-                    patchMap = remember(state.stagedPatches) { state.stagedPatches.associateBy { it.offset } },
-                    bookmarkedOffsets = remember(state.bookmarkedOffsets) { state.bookmarkedOffsets.toSet() },
-                    onCacheVersionChanged = { cacheVersion++ },
-                    onOffsetSelected = { offset ->
-                        val selectedOffset = dataManager.coerceOffset(offset)
-                        state = state.copy(
-                            selectedOffset = selectedOffset,
-                            currentOffset = selectedOffset,
-                            pendingNibble = "",
-                            error = null
-                        )
-                    },
-                    onByteLongPressed = { target ->
-                        val selectedOffset = dataManager.coerceOffset(target.offset)
-                        contextTarget = target.copy(offset = selectedOffset)
-                        state = state.copy(
-                            selectedOffset = selectedOffset,
-                            currentOffset = selectedOffset,
-                            pendingNibble = "",
-                            error = null
-                        )
-                    },
-                    modifier = Modifier.weight(1f)
-                )
             }
         }
 
@@ -597,6 +653,13 @@ fun HexViewerScreen(
             )
         }
 
+        if (showWorkbenchCommandsDialog) {
+            HexWorkbenchCommandsDialog(
+                state = state,
+                onDismiss = { showWorkbenchCommandsDialog = false }
+            )
+        }
+
         if (showAnalysisDialog) {
             HexAnalysisDialog(
                 analysis = binaryAnalysis,
@@ -763,8 +826,10 @@ private fun HexTopActionBar(
     analysis: HexBinaryAnalysis?,
     isAnalysisLoading: Boolean,
     isSearchExpanded: Boolean,
+    isAnalysisPanelOpen: Boolean,
     onToggleSearch: () -> Unit,
-    onOpenAnalysis: () -> Unit
+    onToggleAnalysisPanel: () -> Unit,
+    onOpenCommands: () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -790,10 +855,24 @@ private fun HexTopActionBar(
                 )
             }
             TextButton(
-                onClick = onOpenAnalysis,
+                onClick = onToggleAnalysisPanel,
                 enabled = state.fileSize > 0L
             ) {
-                Text(stringResource(Strings.hex_analysis_title))
+                Text(
+                    stringResource(
+                        if (isAnalysisPanelOpen) {
+                            Strings.hex_workbench_hide_analysis_panel
+                        } else {
+                            Strings.hex_workbench_show_analysis_panel
+                        }
+                    )
+                )
+            }
+            TextButton(
+                onClick = onOpenCommands,
+                enabled = state.fileSize > 0L
+            ) {
+                Text(stringResource(Strings.hex_workbench_commands_title))
             }
 
             when {
@@ -862,6 +941,241 @@ private fun HexAnalysisDialog(
             )
         }
     )
+}
+
+@Composable
+private fun HexDockedAnalysisPanel(
+    state: HexViewerState,
+    analysis: HexBinaryAnalysis?,
+    isLoading: Boolean,
+    onClose: () -> Unit,
+    onOpenCommands: () -> Unit,
+    onGotoOffset: (Long) -> Unit,
+    onMarkOffsets: (List<Long>) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .width(HexDockedAnalysisPanelWidth)
+            .fillMaxHeight(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = stringResource(Strings.hex_workbench_analysis_panel_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(Strings.hex_workbench_close_analysis_panel)
+                    )
+                }
+            }
+            HorizontalDivider()
+            HexWorkbenchCommandStrip(
+                state = state,
+                onOpenCommands = onOpenCommands
+            )
+            HorizontalDivider()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                HexAnalysisPanel(
+                    analysis = analysis,
+                    isLoading = isLoading,
+                    onGotoOffset = onGotoOffset,
+                    onMarkOffsets = onMarkOffsets,
+                    showTitle = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HexWorkbenchCommandStrip(
+    state: HexViewerState,
+    onOpenCommands: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(Strings.hex_selected_offset, state.selectedOffset),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace
+        )
+        state.selectionRange?.let { selectionRange ->
+            Text(
+                text = stringResource(
+                    Strings.hex_selection_range,
+                    selectionRange.firstOffset,
+                    selectionRange.lastOffset,
+                    selectionRange.byteCount
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        TextButton(onClick = onOpenCommands) {
+            Text(stringResource(Strings.hex_workbench_commands_title))
+        }
+    }
+}
+
+@Composable
+private fun HexWorkbenchCommandsDialog(
+    state: HexViewerState,
+    onDismiss: () -> Unit
+) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+
+    fun copyCommand(label: String, command: String) {
+        scope.launch {
+            clipboard.setClipEntry(
+                ClipData.newPlainText(label, command).toClipEntry()
+            )
+        }
+    }
+
+    val navigationScript = formatHexNavigationScript(state.selectedOffset)
+    val selectionScript = state.selectionRange?.let { formatHexSelectionDumpScript(it) }
+    val patchScript = formatHexPatchScript(state.stagedPatches)
+    val workbenchScript = formatHexWorkbenchScript(
+        selectedOffset = state.selectedOffset,
+        selectionRange = state.selectionRange,
+        patches = state.stagedPatches
+    )
+
+    TinaAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { TinaDialogTitleText(stringResource(Strings.hex_workbench_commands_title)) },
+        text = {
+            TinaDialogContentColumn {
+                TinaDialogCard {
+                    Text(
+                        text = stringResource(Strings.hex_workbench_commands_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_navigation_script),
+                    script = navigationScript,
+                    onCopy = { copyCommand("hex-r2-navigation", navigationScript) }
+                )
+                if (selectionScript == null) {
+                    TinaDialogCard {
+                        Text(
+                            text = stringResource(Strings.hex_workbench_commands_no_selection),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    HexCommandSnippetCard(
+                        title = stringResource(Strings.hex_workbench_selection_script),
+                        script = selectionScript,
+                        onCopy = { copyCommand("hex-r2-selection", selectionScript) }
+                    )
+                }
+                if (patchScript.isBlank()) {
+                    TinaDialogCard {
+                        Text(
+                            text = stringResource(Strings.hex_workbench_commands_no_patches),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    HexCommandSnippetCard(
+                        title = stringResource(Strings.hex_workbench_patch_script),
+                        script = patchScript,
+                        onCopy = { copyCommand("hex-r2-patches", patchScript) }
+                    )
+                }
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_full_script),
+                    script = workbenchScript,
+                    onCopy = { copyCommand("hex-r2-workbench", workbenchScript) }
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TinaTextButton(
+                text = stringResource(Strings.btn_close),
+                onClick = onDismiss
+            )
+        }
+    )
+}
+
+@Composable
+private fun HexCommandSnippetCard(
+    title: String,
+    script: String,
+    onCopy: () -> Unit
+) {
+    TinaDialogCard {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onCopy) {
+                    Text(stringResource(Strings.hex_workbench_copy_script))
+                }
+            }
+            Text(
+                text = script,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            )
+        }
+    }
 }
 
 @Composable
@@ -960,7 +1274,8 @@ private fun HexAnalysisPanel(
     analysis: HexBinaryAnalysis?,
     isLoading: Boolean,
     onGotoOffset: (Long) -> Unit,
-    onMarkOffsets: (List<Long>) -> Unit
+    onMarkOffsets: (List<Long>) -> Unit,
+    showTitle: Boolean = true
 ) {
     var showStringsDialog by remember(analysis) { mutableStateOf(false) }
     var showSectionsDialog by remember(analysis) { mutableStateOf(false) }
@@ -1020,11 +1335,13 @@ private fun HexAnalysisPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = stringResource(Strings.hex_analysis_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (showTitle) {
+                    Text(
+                        text = stringResource(Strings.hex_analysis_title),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                     Text(
@@ -11421,6 +11738,7 @@ private fun computeHexColumn(
 
 private val AddressColumnWidth = 84.dp
 private val AsciiColumnWidth = 104.dp
+private val HexDockedAnalysisPanelWidth = 360.dp
 private const val MAX_GOTO_HISTORY = 64
 private const val MAX_ANALYSIS_PANEL_ITEMS = 5
 private const val ANALYSIS_PANEL_STRING_LIMIT = 48
