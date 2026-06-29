@@ -37,6 +37,31 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.9] - 2026-06-29
+
+### Added
+
+- Hex Viewer 工作台新增二进制发现项导航：统一汇总 ELF 风险、JNI 注册线索、Native API 导入、DEX native 方法、APK native marker、APK entry name 风险、混淆启发式和 analysis signals，按严重度排序后在右侧分析栏顶部展示。
+- 发现项支持 offset 跳转、批量标记书签，并可直接打开命令弹窗生成针对单个发现项的逆向脚本。
+- 命令弹窗新增 Rizin/radare2 只读分析脚本和 `pd` 反汇编预览脚本，默认不包含 `wx` 写命令，避免把 patch 脚本和只读分析混在一起。
+- 命令弹窗新增 Frida Hook 模板和 LLDB breakpoint/memory/disassemble 模板；从发现项打开时优先使用发现项 offset 和可用的 JNI/native symbol。
+
+### Documentation
+
+- 更新 `docs/guides/Hex-Viewer-Design.md`，补充发现项导航、只读逆向脚本、Frida/LLDB 模板以及“不在 App 内直接执行外部逆向工具”的边界。
+
+### Tests
+
+- 新增 `HexBinaryWorkbenchTest`，覆盖发现项严重度排序、APK native marker 绝对 offset、只读脚本避免 `wx` 写命令，以及 Frida/LLDB 模板生成。
+
+### Verification
+
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryWorkbenchTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+
 ## [0.18.8] - 2026-06-27
 
 ### Added

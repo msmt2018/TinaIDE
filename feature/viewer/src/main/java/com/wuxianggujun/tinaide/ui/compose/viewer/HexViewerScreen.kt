@@ -112,6 +112,12 @@ fun HexViewerScreen(
     var showAnalysisPanel by remember(filePath) { mutableStateOf(initialHexAnalysisPanelExpanded()) }
     var showAnalysisDialog by remember(filePath) { mutableStateOf(false) }
     var showWorkbenchCommandsDialog by remember(filePath) { mutableStateOf(false) }
+    var workbenchCommandFinding by remember(filePath) { mutableStateOf<HexBinaryFinding?>(null) }
+
+    fun openWorkbenchCommands(finding: HexBinaryFinding? = null) {
+        workbenchCommandFinding = finding
+        showWorkbenchCommandsDialog = true
+    }
 
     fun scrollToOffset(offset: Long) {
         val targetOffset = dataManager.coerceOffset(offset)
@@ -336,7 +342,7 @@ fun HexViewerScreen(
             isAnalysisPanelOpen = showAnalysisPanel,
             onToggleSearch = { showSearchPanel = !showSearchPanel },
             onToggleAnalysisPanel = { showAnalysisPanel = !showAnalysisPanel },
-            onOpenCommands = { showWorkbenchCommandsDialog = true }
+            onOpenCommands = { openWorkbenchCommands() }
         )
         if (showSearchPanel) {
             HexSearchPanel(
@@ -466,7 +472,7 @@ fun HexViewerScreen(
                         analysis = binaryAnalysis,
                         isLoading = isAnalysisLoading,
                         onClose = { showAnalysisPanel = false },
-                        onOpenCommands = { showWorkbenchCommandsDialog = true },
+                        onOpenCommands = { finding -> openWorkbenchCommands(finding) },
                         onGotoOffset = { offset -> goToOffset(offset) },
                         onMarkOffsets = { offsets ->
                             state = state.copy(
@@ -656,7 +662,12 @@ fun HexViewerScreen(
         if (showWorkbenchCommandsDialog) {
             HexWorkbenchCommandsDialog(
                 state = state,
-                onDismiss = { showWorkbenchCommandsDialog = false }
+                analysis = binaryAnalysis,
+                finding = workbenchCommandFinding,
+                onDismiss = {
+                    showWorkbenchCommandsDialog = false
+                    workbenchCommandFinding = null
+                }
             )
         }
 
@@ -949,7 +960,7 @@ private fun HexDockedAnalysisPanel(
     analysis: HexBinaryAnalysis?,
     isLoading: Boolean,
     onClose: () -> Unit,
-    onOpenCommands: () -> Unit,
+    onOpenCommands: (HexBinaryFinding?) -> Unit,
     onGotoOffset: (Long) -> Unit,
     onMarkOffsets: (List<Long>) -> Unit
 ) {
@@ -989,7 +1000,7 @@ private fun HexDockedAnalysisPanel(
             HorizontalDivider()
             HexWorkbenchCommandStrip(
                 state = state,
-                onOpenCommands = onOpenCommands
+                onOpenCommands = { onOpenCommands(null) }
             )
             HorizontalDivider()
             Column(
@@ -997,6 +1008,13 @@ private fun HexDockedAnalysisPanel(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
+                HexBinaryFindingsPanel(
+                    analysis = analysis,
+                    onGotoOffset = onGotoOffset,
+                    onMarkOffsets = onMarkOffsets,
+                    onOpenCommands = onOpenCommands
+                )
+                HorizontalDivider()
                 HexAnalysisPanel(
                     analysis = analysis,
                     isLoading = isLoading,
@@ -1048,8 +1066,128 @@ private fun HexWorkbenchCommandStrip(
 }
 
 @Composable
+private fun HexBinaryFindingsPanel(
+    analysis: HexBinaryAnalysis?,
+    onGotoOffset: (Long) -> Unit,
+    onMarkOffsets: (List<Long>) -> Unit,
+    onOpenCommands: (HexBinaryFinding) -> Unit
+) {
+    val findings = remember(analysis) { buildHexBinaryFindings(analysis) }
+    val markableOffsets = remember(findings) { findings.mapNotNull { finding -> finding.offset }.distinct() }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = stringResource(Strings.hex_workbench_findings_title),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            if (findings.isNotEmpty()) {
+                Text(
+                    text = stringResource(Strings.hex_workbench_findings_count, findings.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (markableOffsets.isNotEmpty()) {
+                TextButton(onClick = { onMarkOffsets(markableOffsets) }) {
+                    Text(stringResource(Strings.hex_bookmark_mark_all))
+                }
+            }
+        }
+        if (findings.isEmpty()) {
+            Text(
+                text = stringResource(Strings.hex_workbench_findings_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            findings.take(MAX_WORKBENCH_FINDING_PANEL_ITEMS).forEachIndexed { index, finding ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                HexBinaryFindingRow(
+                    finding = finding,
+                    onGotoOffset = onGotoOffset,
+                    onOpenCommands = onOpenCommands
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HexBinaryFindingRow(
+    finding: HexBinaryFinding,
+    onGotoOffset: (Long) -> Unit,
+    onOpenCommands: (HexBinaryFinding) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = hexBinaryFindingSeverityLabel(finding.severity),
+                style = MaterialTheme.typography.labelSmall,
+                color = hexBinaryFindingSeverityColor(finding.severity),
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = hexBinaryFindingKindLabel(finding.kind),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = { onOpenCommands(finding) }) {
+                Text(stringResource(Strings.hex_workbench_commands_title))
+            }
+            finding.offset?.let { offset ->
+                TextButton(onClick = { onGotoOffset(offset) }) {
+                    Text(stringResource(Strings.hex_workbench_goto_finding))
+                }
+            }
+        }
+        Text(
+            text = finding.primary.compactForAnalysisPanel(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        finding.secondary?.takeIf { it.isNotBlank() }?.let { secondary ->
+            Text(
+                text = secondary.compactForAnalysisPanel(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 private fun HexWorkbenchCommandsDialog(
     state: HexViewerState,
+    analysis: HexBinaryAnalysis?,
+    finding: HexBinaryFinding?,
     onDismiss: () -> Unit
 ) {
     val clipboard = LocalClipboard.current
@@ -1066,10 +1204,28 @@ private fun HexWorkbenchCommandsDialog(
     val navigationScript = formatHexNavigationScript(state.selectedOffset)
     val selectionScript = state.selectionRange?.let { formatHexSelectionDumpScript(it) }
     val patchScript = formatHexPatchScript(state.stagedPatches)
+    val fallbackFinding = remember(analysis) { buildHexBinaryFindings(analysis, maxCount = 1).firstOrNull() }
+    val activeFinding = finding ?: fallbackFinding
     val workbenchScript = formatHexWorkbenchScript(
         selectedOffset = state.selectedOffset,
         selectionRange = state.selectionRange,
         patches = state.stagedPatches
+    )
+    val readOnlyAnalysisScript = formatHexReadOnlyAnalysisScript(
+        selectedOffset = state.selectedOffset,
+        selectionRange = state.selectionRange,
+        finding = activeFinding
+    )
+    val disassemblyPreviewScript = formatHexDisassemblyPreviewScript(
+        offset = activeFinding?.offset ?: state.selectedOffset
+    )
+    val fridaHookTemplate = formatHexFridaHookTemplate(
+        selectedOffset = state.selectedOffset,
+        finding = activeFinding
+    )
+    val lldbBreakpointTemplate = formatHexLldbBreakpointTemplate(
+        selectedOffset = state.selectedOffset,
+        finding = activeFinding
     )
 
     TinaAlertDialog(
@@ -1078,12 +1234,29 @@ private fun HexWorkbenchCommandsDialog(
         text = {
             TinaDialogContentColumn {
                 TinaDialogCard {
-                    Text(
-                        text = stringResource(Strings.hex_workbench_commands_summary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = stringResource(Strings.hex_workbench_commands_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        activeFinding?.let { selectedFinding ->
+                            Text(
+                                text = stringResource(
+                                    Strings.hex_workbench_active_finding,
+                                    hexBinaryFindingKindLabel(selectedFinding.kind),
+                                    selectedFinding.primary.compactForAnalysisPanel()
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
                 }
                 HexCommandSnippetCard(
                     title = stringResource(Strings.hex_workbench_navigation_script),
@@ -1126,6 +1299,26 @@ private fun HexWorkbenchCommandsDialog(
                     title = stringResource(Strings.hex_workbench_full_script),
                     script = workbenchScript,
                     onCopy = { copyCommand("hex-r2-workbench", workbenchScript) }
+                )
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_read_only_analysis_script),
+                    script = readOnlyAnalysisScript,
+                    onCopy = { copyCommand("hex-r2-read-only-analysis", readOnlyAnalysisScript) }
+                )
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_disassembly_preview_script),
+                    script = disassemblyPreviewScript,
+                    onCopy = { copyCommand("hex-r2-disassembly-preview", disassemblyPreviewScript) }
+                )
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_frida_hook_template),
+                    script = fridaHookTemplate,
+                    onCopy = { copyCommand("hex-frida-hook-template", fridaHookTemplate) }
+                )
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_lldb_breakpoint_template),
+                    script = lldbBreakpointTemplate,
+                    onCopy = { copyCommand("hex-lldb-breakpoint-template", lldbBreakpointTemplate) }
                 )
             }
         },
@@ -11047,6 +11240,36 @@ private fun hexSignalLabel(signalType: HexAnalysisSignalType): String = stringRe
 )
 
 @Composable
+private fun hexBinaryFindingKindLabel(kind: HexBinaryFindingKind): String = stringResource(
+    when (kind) {
+        HexBinaryFindingKind.ELF_RISK -> Strings.hex_workbench_finding_kind_elf_risk
+        HexBinaryFindingKind.JNI_REGISTRATION -> Strings.hex_workbench_finding_kind_jni_registration
+        HexBinaryFindingKind.NATIVE_API -> Strings.hex_workbench_finding_kind_native_api
+        HexBinaryFindingKind.DEX_NATIVE_METHOD -> Strings.hex_workbench_finding_kind_dex_native_method
+        HexBinaryFindingKind.OBFUSCATION -> Strings.hex_workbench_finding_kind_obfuscation
+        HexBinaryFindingKind.APK_NATIVE_LIBRARY -> Strings.hex_workbench_finding_kind_apk_native_library
+        HexBinaryFindingKind.APK_ENTRY_RISK -> Strings.hex_workbench_finding_kind_apk_entry_risk
+        HexBinaryFindingKind.SIGNAL -> Strings.hex_workbench_finding_kind_signal
+    }
+)
+
+@Composable
+private fun hexBinaryFindingSeverityLabel(severity: HexBinaryFindingSeverity): String = stringResource(
+    when (severity) {
+        HexBinaryFindingSeverity.HIGH -> Strings.hex_workbench_finding_severity_high
+        HexBinaryFindingSeverity.WARNING -> Strings.hex_workbench_finding_severity_warning
+        HexBinaryFindingSeverity.INFO -> Strings.hex_workbench_finding_severity_info
+    }
+)
+
+@Composable
+private fun hexBinaryFindingSeverityColor(severity: HexBinaryFindingSeverity): Color = when (severity) {
+    HexBinaryFindingSeverity.HIGH -> MaterialTheme.colorScheme.error
+    HexBinaryFindingSeverity.WARNING -> MaterialTheme.colorScheme.tertiary
+    HexBinaryFindingSeverity.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+@Composable
 private fun hexObfuscationFindingLabel(findingType: HexObfuscationFindingType): String = stringResource(
     when (findingType) {
         HexObfuscationFindingType.OLLVM_MARKER -> Strings.hex_obfuscation_ollvm_marker
@@ -11741,5 +11964,6 @@ private val AsciiColumnWidth = 104.dp
 private val HexDockedAnalysisPanelWidth = 360.dp
 private const val MAX_GOTO_HISTORY = 64
 private const val MAX_ANALYSIS_PANEL_ITEMS = 5
+private const val MAX_WORKBENCH_FINDING_PANEL_ITEMS = 6
 private const val ANALYSIS_PANEL_STRING_LIMIT = 48
 private const val HASH_PREVIEW_LENGTH = 12
