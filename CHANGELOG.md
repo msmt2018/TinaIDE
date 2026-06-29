@@ -37,6 +37,35 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.10] - 2026-06-29
+
+### Added
+
+- Hex Viewer 新增 Reverse Action Pipeline：把当前 offset、选区、分析结果和二进制发现项统一映射为可复制动作，覆盖只读分析、反汇编预览、Frida Hook、LLDB 断点、Markdown 报告和 JSON 报告。
+- Hex Viewer 新增 JNI/APK 分析报告：汇总 DEX native 方法、APK native library、JNI 注册线索、Native API、loadLibrary 候选字符串、ELF 风险和工作台发现项。
+- 右侧二进制发现项栏新增报告入口，可复制 Markdown 或 JSON 报告，用于逆向笔记、问题单和后续 AI 分析。
+
+### Changed
+
+- 命令弹窗的 Rizin/radare2、Frida 和 LLDB 模板改为从统一 action content 读取，减少 UI 里分叉生成脚本的重复逻辑。
+- JNI/APK 报告当前只复制到剪贴板，不直接写入项目文件，避免新增存储权限和路径风险。
+
+### Documentation
+
+- 更新 `docs/guides/Hex-Viewer-Design.md`，补充 Reverse Action Pipeline、JNI/APK 报告弹窗和报告边界。
+
+### Tests
+
+- 扩展 `HexBinaryWorkbenchTest`，覆盖 action pipeline、JNI/APK 报告模型、Markdown/JSON 格式输出和 loadLibrary 候选字符串。
+
+### Verification
+
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryWorkbenchTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+
 ## [0.18.9] - 2026-06-29
 
 ### Added

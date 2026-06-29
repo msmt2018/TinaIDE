@@ -112,6 +112,7 @@ fun HexViewerScreen(
     var showAnalysisPanel by remember(filePath) { mutableStateOf(initialHexAnalysisPanelExpanded()) }
     var showAnalysisDialog by remember(filePath) { mutableStateOf(false) }
     var showWorkbenchCommandsDialog by remember(filePath) { mutableStateOf(false) }
+    var showWorkbenchReportDialog by remember(filePath) { mutableStateOf(false) }
     var workbenchCommandFinding by remember(filePath) { mutableStateOf<HexBinaryFinding?>(null) }
 
     fun openWorkbenchCommands(finding: HexBinaryFinding? = null) {
@@ -473,6 +474,7 @@ fun HexViewerScreen(
                         isLoading = isAnalysisLoading,
                         onClose = { showAnalysisPanel = false },
                         onOpenCommands = { finding -> openWorkbenchCommands(finding) },
+                        onOpenReport = { showWorkbenchReportDialog = true },
                         onGotoOffset = { offset -> goToOffset(offset) },
                         onMarkOffsets = { offsets ->
                             state = state.copy(
@@ -668,6 +670,14 @@ fun HexViewerScreen(
                     showWorkbenchCommandsDialog = false
                     workbenchCommandFinding = null
                 }
+            )
+        }
+
+        if (showWorkbenchReportDialog) {
+            HexWorkbenchReportDialog(
+                state = state,
+                analysis = binaryAnalysis,
+                onDismiss = { showWorkbenchReportDialog = false }
             )
         }
 
@@ -961,6 +971,7 @@ private fun HexDockedAnalysisPanel(
     isLoading: Boolean,
     onClose: () -> Unit,
     onOpenCommands: (HexBinaryFinding?) -> Unit,
+    onOpenReport: () -> Unit,
     onGotoOffset: (Long) -> Unit,
     onMarkOffsets: (List<Long>) -> Unit
 ) {
@@ -1012,7 +1023,8 @@ private fun HexDockedAnalysisPanel(
                     analysis = analysis,
                     onGotoOffset = onGotoOffset,
                     onMarkOffsets = onMarkOffsets,
-                    onOpenCommands = onOpenCommands
+                    onOpenCommands = onOpenCommands,
+                    onOpenReport = onOpenReport
                 )
                 HorizontalDivider()
                 HexAnalysisPanel(
@@ -1070,7 +1082,8 @@ private fun HexBinaryFindingsPanel(
     analysis: HexBinaryAnalysis?,
     onGotoOffset: (Long) -> Unit,
     onMarkOffsets: (List<Long>) -> Unit,
-    onOpenCommands: (HexBinaryFinding) -> Unit
+    onOpenCommands: (HexBinaryFinding) -> Unit,
+    onOpenReport: () -> Unit
 ) {
     val findings = remember(analysis) { buildHexBinaryFindings(analysis) }
     val markableOffsets = remember(findings) { findings.mapNotNull { finding -> finding.offset }.distinct() }
@@ -1102,6 +1115,12 @@ private fun HexBinaryFindingsPanel(
                 TextButton(onClick = { onMarkOffsets(markableOffsets) }) {
                     Text(stringResource(Strings.hex_bookmark_mark_all))
                 }
+            }
+            TextButton(
+                onClick = onOpenReport,
+                enabled = analysis != null
+            ) {
+                Text(stringResource(Strings.hex_workbench_reports_title))
             }
         }
         if (findings.isEmpty()) {
@@ -1211,22 +1230,18 @@ private fun HexWorkbenchCommandsDialog(
         selectionRange = state.selectionRange,
         patches = state.stagedPatches
     )
-    val readOnlyAnalysisScript = formatHexReadOnlyAnalysisScript(
-        selectedOffset = state.selectedOffset,
-        selectionRange = state.selectionRange,
-        finding = activeFinding
-    )
-    val disassemblyPreviewScript = formatHexDisassemblyPreviewScript(
-        offset = activeFinding?.offset ?: state.selectedOffset
-    )
-    val fridaHookTemplate = formatHexFridaHookTemplate(
-        selectedOffset = state.selectedOffset,
-        finding = activeFinding
-    )
-    val lldbBreakpointTemplate = formatHexLldbBreakpointTemplate(
-        selectedOffset = state.selectedOffset,
-        finding = activeFinding
-    )
+    val reverseActions = remember(state.selectedOffset, state.selectionRange, analysis, activeFinding) {
+        buildHexReverseActions(
+            selectedOffset = state.selectedOffset,
+            selectionRange = state.selectionRange,
+            analysis = analysis,
+            finding = activeFinding
+        )
+    }
+    val readOnlyAnalysisScript = reverseActions.actionContent(HexReverseActionKind.READ_ONLY_ANALYSIS)
+    val disassemblyPreviewScript = reverseActions.actionContent(HexReverseActionKind.DISASSEMBLY_PREVIEW)
+    val fridaHookTemplate = reverseActions.actionContent(HexReverseActionKind.FRIDA_HOOK)
+    val lldbBreakpointTemplate = reverseActions.actionContent(HexReverseActionKind.LLDB_BREAKPOINT)
 
     TinaAlertDialog(
         onDismissRequest = onDismiss,
@@ -1333,9 +1348,80 @@ private fun HexWorkbenchCommandsDialog(
 }
 
 @Composable
+private fun HexWorkbenchReportDialog(
+    state: HexViewerState,
+    analysis: HexBinaryAnalysis?,
+    onDismiss: () -> Unit
+) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val report = remember(analysis) { buildHexJniAnalysisReport(analysis) }
+    val reverseActions = remember(state.selectedOffset, state.selectionRange, analysis) {
+        buildHexReverseActions(
+            selectedOffset = state.selectedOffset,
+            selectionRange = state.selectionRange,
+            analysis = analysis
+        )
+    }
+    val markdownReport = reverseActions.actionContent(HexReverseActionKind.JNI_MARKDOWN_REPORT)
+    val jsonReport = reverseActions.actionContent(HexReverseActionKind.JNI_JSON_REPORT)
+
+    fun copyReport(label: String, reportText: String) {
+        scope.launch {
+            clipboard.setClipEntry(
+                ClipData.newPlainText(label, reportText).toClipEntry()
+            )
+        }
+    }
+
+    TinaAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { TinaDialogTitleText(stringResource(Strings.hex_workbench_reports_title)) },
+        text = {
+            TinaDialogContentColumn {
+                TinaDialogCard {
+                    Text(
+                        text = stringResource(
+                            Strings.hex_workbench_reports_summary,
+                            report.nativeMethods.size,
+                            report.nativeLibraries.size,
+                            report.jniHints.size,
+                            report.nativeApis.size
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_markdown_report),
+                    script = markdownReport,
+                    copyLabel = stringResource(Strings.hex_workbench_copy_report),
+                    onCopy = { copyReport("hex-jni-report-markdown", markdownReport) }
+                )
+                HexCommandSnippetCard(
+                    title = stringResource(Strings.hex_workbench_json_report),
+                    script = jsonReport,
+                    copyLabel = stringResource(Strings.hex_workbench_copy_report),
+                    onCopy = { copyReport("hex-jni-report-json", jsonReport) }
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TinaTextButton(
+                text = stringResource(Strings.btn_close),
+                onClick = onDismiss
+            )
+        }
+    )
+}
+
+@Composable
 private fun HexCommandSnippetCard(
     title: String,
     script: String,
+    copyLabel: String? = null,
     onCopy: () -> Unit
 ) {
     TinaDialogCard {
@@ -1355,7 +1441,7 @@ private fun HexCommandSnippetCard(
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = onCopy) {
-                    Text(stringResource(Strings.hex_workbench_copy_script))
+                    Text(copyLabel ?: stringResource(Strings.hex_workbench_copy_script))
                 }
             }
             Text(
@@ -11928,6 +12014,9 @@ private fun String.compactForAnalysisPanel(): String = if (length <= ANALYSIS_PA
 } else {
     take(ANALYSIS_PANEL_STRING_LIMIT) + "..."
 }
+
+private fun List<HexReverseAction>.actionContent(kind: HexReverseActionKind): String =
+    first { action -> action.kind == kind }.content
 
 private fun String.toShortHashPreview(): String = if (length <= HASH_PREVIEW_LENGTH) {
     this

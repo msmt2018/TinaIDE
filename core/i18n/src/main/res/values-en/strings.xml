@@ -1309,6 +1309,11 @@
   <string name="hex_workbench_disassembly_preview_script">Disassembly preview script</string>
   <string name="hex_workbench_frida_hook_template">Frida hook template</string>
   <string name="hex_workbench_lldb_breakpoint_template">LLDB breakpoint template</string>
+  <string name="hex_workbench_reports_title">Reports</string>
+  <string name="hex_workbench_reports_summary">Native methods %1$d · Native libraries %2$d · JNI hints %3$d · Native APIs %4$d</string>
+  <string name="hex_workbench_markdown_report">Markdown report</string>
+  <string name="hex_workbench_json_report">JSON report</string>
+  <string name="hex_workbench_copy_report">Copy report</string>
   <string name="hex_workbench_findings_title">Findings</string>
   <string name="hex_workbench_findings_count">%1$d items</string>
   <string name="hex_workbench_findings_empty">No navigable binary findings yet</string>

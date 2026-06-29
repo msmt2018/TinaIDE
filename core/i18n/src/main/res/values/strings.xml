@@ -1550,6 +1550,11 @@
   <string name="hex_workbench_disassembly_preview_script">反汇编预览脚本</string>
   <string name="hex_workbench_frida_hook_template">Frida Hook 模板</string>
   <string name="hex_workbench_lldb_breakpoint_template">LLDB 断点模板</string>
+  <string name="hex_workbench_reports_title">报告</string>
+  <string name="hex_workbench_reports_summary">native 方法 %1$d · native 库 %2$d · JNI 线索 %3$d · Native API %4$d</string>
+  <string name="hex_workbench_markdown_report">Markdown 报告</string>
+  <string name="hex_workbench_json_report">JSON 报告</string>
+  <string name="hex_workbench_copy_report">复制报告</string>
   <string name="hex_workbench_findings_title">发现项</string>
   <string name="hex_workbench_findings_count">%1$d 项</string>
   <string name="hex_workbench_findings_empty">暂无可导航的二进制发现项</string>
