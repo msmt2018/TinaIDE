@@ -86,8 +86,13 @@ class TinaApplication : Application() {
         )
         NativeCrashHandler.setCrashDisplayer(
             if (crashSource != null) {
-                NativeCrashHandler.CrashDisplayer { context, crashReport ->
-                    CrashActivity.start(context, crashReport, crashSource)
+                NativeCrashHandler.CrashDisplayer { context, crashReport, crashLogFileName ->
+                    CrashActivity.start(
+                        context = context,
+                        crashReport = crashReport,
+                        source = crashSource,
+                        crashLogFileName = crashLogFileName,
+                    )
                 }
             } else {
                 null

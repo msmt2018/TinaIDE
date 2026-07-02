@@ -83,6 +83,8 @@ class CrashActivity : ComponentActivity() {
 
     private var crashReport: String = ""
     private var crashSource: String = SOURCE_APP
+    private var crashLogFileName: String = ""
+    private var crashAutoUploadEnabled by mutableStateOf(true)
     private var crashUploadSnapshot by mutableStateOf<CrashUploadState.Snapshot?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,13 +98,13 @@ class CrashActivity : ComponentActivity() {
         // xCrash 已提供完整的崩溃报告，直接使用
         crashReport = intent.getStringExtra(EXTRA_STACK_TRACE) ?: Strings.crash_no_info.strOr(this)
         crashSource = intent.getStringExtra(EXTRA_SOURCE) ?: SOURCE_APP
+        crashLogFileName = intent.getStringExtra(EXTRA_CRASH_LOG_FILE_NAME).orEmpty()
 
         if (crashSource == SOURCE_APP) {
-            crashUploadSnapshot = CrashUploadState.getLastUploadSnapshot(applicationContext)
-            // 用户可能不会再次启动 App：在崩溃页进程里立即补传，并保留 JobScheduler 兜底重试。
+            refreshCrashUploadState()
             CrashLogAutoUploader.uploadFromCrashScreen(applicationContext, lifecycleScope) {
                 lifecycleScope.launch {
-                    crashUploadSnapshot = CrashUploadState.getLastUploadSnapshot(applicationContext)
+                    refreshCrashUploadState()
                 }
             }
         }
@@ -113,6 +115,7 @@ class CrashActivity : ComponentActivity() {
                 CrashScreen(
                     crashReport = crashReport,
                     crashSource = crashSource,
+                    crashAutoUploadEnabled = crashAutoUploadEnabled,
                     crashUploadSnapshot = crashUploadSnapshot,
                     onCopy = { copyToClipboard() },
                     onShare = { shareCrashReport() },
@@ -124,6 +127,37 @@ class CrashActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun refreshCrashUploadState() {
+        crashAutoUploadEnabled = CrashUploadState.isAutoUploadEnabled(applicationContext)
+        crashUploadSnapshot = getCrashUploadSnapshotForCurrentCrash()
+    }
+
+    private fun getCrashUploadSnapshotForCurrentCrash(): CrashUploadState.Snapshot {
+        val snapshot = CrashUploadState.getLastUploadSnapshot(applicationContext)
+        val currentFileName = crashLogFileName.trim()
+        if (currentFileName.isBlank()) {
+            return CrashUploadState.Snapshot(
+                status = CrashUploadState.Status.NONE,
+                fileName = "",
+                fileMtime = 0L,
+                updatedAt = 0L,
+                reason = "",
+                attemptCount = 0,
+            )
+        }
+        if (snapshot.fileName == currentFileName) {
+            return snapshot
+        }
+        return CrashUploadState.Snapshot(
+            status = CrashUploadState.Status.NONE,
+            fileName = currentFileName,
+            fileMtime = 0L,
+            updatedAt = 0L,
+            reason = "",
+            attemptCount = 0,
+        )
     }
 
     private fun copyToClipboard() {
@@ -174,11 +208,17 @@ class CrashActivity : ComponentActivity() {
     companion object {
         const val EXTRA_STACK_TRACE = "extra_stack_trace"
         const val EXTRA_SOURCE = "extra_source"
+        private const val EXTRA_CRASH_LOG_FILE_NAME = "extra_crash_log_file_name"
         const val SOURCE_APP = "app"
         const val SOURCE_USER_NATIVE = "user_native"
         private const val MAX_CRASH_REPORT_EXTRA_CHARS = 120_000
 
-        fun start(context: Context, crashReport: String, source: String = SOURCE_APP) {
+        fun start(
+            context: Context,
+            crashReport: String,
+            source: String = SOURCE_APP,
+            crashLogFileName: String = "",
+        ) {
             val safeReport = if (crashReport.length > MAX_CRASH_REPORT_EXTRA_CHARS) {
                 crashReport.take(MAX_CRASH_REPORT_EXTRA_CHARS) +
                     "\n\n[Crash report truncated before launching CrashActivity]"
@@ -188,6 +228,7 @@ class CrashActivity : ComponentActivity() {
             val intent = Intent(context, CrashActivity::class.java).apply {
                 putExtra(EXTRA_STACK_TRACE, safeReport)
                 putExtra(EXTRA_SOURCE, source)
+                putExtra(EXTRA_CRASH_LOG_FILE_NAME, crashLogFileName)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             }
             context.startActivity(intent)
@@ -222,6 +263,7 @@ private fun ApplySystemBars(window: Window) {
 private fun CrashScreen(
     crashReport: String,
     crashSource: String,
+    crashAutoUploadEnabled: Boolean,
     crashUploadSnapshot: CrashUploadState.Snapshot?,
     onCopy: () -> Unit,
     onShare: () -> Unit,
@@ -229,11 +271,15 @@ private fun CrashScreen(
     onExit: () -> Unit
 ) {
     val isUserNativeCrash = crashSource == CrashActivity.SOURCE_USER_NATIVE
-    val uploadStatusModel = remember(crashUploadSnapshot, isUserNativeCrash) {
-        if (isUserNativeCrash || crashUploadSnapshot == null) {
-            null
-        } else {
-            CrashUploadStatusTextResolver.resolve(crashUploadSnapshot.status)
+    val uploadStatusModel = remember(crashUploadSnapshot, isUserNativeCrash, crashAutoUploadEnabled) {
+        when {
+            isUserNativeCrash -> null
+            !crashAutoUploadEnabled -> CrashUploadStatusTextSpec(
+                messageRes = Strings.settings_crash_upload_status_disabled,
+                isAttention = true,
+            )
+            crashUploadSnapshot == null -> null
+            else -> CrashUploadStatusTextResolver.resolve(crashUploadSnapshot.status)
         }
     }
     val truncatedSuffix = stringResource(Strings.crash_log_truncated)

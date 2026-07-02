@@ -100,16 +100,21 @@ class NativeMakeBuildStrategy(
         val makeBinary = File(toolchainManager.getBinDir(), "make")
         val makeCommand = mutableListOf(makeBinary.absolutePath)
         val packagePaths = InstalledPackagePathResolver.resolve(context.applicationContext, projectRoot)
+        val arch = AndroidSysrootManager.Companion.Arch.current()
         val packageEnvironment = MakeBuildEnvironment.build(
             packagePaths = packagePaths,
             nativeCFlags = options.nativeCFlags,
             nativeCppFlags = options.nativeCppFlags,
-            nativeLdFlags = options.nativeLdFlags,
+            nativeLdFlags = AndroidLinkerCompatibilityFlags.mergeWithUserLdFlags(
+                arch = arch,
+                apiLevel = sysrootApiLevel,
+                userLdFlags = options.nativeLdFlags,
+            ),
             nativeLdLibs = options.nativeLdLibs,
             extraLibraryDirs = listOfNotNull(
                 sysrootManager.getLibPath(
                     apiLevel = sysrootApiLevel,
-                    arch = AndroidSysrootManager.Companion.Arch.current(),
+                    arch = arch,
                     profileId = sysrootProfileId
                 )
             )

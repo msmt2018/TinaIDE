@@ -34,6 +34,6 @@ data class BuildFingerprint(
     val schemaVersion: Int = SCHEMA_VERSION,
 ) {
     companion object {
-        const val SCHEMA_VERSION: Int = 5
+        const val SCHEMA_VERSION: Int = 6
     }
 }

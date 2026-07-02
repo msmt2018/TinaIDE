@@ -1,7 +1,6 @@
 package com.wuxianggujun.tinaide.ui.compose.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
 import com.wuxianggujun.tinaide.core.git.GitStatus
@@ -139,10 +135,7 @@ internal fun DrawerContent(
             }
 
             DrawerTab.RIKKAHUB -> {
-                RikkaHubPanel(
-                    onOpenRikkaHub = onOpenRikkaHub,
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
 
@@ -151,54 +144,13 @@ internal fun DrawerContent(
         DrawerTabBar(
             selectedTab = drawerTab,
             onTabSelected = { tab ->
-                drawerTab = tab
+                if (tab == DrawerTab.RIKKAHUB) {
+                    onOpenRikkaHub()
+                } else {
+                    drawerTab = tab
+                }
             }
         )
-    }
-}
-
-@Composable
-private fun RikkaHubPanel(
-    onOpenRikkaHub: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = TinaTabIcons.RikkaHub,
-                contentDescription = null,
-                modifier = Modifier.size(44.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = stringResource(Strings.rikkahub_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(Strings.rikkahub_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            OutlinedButton(onClick = onOpenRikkaHub) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = stringResource(Strings.rikkahub_open))
-            }
-        }
     }
 }
 
@@ -233,7 +185,7 @@ private fun DrawerHeader(
         val headerTitle = when (drawerTab) {
             DrawerTab.FILES -> projectName
             DrawerTab.GIT -> stringResource(Strings.drawer_title_source_control)
-            DrawerTab.RIKKAHUB -> stringResource(Strings.rikkahub_title)
+            DrawerTab.RIKKAHUB -> stringResource(Strings.drawer_tab_rikkahub_title)
         }
         Text(
             text = headerTitle,

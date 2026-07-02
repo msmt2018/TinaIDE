@@ -25,7 +25,7 @@ object NativeCrashHandler {
     private var appContext: Context? = null
 
     fun interface CrashDisplayer {
-        fun show(context: Context, crashReport: String)
+        fun show(context: Context, crashReport: String, crashLogFileName: String)
     }
 
     @Volatile
@@ -91,10 +91,11 @@ object NativeCrashHandler {
     private fun handleCrash(context: Context, logPath: String?, emergency: String?) {
         try {
             val crashInfo = buildCrashInfo(logPath, emergency)
+            val crashLogFileName = crashLogFileName(logPath)
 
             val appContext = context.applicationContext
             if (crashUploadEnabled && CrashUploadState.isAutoUploadEnabled(appContext)) {
-                markCrashLogUploadQueued(context, logPath)
+                markCrashLogUploadQueued(context, crashLogFileName)
                 // 入队后台上传任务：崩溃回调可能早于 tombstone 完全落盘，直接入队避免扫描竞态。
                 runCatching {
                     CrashLogUploadScheduler.schedule(appContext)
@@ -103,12 +104,12 @@ object NativeCrashHandler {
                 }
             } else {
                 val reason = if (crashUploadEnabled) "auto_upload_disabled" else "process_not_uploadable"
-                markCrashLogUploadSkipped(context, logPath, reason)
+                markCrashLogUploadSkipped(context, crashLogFileName, reason)
             }
 
             val displayer = crashDisplayer
             if (displayer != null) {
-                displayer.show(context.applicationContext, crashInfo)
+                displayer.show(context.applicationContext, crashInfo, crashLogFileName)
             } else {
                 Timber.tag(TAG).e("Crash captured (no displayer registered):\n%s", crashInfo)
             }
@@ -117,14 +118,12 @@ object NativeCrashHandler {
         }
     }
 
-    private fun markCrashLogUploadQueued(context: Context, logPath: String?) {
-        val fileName = crashLogFileName(logPath)
+    private fun markCrashLogUploadQueued(context: Context, fileName: String) {
         CrashUploadState.markUploadQueued(context.applicationContext, fileName, "captured_by_xcrash")
         Timber.tag(TAG).i("Crash log upload queued: %s", fileName.ifBlank { "<unknown>" })
     }
 
-    private fun markCrashLogUploadSkipped(context: Context, logPath: String?, reason: String) {
-        val fileName = crashLogFileName(logPath)
+    private fun markCrashLogUploadSkipped(context: Context, fileName: String, reason: String) {
         if (fileName.isNotBlank()) {
             CrashUploadState.markUploadSkipped(context.applicationContext, fileName, reason)
         }

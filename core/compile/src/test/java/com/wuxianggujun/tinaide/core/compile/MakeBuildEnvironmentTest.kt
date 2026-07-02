@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.compile
 
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import java.io.File
 import org.junit.Test
@@ -38,6 +39,32 @@ class MakeBuildEnvironmentTest {
         assertThat(env["CXXFLAGS"]).isEqualTo("-Wall -Wextra")
         assertThat(env["LDFLAGS"]).isEqualTo("-Wl,--as-needed")
         assertThat(env["LDLIBS"]).isEqualTo("-lSDL3")
+    }
+
+    @Test
+    fun `build can export linker compatibility flags before project ld flags`() {
+        val packagePaths = InstalledPackagePathResolver.PackagePaths(
+            includeDirs = emptyList(),
+            libDirs = emptyList(),
+            prefixDirs = emptyList(),
+            pkgConfigDirs = emptyList(),
+            linkLibraries = emptyList(),
+            runtimeLibDirs = emptyList()
+        )
+        val ldFlags = AndroidLinkerCompatibilityFlags.mergeWithUserLdFlags(
+            arch = AndroidSysrootManager.Companion.Arch.ARM64,
+            apiLevel = 28,
+            userLdFlags = " -Wl,--as-needed ",
+        )
+
+        val env = MakeBuildEnvironment.build(
+            packagePaths = packagePaths,
+            nativeLdFlags = ldFlags,
+        )
+
+        assertThat(env["LDFLAGS"]).isEqualTo(
+            "${AndroidLinkerCompatibilityFlags.DISABLE_AARCH64_AUTH_RELR_PACKING} -Wl,--as-needed"
+        )
     }
 
     @Test

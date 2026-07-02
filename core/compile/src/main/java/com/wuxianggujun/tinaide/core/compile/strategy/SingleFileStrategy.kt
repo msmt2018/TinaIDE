@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.compile.strategy
 
 import android.content.Context
+import com.wuxianggujun.tinaide.core.compile.AndroidLinkerCompatibilityFlags
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnostic
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
 import com.wuxianggujun.tinaide.core.compile.BuildOptions
@@ -240,6 +241,7 @@ class SingleFileStrategy(
         }
 
         val sysrootFlags = buildSysrootFlags(isCpp, apiLevel, options.sysrootProfileId)
+        val linkerCompatibilityFlags = AndroidLinkerCompatibilityFlags.forCurrentTarget(apiLevel)
         val packagePaths = InstalledPackagePathResolver.resolve(appContext, ctx.projectRoot)
         val extraCompileFlags = NativeBuildFlagTokenizer.tokenize(
             if (isCpp) options.nativeCppFlags else options.nativeCFlags
@@ -263,6 +265,7 @@ class SingleFileStrategy(
             add("-Wall")
             addAll(extraCompileFlags)
             addAll(sysrootFlags)
+            addAll(linkerCompatibilityFlags)
             for (dir in packagePaths.includeDirs) add("-I${dir.absolutePath}")
             for (dir in packagePaths.libDirs) add("-L${dir.absolutePath}")
             for (library in packagePaths.linkLibraries) add("-l$library")

@@ -1939,7 +1939,7 @@
   <!-- DrawerTab -->
   <string name="drawer_tab_files_title">Files</string>
   <string name="drawer_tab_git_title">Git</string>
-  <string name="drawer_tab_rikkahub_title">RikkaHub</string>
+  <string name="drawer_tab_rikkahub_title">AI</string>
 
   <string name="rikkahub_title">RikkaHub</string>
   <string name="rikkahub_desc">RikkaHub is embedded in TinaIDE. Chat, models, and channel settings are handled by RikkaHub.</string>
@@ -2265,7 +2265,7 @@ kept=%3$d bytes
 
   <!-- Log Management -->
   <string name="settings_crash_auto_upload">Crash log auto upload</string>
-  <string name="settings_crash_auto_upload_desc">Upload crash logs automatically on next launch (you can disable here)</string>
+  <string name="settings_crash_auto_upload_desc">Automatically upload TinaIDE main-process crash logs; user runtime crashes stay local.</string>
   <string name="settings_crash_upload_status">Latest crash upload status</string>
   <string name="settings_crash_upload_status_no_record">No crash upload status has been recorded yet.</string>
   <string name="settings_crash_upload_status_disabled">Automatic upload is off. New TinaIDE crash logs will not be uploaded automatically.</string>

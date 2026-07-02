@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.compile.cmake
 
 import android.content.Context
+import com.wuxianggujun.tinaide.core.compile.AndroidLinkerCompatibilityFlags
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
 import com.wuxianggujun.tinaide.core.compile.BuildProcessRunner
 import com.wuxianggujun.tinaide.core.compile.BuildResourceCleaner
@@ -896,6 +897,9 @@ class NativeCMakeBuildExecutor(
         val cCompileFlags = cSysrootSplit.compileFlags.joinToString(" ")
         val cxxCompileFlags = cxxSysrootSplit.compileFlags.joinToString(" ")
         val sysrootLinkFlags = cxxSysrootSplit.linkFlags.joinToString(" ")
+        val linkerCompatibilityFlags = AndroidLinkerCompatibilityFlags
+            .forTarget(arch = arch, apiLevel = sysrootApiLevel)
+            .joinToString(" ")
         val preferLinker64 = NativeExecutableRunner.shouldPreferLinker64()
         val toolchainShimSet = if (preferLinker64) {
             shimManager.prepare(toolchainBinDir, SHIM_TOOL_NAMES)
@@ -1016,6 +1020,7 @@ class NativeCMakeBuildExecutor(
                     "--target=$targetTripleWithApi",
                     "--sysroot=${sysrootDir.absolutePath}",
                     sysrootLinkFlags,
+                    linkerCompatibilityFlags,
                     "-fuse-ld=lld"
                 )
                 add("-DCMAKE_C_FLAGS=${mergeFlagSegments(cCompileFlags, compilerExecutionFlags, projectCFlags)}")

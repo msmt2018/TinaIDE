@@ -2525,7 +2525,7 @@
   <!-- DrawerTab -->
   <string name="drawer_tab_files_title">文件</string>
   <string name="drawer_tab_git_title">Git</string>
-  <string name="drawer_tab_rikkahub_title">RikkaHub</string>
+  <string name="drawer_tab_rikkahub_title">AI</string>
 
   <string name="rikkahub_title">RikkaHub</string>
   <string name="rikkahub_desc">TinaIDE 已内嵌 RikkaHub，聊天、模型和渠道配置由 RikkaHub 提供。</string>
@@ -3238,7 +3238,7 @@ kept=%3$d bytes
   <string name="settings_view_proot_logs">查看 PRoot 日志</string>
   <string name="settings_view_proot_logs_desc">查看 PRoot 会话/错误日志（用于排查安装与运行问题）</string>
   <string name="settings_crash_auto_upload">崩溃日志自动上传</string>
-  <string name="settings_crash_auto_upload_desc">下次启动自动上传崩溃日志（可在此关闭）</string>
+  <string name="settings_crash_auto_upload_desc">自动上传 TinaIDE 主进程崩溃日志；用户程序崩溃仍只保存在本地。</string>
   <string name="settings_crash_upload_status">最近崩溃上传状态</string>
   <string name="settings_crash_upload_status_no_record">暂未记录崩溃上传状态。</string>
   <string name="settings_crash_upload_status_disabled">自动上传已关闭，新的 TinaIDE 崩溃日志不会自动上传。</string>

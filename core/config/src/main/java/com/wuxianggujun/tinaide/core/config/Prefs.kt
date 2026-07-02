@@ -209,9 +209,10 @@ object Prefs {
         }
 
     /**
-     * 崩溃日志自动上传开关（默认开启）。
+     * TinaIDE 主进程崩溃日志自动上传开关（默认开启）。
      *
      * 说明：崩溃日志由 xCrash 生成，内容包含设备信息、应用信息与堆栈。
+     * 用户 native runtime 崩溃仍只保存在本地，不会自动上传。
      */
     var crashAutoUploadEnabled: Boolean
         get() = configManager.get(ConfigKeys.CrashAutoUploadEnabled)
