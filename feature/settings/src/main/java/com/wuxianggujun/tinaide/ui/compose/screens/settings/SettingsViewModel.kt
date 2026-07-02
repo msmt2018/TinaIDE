@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.ui.compose.screens.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wuxianggujun.tinaide.core.config.AppTheme
 import com.wuxianggujun.tinaide.core.config.ConfigKeys
 import com.wuxianggujun.tinaide.core.config.DebugToolbarPosition
 import com.wuxianggujun.tinaide.core.config.IConfigManager
@@ -35,7 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val appTheme: String,
+    val appTheme: AppTheme,
     val editorTheme: String,
     val editorFontSize: Float,
     val editorTabSize: Int,
@@ -241,7 +242,7 @@ class SettingsViewModel(
 
         viewModelScope.launch {
             ThemeManager.themeFlow.collect { theme ->
-                _uiState.update { it.copy(appTheme = theme.name) }
+                _uiState.update { it.copy(appTheme = theme) }
             }
         }
 
@@ -315,7 +316,7 @@ class SettingsViewModel(
         }
     }
 
-    fun setAppTheme(theme: String) {
+    fun setAppTheme(theme: AppTheme) {
         Prefs.setTheme(theme)
         _uiState.update { it.copy(appTheme = theme) }
     }

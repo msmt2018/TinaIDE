@@ -47,6 +47,7 @@ internal fun MainActivityDrawerContentHost(
         fileTreeState = fileTreeState,
         pluginManager = koinInject(),
         hostCommandExecutor = hostCommandExecutor,
+        drawerOpen = drawerState.isOpen,
         fileCallbacks = DrawerFileCallbacks(
             onFileClick = { file ->
                 editorContainerState.openFile(file)
@@ -167,6 +168,5 @@ internal fun MainActivityDrawerContentHost(
             recentCommitMessages = gitUiState.recentCommitMessages,
             onClearCommitMessageHistory = gitViewModel::clearRecentCommitMessages,
         ),
-        onOpenRikkaHub = callbacks.onOpenRikkaHub,
     )
 }

@@ -1,5 +1,9 @@
 package com.wuxianggujun.tinaide.ui.compose.components
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +13,14 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -29,6 +35,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
@@ -45,6 +56,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.ui.compose.icons.TinaTabIcons
 import java.io.File
+import me.rerere.rikkahub.RikkaHubEmbeddedChatPane
 
 internal class DrawerFileCallbacks(
     val onFileClick: (File) -> Unit,
@@ -81,24 +93,38 @@ internal fun DrawerContent(
     gitCallbacks: DrawerGitCallbacks,
     modifier: Modifier = Modifier,
     hostCommandExecutor: HostCommandExecutor? = null,
-    onOpenRikkaHub: () -> Unit = {},
+    drawerOpen: Boolean = true,
 ) {
     var drawerTab by remember { mutableStateOf(DrawerTab.FILES) }
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val density = LocalDensity.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    val showDrawerTabBar = drawerTab != DrawerTab.RIKKAHUB || !keyboardVisible
+
+    RikkaHubDrawerSoftInputModeEffect(
+        activity = activity,
+        enabled = drawerOpen && drawerTab == DrawerTab.RIKKAHUB
+    )
 
     Column(modifier = modifier.fillMaxSize()) {
-        DrawerHeader(
-            drawerTab = drawerTab,
-            projectName = projectName,
-            gitStatus = gitStatus,
-            gitIsLoading = gitIsLoading,
-            onAddFileClick = {
-                val targetDir = fileTreeState.selectedDirectoryPath?.let(::File)
-                fileCallbacks.onAddFileClick(targetDir)
-            },
-            onGitRefresh = gitCallbacks.onRefresh
-        )
+        if (drawerTab != DrawerTab.RIKKAHUB) {
+            DrawerHeader(
+                drawerTab = drawerTab,
+                projectName = projectName,
+                gitStatus = gitStatus,
+                gitIsLoading = gitIsLoading,
+                onAddFileClick = {
+                    val targetDir = fileTreeState.selectedDirectoryPath?.let(::File)
+                    fileCallbacks.onAddFileClick(targetDir)
+                },
+                onGitRefresh = gitCallbacks.onRefresh
+            )
 
-        HorizontalDivider()
+            HorizontalDivider()
+        }
 
         when (drawerTab) {
             DrawerTab.FILES -> {
@@ -135,23 +161,84 @@ internal fun DrawerContent(
             }
 
             DrawerTab.RIKKAHUB -> {
-                Spacer(modifier = Modifier.weight(1f))
+                Box(modifier = Modifier.weight(1f)) {
+                    RikkaHubEmbeddedChatPane(
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    if (keyboardVisible) {
+                        RikkaHubKeyboardDismissButton(
+                            onClick = {
+                                focusManager.clearFocus(force = true)
+                                keyboardController?.hide()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp)
+                        )
+                    }
+                }
             }
         }
 
-        HorizontalDivider()
+        if (showDrawerTabBar) {
+            HorizontalDivider()
 
-        DrawerTabBar(
-            selectedTab = drawerTab,
-            onTabSelected = { tab ->
-                if (tab == DrawerTab.RIKKAHUB) {
-                    onOpenRikkaHub()
-                } else {
-                    drawerTab = tab
-                }
-            }
+            DrawerTabBar(
+                selectedTab = drawerTab,
+                onTabSelected = { tab -> drawerTab = tab }
+            )
+        }
+    }
+}
+
+@Composable
+private fun RikkaHubKeyboardDismissButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier,
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = stringResource(Strings.content_desc_hide_keyboard),
+            modifier = Modifier.size(24.dp)
         )
     }
+}
+
+@Composable
+private fun RikkaHubDrawerSoftInputModeEffect(
+    activity: Activity?,
+    enabled: Boolean,
+) {
+    DisposableEffect(activity, enabled) {
+        if (activity == null || !enabled) {
+            onDispose { }
+        } else {
+            val window = activity.window
+            val originalMode = window.attributes.softInputMode
+            val adjustedMode =
+                (originalMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()) or
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+            window.setSoftInputMode(adjustedMode)
+
+            onDispose {
+                window.setSoftInputMode(originalMode)
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
@@ -163,6 +250,8 @@ private fun DrawerHeader(
     onAddFileClick: () -> Unit,
     onGitRefresh: () -> Unit
 ) {
+    if (drawerTab == DrawerTab.RIKKAHUB) return
+
     val actionIconButtonColors = IconButtonDefaults.iconButtonColors(
         contentColor = MaterialTheme.colorScheme.onSurface
     )
@@ -185,7 +274,7 @@ private fun DrawerHeader(
         val headerTitle = when (drawerTab) {
             DrawerTab.FILES -> projectName
             DrawerTab.GIT -> stringResource(Strings.drawer_title_source_control)
-            DrawerTab.RIKKAHUB -> stringResource(Strings.drawer_tab_rikkahub_title)
+            DrawerTab.RIKKAHUB -> ""
         }
         Text(
             text = headerTitle,

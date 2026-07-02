@@ -150,7 +150,6 @@ class DeveloperOptionsSectionSupportTest {
                 updatedAt = "   ",
                 configRefreshIntervalSecs = 600,
                 features = FeatureFlags(
-                    feedbackEnabled = true,
                     pluginMarketEnabled = false,
                     packageManagerEnabled = true,
                     developerOptionsEnabled = false
@@ -166,7 +165,6 @@ class DeveloperOptionsSectionSupportTest {
         assertThat(preview.version).isEqualTo(12)
         assertThat(preview.updatedAt).isNull()
         assertThat(preview.configRefreshIntervalSecs).isEqualTo(600)
-        assertThat(preview.feedbackEnabled).isTrue()
         assertThat(preview.pluginMarketEnabled).isFalse()
         assertThat(preview.packageManagerEnabled).isTrue()
         assertThat(preview.developerOptionsEnabled).isFalse()

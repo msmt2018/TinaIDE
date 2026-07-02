@@ -2,11 +2,11 @@ package com.wuxianggujun.tinaide.ui.compose.screens.settings
 
 internal enum class SettingsScreenHost {
     HelpContent,
-    FeedbackContent,
     PluginMarketplaceScreen,
     PluginLogScreen,
     StorageCleanupScreen,
     PackagesContent,
+    AiSettingsContent,
     GitSpecialLayout,
     PluginsSpecialLayout,
     ScrollableContent
@@ -36,15 +36,11 @@ internal object SettingsScreenSupport {
     fun resolveRouteResolution(
         currentRoute: SettingsRoute,
         hasHelpContent: Boolean,
-        hasFeedbackContent: Boolean,
-        hasPackagesContent: Boolean
+        hasPackagesContent: Boolean,
+        hasAiSettingsContent: Boolean
     ): SettingsScreenRouteResolution = when {
         currentRoute == SettingsRoute.Help && hasHelpContent -> SettingsScreenRouteResolution(
             host = SettingsScreenHost.HelpContent
-        )
-
-        currentRoute == SettingsRoute.Feedback && hasFeedbackContent -> SettingsScreenRouteResolution(
-            host = SettingsScreenHost.FeedbackContent
         )
 
         currentRoute == SettingsRoute.PluginMarketplace -> SettingsScreenRouteResolution(
@@ -61,6 +57,10 @@ internal object SettingsScreenSupport {
 
         currentRoute == SettingsRoute.Packages && hasPackagesContent -> SettingsScreenRouteResolution(
             host = SettingsScreenHost.PackagesContent
+        )
+
+        currentRoute == SettingsRoute.Ai && hasAiSettingsContent -> SettingsScreenRouteResolution(
+            host = SettingsScreenHost.AiSettingsContent
         )
 
         currentRoute == SettingsRoute.Git -> SettingsScreenRouteResolution(

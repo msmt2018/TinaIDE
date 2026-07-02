@@ -85,9 +85,6 @@ class MainPortalActivity :
                         onNavigateToSettings = {
                             SettingsActivity.start(this)
                         },
-                        onNavigateToFeedback = {
-                            SettingsActivity.start(this, SettingsRoute.Feedback)
-                        },
                         onNavigateToAbout = {
                             SettingsActivity.start(this, SettingsRoute.About)
                         },
@@ -153,7 +150,6 @@ class MainPortalActivity :
 fun MainPortalScreen(
     onOpenProject: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToFeedback: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     onNavigateToPlugins: () -> Unit = {},
     onNavigateToPackages: () -> Unit = {},
@@ -163,7 +159,6 @@ fun MainPortalScreen(
     MainScreen(
         onOpenProject = onOpenProject,
         onNavigateToSettings = onNavigateToSettings,
-        onNavigateToFeedback = onNavigateToFeedback,
         onNavigateToAbout = onNavigateToAbout,
         onNavigateToPlugins = onNavigateToPlugins,
         onNavigateToPackages = onNavigateToPackages,

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -43,13 +42,12 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
  * 开源版“我的”页。
  *
  * 账号登录、第三方登录、激活码和会员入口已从主 APK 移除；这里仅保留本地内容、
- * 反馈、日志与关于等仍可用能力。
+ * 日志、关于等仍可用能力。
  */
 @Composable
 fun ProfileScreen(
     modifier: Modifier = Modifier,
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToFeedback: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     onNavigateToPlugins: () -> Unit = {},
     onNavigateToPackages: () -> Unit = {},
@@ -95,7 +93,6 @@ fun ProfileScreen(
             item {
                 SettingsSection(
                     onSettingsClick = onNavigateToSettings,
-                    onFeedbackClick = onNavigateToFeedback,
                     onAboutClick = onNavigateToAbout
                 )
             }
@@ -183,7 +180,6 @@ private fun MyContentSection(
 @Composable
 private fun SettingsSection(
     onSettingsClick: () -> Unit,
-    onFeedbackClick: () -> Unit,
     onAboutClick: () -> Unit
 ) {
     TinaCard(modifier = Modifier.fillMaxWidth()) {
@@ -193,13 +189,6 @@ private fun SettingsSection(
                 title = stringResource(Strings.profile_settings),
                 subtitle = stringResource(Strings.profile_settings_desc),
                 onClick = onSettingsClick
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            ProfileMenuItem(
-                icon = Icons.AutoMirrored.Filled.Send,
-                title = stringResource(Strings.profile_feedback),
-                subtitle = stringResource(Strings.profile_feedback_desc),
-                onClick = onFeedbackClick
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             ProfileMenuItem(

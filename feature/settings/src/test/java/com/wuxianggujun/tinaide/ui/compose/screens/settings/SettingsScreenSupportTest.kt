@@ -7,11 +7,11 @@ class SettingsScreenSupportTest {
 
     @Test
     fun resolveRouteResolution_shouldKeepDeveloperRouteOnScrollableContent() {
-        val resolution = SettingsScreenSupport.resolveRouteResolution(
+        val resolution = resolveRouteResolution(
             currentRoute = SettingsRoute.Developer,
             hasHelpContent = true,
-            hasFeedbackContent = true,
-            hasPackagesContent = true
+            hasPackagesContent = true,
+            hasAiSettingsContent = true
         )
 
         assertThat(resolution.host).isEqualTo(SettingsScreenHost.ScrollableContent)
@@ -21,62 +21,56 @@ class SettingsScreenSupportTest {
     @Test
     fun resolveRouteResolution_shouldPreferExternalHostsWhenSlotsAvailable() {
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.Help,
                 hasHelpContent = true,
-                hasFeedbackContent = false,
                 hasPackagesContent = false
             ).host
         ).isEqualTo(SettingsScreenHost.HelpContent)
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
-                currentRoute = SettingsRoute.Feedback,
-                hasHelpContent = false,
-                hasFeedbackContent = true,
-                hasPackagesContent = false
-            ).host
-        ).isEqualTo(SettingsScreenHost.FeedbackContent)
-        assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.Packages,
                 hasHelpContent = false,
-                hasFeedbackContent = false,
                 hasPackagesContent = true
             ).host
         ).isEqualTo(SettingsScreenHost.PackagesContent)
+        assertThat(
+            resolveRouteResolution(
+                currentRoute = SettingsRoute.Ai,
+                hasHelpContent = false,
+                hasPackagesContent = false,
+                hasAiSettingsContent = true
+            ).host
+        ).isEqualTo(SettingsScreenHost.AiSettingsContent)
     }
 
     @Test
     fun resolveRouteResolution_shouldKeepPluginAndGitRoutesOnSpecialLayouts() {
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.Git,
                 hasHelpContent = false,
-                hasFeedbackContent = false,
                 hasPackagesContent = false
             ).host
         ).isEqualTo(SettingsScreenHost.GitSpecialLayout)
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.Plugins,
                 hasHelpContent = false,
-                hasFeedbackContent = false,
                 hasPackagesContent = false
             ).host
         ).isEqualTo(SettingsScreenHost.PluginsSpecialLayout)
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.PluginMarketplace,
                 hasHelpContent = false,
-                hasFeedbackContent = false,
                 hasPackagesContent = false
             ).host
         ).isEqualTo(SettingsScreenHost.PluginMarketplaceScreen)
         assertThat(
-            SettingsScreenSupport.resolveRouteResolution(
+            resolveRouteResolution(
                 currentRoute = SettingsRoute.PluginLog,
                 hasHelpContent = false,
-                hasFeedbackContent = false,
                 hasPackagesContent = false
             ).host
         ).isEqualTo(SettingsScreenHost.PluginLogScreen)
@@ -84,31 +78,29 @@ class SettingsScreenSupportTest {
 
     @Test
     fun resolveRouteResolution_shouldFallbackToScrollablePlaceholderWhenExternalSlotsMissing() {
-        val helpResolution = SettingsScreenSupport.resolveRouteResolution(
+        val helpResolution = resolveRouteResolution(
             currentRoute = SettingsRoute.Help,
             hasHelpContent = false,
-            hasFeedbackContent = false,
             hasPackagesContent = false
         )
-        val feedbackResolution = SettingsScreenSupport.resolveRouteResolution(
-            currentRoute = SettingsRoute.Feedback,
-            hasHelpContent = false,
-            hasFeedbackContent = false,
-            hasPackagesContent = false
-        )
-        val packagesResolution = SettingsScreenSupport.resolveRouteResolution(
+        val packagesResolution = resolveRouteResolution(
             currentRoute = SettingsRoute.Packages,
             hasHelpContent = false,
-            hasFeedbackContent = false,
             hasPackagesContent = false
+        )
+        val aiResolution = resolveRouteResolution(
+            currentRoute = SettingsRoute.Ai,
+            hasHelpContent = false,
+            hasPackagesContent = false,
+            hasAiSettingsContent = false
         )
 
         assertThat(helpResolution.host).isEqualTo(SettingsScreenHost.ScrollableContent)
         assertThat(helpResolution.scrollableContent).isEqualTo(SettingsScrollableContent.Placeholder)
-        assertThat(feedbackResolution.host).isEqualTo(SettingsScreenHost.ScrollableContent)
-        assertThat(feedbackResolution.scrollableContent).isEqualTo(SettingsScrollableContent.Placeholder)
         assertThat(packagesResolution.host).isEqualTo(SettingsScreenHost.ScrollableContent)
         assertThat(packagesResolution.scrollableContent).isEqualTo(SettingsScrollableContent.Placeholder)
+        assertThat(aiResolution.host).isEqualTo(SettingsScreenHost.ScrollableContent)
+        assertThat(aiResolution.scrollableContent).isEqualTo(SettingsScrollableContent.Placeholder)
     }
 
     @Test
@@ -142,4 +134,16 @@ class SettingsScreenSupportTest {
             )
         ).isFalse()
     }
+
+    private fun resolveRouteResolution(
+        currentRoute: SettingsRoute,
+        hasHelpContent: Boolean,
+        hasPackagesContent: Boolean,
+        hasAiSettingsContent: Boolean = false
+    ): SettingsScreenRouteResolution = SettingsScreenSupport.resolveRouteResolution(
+        currentRoute = currentRoute,
+        hasHelpContent = hasHelpContent,
+        hasPackagesContent = hasPackagesContent,
+        hasAiSettingsContent = hasAiSettingsContent
+    )
 }

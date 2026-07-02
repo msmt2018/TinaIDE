@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import com.gyf.immersionbar.ktx.immersionBar
 import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.config.Prefs
@@ -20,7 +21,6 @@ import com.wuxianggujun.tinaide.plugin.PluginHostLogSources
 import com.wuxianggujun.tinaide.plugin.PluginLogManager
 import com.wuxianggujun.tinaide.plugin.PluginManager
 import com.wuxianggujun.tinaide.plugin.lsp.LspPluginManager
-import com.wuxianggujun.tinaide.ui.compose.screens.FeedbackScreen
 import com.wuxianggujun.tinaide.ui.compose.screens.help.HelpScreen
 import com.wuxianggujun.tinaide.ui.compose.screens.help.HelpViewModel
 import com.wuxianggujun.tinaide.ui.compose.screens.packages.PackageManagerScreen
@@ -31,6 +31,10 @@ import com.wuxianggujun.tinaide.ui.theme.TinaIDETheme
 import com.wuxianggujun.tinaide.ui.wizard.NewProjectWizardActivity
 import com.wuxianggujun.tinaide.ui.workspace.DependencyInstallActivity
 import com.wuxianggujun.tinaide.ui.workspace.PRootLogActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import me.rerere.rikkahub.RikkaHubEmbeddedSettingsPane
+import me.rerere.rikkahub.RikkaHubEmbeddedWarmup
 import org.koin.androidx.viewmodel.ext.android.viewModel as koinViewModel
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
@@ -46,6 +50,7 @@ internal object SettingsActivitySupport {
         SettingsRoute.Storage,
         SettingsRoute.StorageCleanup,
         SettingsRoute.Terminal,
+        SettingsRoute.Ai,
         SettingsRoute.Git,
         SettingsRoute.Appearance,
         SettingsRoute.Keyboard,
@@ -54,7 +59,6 @@ internal object SettingsActivitySupport {
         SettingsRoute.PluginMarketplace,
         SettingsRoute.PluginLog,
         SettingsRoute.Help,
-        SettingsRoute.Feedback,
         SettingsRoute.Developer,
         SettingsRoute.About
     ).associateBy(SettingsRoute::route)
@@ -216,6 +220,7 @@ class SettingsActivity :
             navigationBarColor(android.R.color.transparent)
             navigationBarDarkIcon(!Prefs.useDarkMode)
         }
+        warmUpRikkaHubSettings()
 
         // 若从项目列表菜单进入，绑定目标项目根路径；否则走默认（使用当前会话项目）
         val targetProjectRoot = intent.getStringExtra(EXTRA_PROJECT_ROOT)?.takeUnless { it.isBlank() }
@@ -300,13 +305,15 @@ class SettingsActivity :
                             },
                         )
                     },
-                    feedbackContent = { onBack ->
-                        FeedbackScreen(onNavigateBack = onBack)
-                    },
                     packagesContent = { onBack ->
                         PackageManagerScreen(
                             onNavigateBack = onBack,
                             initialSearchQuery = initialPackageSearchQuery
+                        )
+                    },
+                    aiSettingsContent = { onBack ->
+                        RikkaHubEmbeddedSettingsPane(
+                            onNavigateBack = onBack
                         )
                     },
                     onNavigateToDependencyInstall = {
@@ -319,6 +326,16 @@ class SettingsActivity :
                         startActivity(Intent(this@SettingsActivity, OpenSourceLicensesActivity::class.java))
                     }
                 )
+            }
+        }
+    }
+
+    private fun warmUpRikkaHubSettings() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            runCatching {
+                RikkaHubEmbeddedWarmup.warmup(application)
+            }.onFailure { error ->
+                Timber.tag(TAG).w(error, "RikkaHub embedded warmup failed")
             }
         }
     }

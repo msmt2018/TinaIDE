@@ -40,17 +40,17 @@ class ConfigManager(
         listeners.clear()
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun <T> get(key: String, default: T): T {
         return try {
             // 先从 JSON 配置中查找
             if (jsonConfig.containsKey(key)) {
-                return (jsonConfig[key] as? T) ?: default
+                return coerceStoredValue(jsonConfig[key], default)
             }
 
             // 再从 SharedPreferences 中查找
             when (default) {
                 is String -> sharedPrefs.getString(key, default) as T
+                is Enum<*> -> readEnumFromPreferences(key, default, default)
                 is Int -> sharedPrefs.getInt(key, default) as T
                 is Long -> sharedPrefs.getLong(key, default) as T
                 is Float -> sharedPrefs.getFloat(key, default) as T
@@ -74,7 +74,7 @@ class ConfigManager(
 
             // 根据类型选择存储方式
             when (value) {
-                is String, is Int, is Long, is Float, is Boolean -> {
+                is String, is Int, is Long, is Float, is Boolean, is Enum<*> -> {
                     if (jsonConfig.remove(key) != null) {
                         saveJsonConfig()
                     }
@@ -86,6 +86,7 @@ class ConfigManager(
                             is Long -> putLong(key, value)
                             is Float -> putFloat(key, value)
                             is Boolean -> putBoolean(key, value)
+                            is Enum<*> -> putString(key, value.name)
                         }
                         apply()
                     }
@@ -254,6 +255,24 @@ class ConfigManager(
             return sharedPrefs.all[key]
         }
         return null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> coerceStoredValue(value: Any?, default: T): T = when {
+        default is Enum<*> -> readEnumValue(value as? String, default, default)
+        else -> value as? T ?: default
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> readEnumFromPreferences(key: String, defaultEnum: Enum<*>, default: T): T =
+        readEnumValue(sharedPrefs.getString(key, defaultEnum.name), defaultEnum, default)
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> readEnumValue(storedName: String?, defaultEnum: Enum<*>, default: T): T {
+        val enumValue = defaultEnum.javaClass.enumConstants
+            ?.filterIsInstance<Enum<*>>()
+            ?.firstOrNull { it.name == storedName }
+        return enumValue as? T ?: default
     }
 
     private fun notifyListeners(key: String, newValue: Any?) {

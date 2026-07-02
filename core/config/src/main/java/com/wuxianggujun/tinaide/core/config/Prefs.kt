@@ -237,32 +237,35 @@ object Prefs {
     // ========== UI / 主题相关 ==========
 
     /**
-     * 应用主题："DARK" / "LIGHT" / "GRAY" / "AUTO"
+     * 应用主题："DARK" / "LIGHT" / "GRAY" / "SAKURA" / "OCEAN" / "SPRING" /
+     * "AUTUMN" / "BLACK" / "AUTO"
      * 通过 ThemeManager 统一管理，确保响应式更新
      */
-    var appTheme: String
-        get() = ThemeManager.getCurrentTheme().name
+    var appTheme: AppTheme
+        get() = ThemeManager.getCurrentTheme()
         set(value) {
             // 更新 ThemeManager（会触发所有订阅者）
-            ThemeManager.setTheme(AppTheme.fromString(value))
+            ThemeManager.setTheme(value)
             // 持久化到 SharedPreferences
             configManager.set(ConfigKeys.Theme, value)
         }
 
-    fun readPersistedTheme(context: Context): String {
+    fun readPersistedTheme(context: Context): AppTheme {
         val prefs = context.applicationContext
             .getSharedPreferences(CONFIG_PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(ConfigKeys.Theme.key, AppTheme.LIGHT.name) ?: AppTheme.LIGHT.name
+        return prefs.getString(ConfigKeys.Theme.key, null)
+            ?.let { storedName -> runCatching { AppTheme.valueOf(storedName) }.getOrNull() }
+            ?: ConfigKeys.Theme.default
     }
 
-    fun resolveNightMode(themeName: String): Int = when (themeName) {
-        AppTheme.DARK.name, AppTheme.GRAY.name -> AppCompatDelegate.MODE_NIGHT_YES
-        AppTheme.AUTO.name -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    fun resolveNightMode(theme: AppTheme): Int = when (theme) {
+        AppTheme.DARK, AppTheme.GRAY, AppTheme.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+        AppTheme.AUTO -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         else -> AppCompatDelegate.MODE_NIGHT_NO
     }
 
-    fun applyNightMode(themeName: String) {
-        val mode = resolveNightMode(themeName)
+    fun applyNightMode(theme: AppTheme) {
+        val mode = resolveNightMode(theme)
         if (AppCompatDelegate.getDefaultNightMode() != mode) {
             AppCompatDelegate.setDefaultNightMode(mode)
         }
@@ -270,14 +273,13 @@ object Prefs {
 
     val useDarkMode: Boolean
         get() = when (appTheme) {
-            "LIGHT" -> false
-            "DARK", "GRAY" -> true
-            "AUTO" -> {
+            AppTheme.DARK, AppTheme.GRAY, AppTheme.BLACK -> true
+            AppTheme.AUTO -> {
                 val nightModeFlags = appContext.resources.configuration.uiMode and
                     Configuration.UI_MODE_NIGHT_MASK
                 nightModeFlags == Configuration.UI_MODE_NIGHT_YES
             }
-            else -> true
+            else -> false
         }
 
     /**
@@ -771,7 +773,7 @@ object Prefs {
 
     // ========== 简单写入方法（供设置界面或业务调用） ==========
 
-    fun setTheme(theme: String) {
+    fun setTheme(theme: AppTheme) {
         appTheme = theme // 使用 setter，会自动触发 ThemeManager
     }
 

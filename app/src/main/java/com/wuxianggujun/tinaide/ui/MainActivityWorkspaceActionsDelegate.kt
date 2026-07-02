@@ -9,7 +9,6 @@ import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.session.SaveReason
 import com.wuxianggujun.tinaide.editor.session.SaveResult
 import com.wuxianggujun.tinaide.file.IProjectContext
-import com.wuxianggujun.tinaide.rikkahub.RikkaHubLauncher
 import com.wuxianggujun.tinaide.settings.SettingsActivity
 import com.wuxianggujun.tinaide.ui.compose.components.BottomPanelTab
 import java.io.File
@@ -38,10 +37,6 @@ class MainActivityWorkspaceActionsDelegate(
 ) {
     fun openSettings() {
         SettingsActivity.start(context)
-    }
-
-    fun openRikkaHub() {
-        RikkaHubLauncher.open(context)
     }
 
     fun openBookmarksPanel() {

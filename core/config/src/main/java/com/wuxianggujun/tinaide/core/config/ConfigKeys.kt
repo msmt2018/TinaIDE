@@ -6,7 +6,7 @@ package com.wuxianggujun.tinaide.core.config
 sealed class ConfigKey<T>(val key: String, val default: T) {
 
     // UI 相关
-    object Theme : ConfigKey<String>("ui.theme", "LIGHT")
+    object Theme : ConfigKey<AppTheme>("ui.theme", AppTheme.DEFAULT)
     object DebugToolbarPositionMode : ConfigKey<String>(
         key = "ui.debug.toolbar.position",
         default = "bottom"

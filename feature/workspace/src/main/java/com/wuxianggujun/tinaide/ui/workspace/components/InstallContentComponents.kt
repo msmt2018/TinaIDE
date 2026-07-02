@@ -1170,20 +1170,6 @@ fun InstallFailedContent(
                             )
                         }
                     )
-                    Text(
-                        text = stringResource(Strings.and_word),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = stringResource(Strings.contact_support),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            context.openSettingsRoute(route = SettingsRouteIds.FEEDBACK)
-                        }
-                    )
                 }
             }
         }
@@ -1264,7 +1250,6 @@ fun SmartInstallHintCompact(
 
 private object SettingsRouteIds {
     const val HELP = "help"
-    const val FEEDBACK = "feedback"
 }
 
 private object HelpDocumentIds {

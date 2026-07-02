@@ -41,18 +41,37 @@
 
 ### Added
 
+- 设置页新增内嵌 RikkaHub AI 设置入口，TinaIDE 开源版现在可以在统一设置页中直接打开 RikkaHub 的模型、渠道和偏好设置。
+- 编辑器侧滑栏新增 RikkaHub AI 标签页，支持在项目文件、Git 状态和 AI 聊天之间切换。
+- RikkaHub embedded 首次加载新增同主题 loading、失败态和重试入口，初始化失败时不再无限转圈。
 - Hex Viewer 新增 Reverse Action Pipeline：把当前 offset、选区、分析结果和二进制发现项统一映射为可复制动作，覆盖只读分析、反汇编预览、Frida Hook、LLDB 断点、Markdown 报告和 JSON 报告。
 - Hex Viewer 新增 JNI/APK 分析报告：汇总 DEX native 方法、APK native library、JNI 注册线索、Native API、loadLibrary 候选字符串、ELF 风险和工作台发现项。
 - 右侧二进制发现项栏新增报告入口，可复制 Markdown 或 JSON 报告，用于逆向笔记、问题单和后续 AI 分析。
 
 ### Changed
 
+- RikkaHub embedded 主题改为跟随 TinaIDE 的 Material 3 主题配置，移除 RikkaHub 独立版的主题、更新、捐赠和商店相关入口，降低开源客户端里的无效功能干扰。
+- AI 侧滑栏输入框改为键盘感知布局：键盘弹出时隐藏底部标签栏并提供收起键盘按钮，减少输入框被遮挡或底部留白过大的情况。
+- 设置页恢复 TinaIDE 自身的 TopBar 与页面滚动体验，避免继续套用不匹配的 RikkaHub 大标题折叠样式。
+- 主题配置与启动初始化链路同步调整，RikkaHub embedded、设置页和主界面会使用同一套 TinaIDE 主题状态。
 - 命令弹窗的 Rizin/radare2、Frida 和 LLDB 模板改为从统一 action content 读取，减少 UI 里分叉生成脚本的重复逻辑。
 - JNI/APK 报告当前只复制到剪贴板，不直接写入项目文件，避免新增存储权限和路径风险。
+
+### Fixed
+
+- 修复打开 AI 设置页时可能出现白屏闪烁或首帧卡顿的问题，RikkaHub 初始化改为异步 warmup 后再挂载页面。
+- 修复 AI 侧滑栏打开输入法后无法顺畅切回项目/Git 侧滑栏的问题。
+- 修复主编辑视图底部栏与 AI 输入框在输入法弹出时互相顶起或遮挡的布局问题。
+
+### Removed
+
+- 移除应用内反馈页面、反馈模型、反馈仓库和对应帮助入口；当前开源客户端不再依赖已停用的反馈服务器。
+- 移除 RikkaHub embedded 中不适合 TinaIDE 内嵌场景的独立版更新检查、捐赠、商店跳转和自带主题配置页面。
 
 ### Documentation
 
 - 更新 `docs/guides/Hex-Viewer-Design.md`，补充 Reverse Action Pipeline、JNI/APK 报告弹窗和报告边界。
+- 更新 App 内帮助文档，说明 AI 能力由内嵌 RikkaHub 承担，并移除反馈服务器相关指引。
 
 ### Tests
 
@@ -65,6 +84,8 @@
 - 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
 - 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryWorkbenchTest" --console=plain`。
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+- 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`，验证 RikkaHub embedded、设置页与主 App 集成编译通过。
 
 ## [0.18.9] - 2026-06-29
 

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.wuxianggujun.tinaide.core.config.AppTheme
 import com.wuxianggujun.tinaide.core.config.DebugToolbarPosition
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.i18n.Strings
@@ -68,20 +69,21 @@ internal fun AppearanceSettingsSection(viewModel: SettingsViewModel) {
 
     if (showThemeDialog) {
         val themes = AppearanceSettingsSectionSupport.buildThemeOptions().map { option ->
-            option.value to stringResource(option.labelRes)
+            option.value.name to stringResource(option.labelRes)
         }
 
         TinaSingleChoiceDialog(
             title = stringResource(Strings.dialog_title_select_theme),
             options = themes,
-            selectedValue = currentTheme,
+            selectedValue = currentTheme.name,
             onSelected = { themeValue ->
-                if (AppearanceSettingsSectionSupport.shouldApplyThemeChange(currentTheme, themeValue)) {
+                val selectedTheme = AppTheme.valueOf(themeValue)
+                if (AppearanceSettingsSectionSupport.shouldApplyThemeChange(currentTheme, selectedTheme)) {
                     val previousTheme = currentTheme
-                    viewModel.setAppTheme(themeValue)
-                    Prefs.applyNightMode(themeValue)
+                    viewModel.setAppTheme(selectedTheme)
+                    Prefs.applyNightMode(selectedTheme)
 
-                    if (AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(previousTheme, themeValue)) {
+                    if (AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(previousTheme, selectedTheme)) {
                         (context as? Activity)?.recreate()
                     }
                 }

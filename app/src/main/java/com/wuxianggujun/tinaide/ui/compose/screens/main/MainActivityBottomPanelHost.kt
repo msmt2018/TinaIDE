@@ -78,6 +78,13 @@ internal fun MainActivityBottomPanelHost(
             bottomPanelState = bottomPanelState,
             bottomPanelController = bottomPanelController,
         )
+        val bottomPanelImeModifier = if (drawerState.isClosed) {
+            Modifier
+                .windowInsetsPadding(WindowInsets.ime)
+                .consumeWindowInsets(WindowInsets.ime)
+        } else {
+            Modifier
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
@@ -110,8 +117,7 @@ internal fun MainActivityBottomPanelHost(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime)
-                    .consumeWindowInsets(WindowInsets.ime)
+                    .then(bottomPanelImeModifier)
             ) {
                 BottomPanel(
                     editorContainerState = editorContainerState,

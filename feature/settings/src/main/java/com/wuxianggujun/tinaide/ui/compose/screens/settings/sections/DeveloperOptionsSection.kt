@@ -411,7 +411,6 @@ internal fun DeveloperOptionsSection(
 
                     TinaDialogCard(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(Strings.dev_options_config_features), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                        Text(stringResource(Strings.dev_options_config_feedback, yesNo(configPreview.feedbackEnabled)))
                         Text(stringResource(Strings.dev_options_config_plugin_market, yesNo(configPreview.pluginMarketEnabled)))
                         Text(stringResource(Strings.dev_options_config_package_manager, yesNo(configPreview.packageManagerEnabled)))
                         Text(stringResource(Strings.dev_options_config_developer_options, yesNo(configPreview.developerOptionsEnabled)))
