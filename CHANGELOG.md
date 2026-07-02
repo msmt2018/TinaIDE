@@ -63,6 +63,7 @@
 - 修复 AI 侧滑栏打开输入法后无法顺畅切回项目/Git 侧滑栏的问题。
 - 修复主编辑视图底部栏与 AI 输入框在输入法弹出时互相顶起或遮挡的布局问题。
 - 修复 RikkaHub embedded Release 构建的 consumer ProGuard 规则，避免 app 级 `-dontobfuscate` 被错误传递给宿主导致 AGP 拒绝打包。
+- 修复 Release workflow 在 GitHub Actions 上执行 R8 minify 时可能因 Gradle 内存不足或单步超时导致发版失败的问题。
 
 ### Removed
 
@@ -88,6 +89,7 @@
 - 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain`。
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`，验证 RikkaHub embedded、设置页与主 App 集成编译通过。
 - 已执行 `./gradlew :rikkahub:embedded:exportReleaseConsumerProguardFiles --console=plain "-Ptina.autoIncrementReleaseVersion=false"`，验证 RikkaHub embedded 的 Release consumer ProGuard 规则可导出。
+- 已触发 GitHub Actions `Release Build`，验证 Release workflow 的 R8 内存与超时配置进入远端发版流程。
 
 ## [0.18.9] - 2026-06-29
 
