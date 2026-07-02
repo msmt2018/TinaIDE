@@ -62,6 +62,7 @@
 - 修复打开 AI 设置页时可能出现白屏闪烁或首帧卡顿的问题，RikkaHub 初始化改为异步 warmup 后再挂载页面。
 - 修复 AI 侧滑栏打开输入法后无法顺畅切回项目/Git 侧滑栏的问题。
 - 修复主编辑视图底部栏与 AI 输入框在输入法弹出时互相顶起或遮挡的布局问题。
+- 修复 RikkaHub embedded Release 构建的 consumer ProGuard 规则，避免 app 级 `-dontobfuscate` 被错误传递给宿主导致 AGP 拒绝打包。
 
 ### Removed
 
@@ -86,6 +87,7 @@
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
 - 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain`。
 - 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`，验证 RikkaHub embedded、设置页与主 App 集成编译通过。
+- 已执行 `./gradlew :rikkahub:embedded:exportReleaseConsumerProguardFiles --console=plain "-Ptina.autoIncrementReleaseVersion=false"`，验证 RikkaHub embedded 的 Release consumer ProGuard 规则可导出。
 
 ## [0.18.9] - 2026-06-29
 
