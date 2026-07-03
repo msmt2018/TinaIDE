@@ -149,7 +149,7 @@ fun CodeBlock(
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.ContentCopy,
-                            contentDescription = stringResource(Strings.code_block_copy),
+                            contentDescription = stringResource(Strings.tina_code_block_copy),
                             modifier = Modifier.size(18.dp),
                             tint = labelColor
                         )
@@ -329,9 +329,9 @@ private fun HighlightedCodeContent(
         ) {
             Text(
                 text = if (isExpanded) {
-                    stringResource(Strings.code_block_collapse)
+                    stringResource(Strings.tina_code_block_collapse)
                 } else {
-                    stringResource(Strings.code_block_expand, lineCount - 20)
+                    stringResource(Strings.tina_code_block_expand, lineCount - 20)
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = editorScheme.syntax.keyword

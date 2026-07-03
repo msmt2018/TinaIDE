@@ -15,9 +15,9 @@ class ResExtTest {
     fun strOr_shouldResolveStringWithProvidedContext() {
         val context = fakeStringContext()
 
-        val appName = Strings.app_name.strOr(context)
+        val message = Strings.error_unknown.strOr(context)
 
-        assertThat(appName).isEqualTo("TinaIDE")
+        assertThat(message).isEqualTo("未知错误")
     }
 
     @Test
@@ -31,7 +31,7 @@ class ResExtTest {
     }
 
     private fun fakeStringContext(): Context = mockk {
-        every { getString(Strings.app_name) } returns "TinaIDE"
+        every { getString(Strings.error_unknown) } returns "未知错误"
         every { getString(Strings.log_export_app_name, *anyVararg()) } answers {
             "应用名称: %1\$s".format(*args.drop(1).toTypedArray())
         }
