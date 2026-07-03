@@ -1,6 +1,6 @@
 # TinaIDE 架构优化任务清单
 
-> 更新日期：2026-06-17
+> 更新日期：2026-07-03
 > 状态：推进中
 > 范围：主工作区、编辑器、文件操作链路、LSP 连接链路、模块装配与测试维护性
 
@@ -77,11 +77,11 @@
 候选热点：
 
 - `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/EditorContainerState.kt`
-- `app/src/main/java/com/wuxianggujun/tinaide/lsp/LspEditorManager.kt`
-- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/pages/TinaCodeEditorPage.kt`
-- `core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/NativeCMakeBuildExecutor.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/LspEditorManager.kt`
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/editor/TinaCodeEditorPage.kt`
+- `core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/cmake/NativeCMakeBuildExecutor.kt`
 - `core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootManager.kt`
-- `feature/settings/src/main/java/com/wuxianggujun/tinaide/ui/settings/sections/PluginsSettingsSection.kt`
+- `feature/settings/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/settings/sections/PluginsSettingsSection.kt`
 
 ## 4. 迭代计划
 

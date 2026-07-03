@@ -251,7 +251,7 @@ TinaIDE 已决定彻底开源，后续精力会优先放在稳定维护和社区
 
 | 微信赞赏码 | 支付宝收款码 |
 |------------|--------------|
-| <img src="./docs/assets/donation/weixin.png" alt="微信赞赏码" width="220"> | <img src="./docs/assets/donation/zhifubao.jpg" alt="支付宝收款码" width="220"> |
+| <img src="./feature/settings/src/main/res/drawable-nodpi/donation_weixin.png" alt="微信赞赏码" width="220"> | <img src="./feature/settings/src/main/res/drawable-nodpi/donation_zhifubao.jpg" alt="支付宝收款码" width="220"> |
 
 你也可以用下面的命令快速统计当前项目源码规模，默认排除第三方库和生成物：
 

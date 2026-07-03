@@ -1,6 +1,6 @@
 # TinaIDE ProGuard/R8 混淆规则参考文档
 
-> 最后更新：2026-04-30 | 维护者：TinaIDE Team
+> 最后更新：2026-07-03 | 维护者：TinaIDE Team
 
 ## 1. 概述
 
@@ -60,7 +60,7 @@ R8 对代码执行三项操作：
 
 | 文件 | 职责 |
 |------|------|
-| `app/proguard-rules.pro` | 全局基础规则（@Keep、Android 组件、JNI、Kotlin/Coroutines/Serialization）+ 无 consumer-rules 的第三方 SDK（SDL、JLatexMath、Jsoup） |
+| `app/proguard-rules.pro` | 全局基础规则（@Keep、Android 组件、JNI、Kotlin/Coroutines/Serialization）+ 无 consumer-rules 的第三方 SDK（SDL、宿主侧 JLatexMath、Jsoup 安全网） |
 
 ### 2.2 Core 模块 consumer-rules.pro
 
@@ -88,6 +88,8 @@ R8 对代码执行三项操作：
 | `external/tina-android-tree-sitter` | 完整的 JNI 字段/方法/工厂类保留 | TSNode/TSParser/TSTree 等 JNI 字段名 |
 | `external/xcrash` | `NativeHandler` native 方法 + 回调 | JNI 崩溃回调 |
 | `external/termux-terminal` | 空（上游模板） | — |
+| `external/rikkahub/embedded` | Kotlin Serialization、RikkaHub 内部 JLatexMath、Jackson/Auth0 JWT、JVM-only API 告警抑制 | embedded RikkaHub 聊天/设置页运行时、JWT/Jackson 反射链、Ktor/JVM 可选 API |
+| `external/rikkahub/document` | MuPDF 与文档解析器 keep | RikkaHub 文档解析能力 |
 
 ---
 
@@ -111,6 +113,8 @@ R8 对代码执行三项操作：
 | **Jsoup** | 1.22.1 | 安全网（自带 consumer-rules，但保险起见保留核心类；其可选 `re2j` 依赖在 Android 未引入时需抑制 R8 告警） | `app/proguard-rules.pro` | `-keep class org.jsoup.** { *; }` + `-dontwarn com.google.re2j.**` |
 | **BouncyCastle** (prov / pkix) | 1.78.1 | JCA/JCE Provider 内部按算法字符串（`SHA256withRSA` 等）SPI/反射查找实现类 | `core:apk-builder/consumer-rules.pro` | `-keep class org.bouncycastle.{jcajce,jce,cert,operator}.**` + `-dontwarn` |
 | **apksig** | 8.11.1 | `Asn1BerParser` / `Asn1DerEncoder` 通过 `@Asn1Class`、`@Asn1Field`、`getDeclaredFields()`、`getDeclaredAnnotation()` 解析 X.509 / PKCS#7 ASN.1 模型 | `core:apk-builder/consumer-rules.pro` | `-keepattributes` 运行时注解属性 + `-keep class com.android.apksig.internal.asn1.** { *; }` + `-keep @Asn1Class ... { *; }` + `@Asn1Field` 字段兜底 |
+| **RikkaHub embedded** | external/rikkahub 版本 | Kotlin Serialization、Jackson `TypeReference`、Auth0 JWT、RikkaHub 内部 JLatexMath、Ktor JVM-only 检测类引用 | `external/rikkahub/embedded/consumer-rules.pro` | `-keep @Serializable`、`-keep class com.fasterxml.jackson.**`、`-keep class com.auth0.jwt.**`、`-dontwarn java.lang.management.*` / `java.beans.*` |
+| **MuPDF / RikkaHub document** | external/rikkahub 版本 | JNI 与反射解析入口 | `external/rikkahub/document/consumer-rules.pro` | `-keep class com.artifex.mupdf.**` + 文档 parser keep |
 
 ### 3.2 无需额外规则的库（安全可混淆）
 

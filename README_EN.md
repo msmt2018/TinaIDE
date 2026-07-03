@@ -295,7 +295,7 @@ PRs are also welcome for features, bug fixes, and docs.
 
 | WeChat | Alipay |
 |--------|--------|
-| <img src="./docs/assets/donation/weixin.png" alt="WeChat donation QR code" width="220"> | <img src="./docs/assets/donation/zhifubao.jpg" alt="Alipay payment QR code" width="220"> |
+| <img src="./feature/settings/src/main/res/drawable-nodpi/donation_weixin.png" alt="WeChat donation QR code" width="220"> | <img src="./feature/settings/src/main/res/drawable-nodpi/donation_zhifubao.jpg" alt="Alipay payment QR code" width="220"> |
 
 To quickly measure the project size while excluding third-party code and generated files:
 
