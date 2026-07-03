@@ -37,6 +37,7 @@ data class EventListener(
 
 object PluginEventBus {
     private val listeners = ConcurrentHashMap<String, CopyOnWriteArrayList<EventListener>>()
+    @Volatile
     private var runtimeProvider: ((String) -> ScriptPluginRuntime?)? = null
 
     fun setRuntimeProvider(provider: (String) -> ScriptPluginRuntime?) {

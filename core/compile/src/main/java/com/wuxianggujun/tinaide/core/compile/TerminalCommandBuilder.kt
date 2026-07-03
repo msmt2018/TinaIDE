@@ -3,7 +3,6 @@ package com.wuxianggujun.tinaide.core.compile
 import android.content.Context
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
-import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
 import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner.shellQuotePosix
@@ -37,6 +36,7 @@ class TerminalCommandBuilder(context: Context) {
         args: List<String>,
         projectRoot: File,
         extraEnvironment: Map<String, String> = emptyMap(),
+        nativeRuntimeIdentity: NativeRuntimeIdentity? = null,
     ): String {
         val outputFile = File(outputPath)
         val stageDir = File(appContext.filesDir, "run-bin")
@@ -50,14 +50,15 @@ class TerminalCommandBuilder(context: Context) {
         // 仅在 sysroot 中存在 libc++_shared.so 时设置 LD_LIBRARY_PATH(供 C++ 程序使用)。
         // 不能把整个 sysroot lib 目录加入 LD_LIBRARY_PATH,因为其中包含 NDK stub 库
         // (libc.so 等),这些 stub 没有实际代码,运行时加载会导致 SIGSEGV。
-        val arch = AndroidSysrootManager.Companion.Arch.current()
-        val sysrootDir = AndroidSysrootManager(appContext).getSysrootDir(arch)
-        val sysrootLibDir = File(sysrootDir, "usr/lib/${arch.triple}")
-        val hasRuntimeLibs = File(sysrootLibDir, "libc++_shared.so").isFile
         val packagePaths = InstalledPackagePathResolver.resolve(appContext, projectRoot)
         val runtimeLibPaths = buildList {
             outputFile.parentFile?.absolutePath?.takeIf { it.isNotBlank() }?.let(::add)
-            if (hasRuntimeLibs) add(sysrootLibDir.absolutePath)
+            addAll(
+                NativeRuntimeLibraryPaths.sysrootRuntimeDirs(
+                    context = appContext,
+                    sysrootProfileId = nativeRuntimeIdentity?.sysrootProfileId,
+                ).map { it.absolutePath }
+            )
             addAll(packagePaths.runtimeLibDirs.map { it.absolutePath })
         }.distinct()
         val launchEnvironment = LaunchEnvironment.withPrependedPath(

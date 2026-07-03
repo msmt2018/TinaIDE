@@ -10,8 +10,13 @@ import com.wuxianggujun.tinaide.plugin.PluginLogLevel
 import com.wuxianggujun.tinaide.plugin.PluginLogManager
 import com.wuxianggujun.tinaide.plugin.PluginManifest
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assume.assumeNoException
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -155,6 +160,75 @@ class PluginPermissionRuntimeTest {
         } else {
             assertThat(runtime.isInitialized).isFalse()
             assertThat(initializeResult.exceptionOrNull()).isNotNull()
+        }
+    }
+
+    @Test
+    fun `callFunction should not throw when destroy races with execution`() = runBlocking {
+        val pluginId = "test.runtime.lua.concurrent.destroy"
+        val runtime = ScriptPluginRuntime(
+            context = context,
+            manifest = PluginManifest(
+                id = pluginId,
+                name = "Lua Concurrent Destroy Test",
+                version = "1.0.0",
+                type = "script"
+            ),
+            pluginDir = File(context.cacheDir, pluginId).apply { mkdirs() },
+            permissionManager = permissionManager
+        )
+
+        try {
+            val initializeResult = runtime.initialize()
+            if (initializeResult.isFailure) {
+                val error = initializeResult.exceptionOrNull()
+                    ?: AssertionError("Lua runtime initialization failed without an exception")
+                if (error is LinkageError) {
+                    assumeNoException("Lua native runtime unavailable in this test environment", error)
+                    return@runBlocking
+                }
+                throw AssertionError("Lua runtime should initialize for concurrency test", error)
+            }
+
+            val defineResult = runtime.execute(
+                """
+                function echo(value)
+                  local total = 0
+                  for i = 1, 1000 do total = total + i end
+                  return value
+                end
+                """.trimIndent()
+            )
+            assertThat(defineResult).isInstanceOf(PluginExecutionResult.Success::class.java)
+
+            coroutineScope {
+                val start = CountDownLatch(1)
+                val calls = (0 until 16).map { index ->
+                    async(Dispatchers.Default) {
+                        runCatching {
+                            start.await()
+                            runtime.callFunction("echo", index)
+                        }
+                    }
+                }
+                val destroy = async(Dispatchers.Default) {
+                    runCatching {
+                        start.await()
+                        runtime.destroy()
+                    }
+                }
+
+                start.countDown()
+                calls.forEach { call ->
+                    assertThat(call.await().isSuccess).isTrue()
+                }
+                assertThat(destroy.await().isSuccess).isTrue()
+            }
+
+            assertThat(runtime.isInitialized).isFalse()
+        } finally {
+            runtime.destroy()
+            permissionManager.revokeAllPermissions(pluginId)
         }
     }
 

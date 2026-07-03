@@ -18,4 +18,5 @@ data class ArtifactSpec(
     val expectedPath: File,
     val kind: ArtifactKind,
     val sources: List<File>,
+    val reconfigureSources: List<File> = emptyList(),
 )

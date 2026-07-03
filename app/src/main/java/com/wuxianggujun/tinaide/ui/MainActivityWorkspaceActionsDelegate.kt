@@ -11,7 +11,6 @@ import com.wuxianggujun.tinaide.editor.session.SaveResult
 import com.wuxianggujun.tinaide.file.IProjectContext
 import com.wuxianggujun.tinaide.settings.SettingsActivity
 import com.wuxianggujun.tinaide.ui.compose.components.BottomPanelTab
-import com.wuxianggujun.tinaide.ui.compose.screens.settings.SettingsRoute
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -38,10 +37,6 @@ class MainActivityWorkspaceActionsDelegate(
 ) {
     fun openSettings() {
         SettingsActivity.start(context)
-    }
-
-    fun openAiSettings() {
-        SettingsActivity.start(context, SettingsRoute.Ai)
     }
 
     fun openBookmarksPanel() {

@@ -26,6 +26,18 @@ class ProjectSysrootApiLevelResolverTest {
     }
 
     @Test
+    fun `run config accepts future api levels for imported newer ndk profiles`() {
+        val projectRoot = tempFolder.newFolder("future-api-run-config")
+        writeMetadata(projectRoot, nativeApiLevel = 33)
+
+        val resolution = ProjectSysrootApiLevelResolver.resolve(projectRoot, runConfigApiLevel = 36)
+
+        assertThat(resolution.apiLevel).isEqualTo(36)
+        assertThat(resolution.source).isEqualTo(ProjectSysrootApiLevelResolver.Source.RUN_CONFIG)
+        assertThat(resolution.invalidRunConfigApiLevel).isNull()
+    }
+
+    @Test
     fun `metadata nativeApiLevel is used when run config is empty`() {
         val projectRoot = tempFolder.newFolder("metadata-native")
         writeMetadata(projectRoot, nativeApiLevel = 31)
@@ -42,17 +54,17 @@ class ProjectSysrootApiLevelResolverTest {
         val projectRoot = tempFolder.newFolder("invalid-run-config")
         writeMetadata(projectRoot, nativeApiLevel = 34)
 
-        val resolution = ProjectSysrootApiLevelResolver.resolve(projectRoot, runConfigApiLevel = 99)
+        val resolution = ProjectSysrootApiLevelResolver.resolve(projectRoot, runConfigApiLevel = 100)
 
         assertThat(resolution.apiLevel).isEqualTo(34)
         assertThat(resolution.source).isEqualTo(ProjectSysrootApiLevelResolver.Source.METADATA)
-        assertThat(resolution.invalidRunConfigApiLevel).isEqualTo(99)
+        assertThat(resolution.invalidRunConfigApiLevel).isEqualTo(100)
     }
 
     @Test
     fun `defaults to API 28 when no valid config exists`() {
         val projectRoot = tempFolder.newFolder("default-fallback")
-        writeMetadata(projectRoot, nativeApiLevel = 99)
+        writeMetadata(projectRoot, nativeApiLevel = 100)
 
         val resolution = ProjectSysrootApiLevelResolver.resolve(projectRoot, runConfigApiLevel = 20)
 

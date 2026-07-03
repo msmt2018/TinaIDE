@@ -130,6 +130,40 @@ class PluginZipTemplateInstallTest {
     }
 
     @Test
+    fun `zip template install writes resolved default run targets to metadata`() {
+        val tempDir = Files.createTempDirectory("template-default-target-install").toFile()
+        val zipFile = Files.createTempFile("template-default-target", ".zip").toFile()
+
+        try {
+            ZipOutputStream(zipFile.outputStream().buffered()).use { zip ->
+                zip.writeEntry("CMakeLists.txt", "project({{PROJECT_NAME}})\n")
+            }
+
+            val installed = ProjectTemplateInstaller.install(
+                destDir = tempDir,
+                projectName = "hello-target",
+                templateSpec = ProjectTemplateSpec.Zip(
+                    id = "user:default-target-demo",
+                    zipFile = zipFile,
+                    buildSystem = ProjectBuildSystem.CMAKE,
+                    primaryLanguage = ProjectLanguage.CPP,
+                    defaultRunTargetName = "{{PROJECT_NAME}}_test",
+                    defaultSdlTargetName = "{{PROJECT_NAME}}"
+                )
+            )
+
+            val metadata = ProjectMetadataStore.read(tempDir)
+
+            assertThat(installed).isTrue()
+            assertThat(metadata?.defaultRunTargetName).isEqualTo("hello-target_test")
+            assertThat(metadata?.defaultSdlTargetName).isEqualTo("hello-target")
+        } finally {
+            tempDir.deleteRecursively()
+            zipFile.delete()
+        }
+    }
+
+    @Test
     fun `zip template install rejects entries escaping project directory`() {
         val tempRoot = Files.createTempDirectory("plugin-template-escape").toFile()
         val projectDir = tempRoot.resolve("project")

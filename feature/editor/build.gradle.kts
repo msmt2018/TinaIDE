@@ -1,7 +1,7 @@
 plugins {
     id("tina.android.library")
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.android.legacy.kapt)
 }
 
 android {
@@ -10,15 +10,15 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
-    implementation(project(":core:common"))
-    implementation(project(":core:config"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:lsp"))
-    implementation(project(":core:plugin"))
-    implementation(project(":core:project"))
-    implementation(project(":core:search"))
-    implementation(project(":core:storage"))
-    implementation(project(":core:cmake"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:lsp"))
+    implementation(project.dependencies.project(":core:plugin"))
+    implementation(project.dependencies.project(":core:project"))
+    implementation(project.dependencies.project(":core:search"))
+    implementation(project.dependencies.project(":core:storage"))
+    implementation(project.dependencies.project(":core:cmake"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.androidx.core.ktx)
@@ -26,7 +26,7 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    kapt(libs.room.compiler)
 
     // Tree-sitter language grammars
     implementation("com.itsaky.androidide.treesitter:tree-sitter-aidl:4.3.2")

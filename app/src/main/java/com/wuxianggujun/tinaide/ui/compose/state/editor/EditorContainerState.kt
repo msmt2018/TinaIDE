@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.wuxianggujun.tinaide.ai.api.MessageContext
 import com.wuxianggujun.tinaide.core.config.EditorSettings
 import com.wuxianggujun.tinaide.core.config.LspAssistSettings
 import com.wuxianggujun.tinaide.core.config.Prefs
@@ -131,20 +130,6 @@ class EditorContainerState(
     data class ActiveEditableEditorSnapshot(
         val file: File,
         val text: String
-    )
-
-    data class ActiveFileContextSnapshot(
-        val file: File,
-        val language: String,
-        val content: String
-    )
-
-    data class ActiveSelectedCodeContextSnapshot(
-        val file: File,
-        val language: String,
-        val content: String,
-        val startLine: Int,
-        val endLine: Int
     )
 
     data class ActivePluginEditorContext(
@@ -1653,56 +1638,6 @@ class EditorContainerState(
     }
 
     internal fun isTabActive(tabId: String): Boolean = getActiveTabId() == tabId
-
-    // ========== AI 集成支持 ==========
-
-    internal fun snapshotActiveFileContextOrNull(): ActiveFileContextSnapshot? {
-        val activeFile = getActiveFileOrNull() ?: return null
-        val content = readActiveTabText() ?: return null
-        if (content.isBlank()) return null
-
-        return ActiveFileContextSnapshot(
-            file = activeFile,
-            language = activeFile.extension,
-            content = content
-        )
-    }
-
-    internal fun snapshotActiveSelectedCodeContextOrNull(): ActiveSelectedCodeContextSnapshot? {
-        val activeFile = getActiveFileOrNull() ?: return null
-        val selection = getSelectionSnapshotInActiveTab() ?: return null
-        if (selection.text.isBlank()) return null
-
-        return ActiveSelectedCodeContextSnapshot(
-            file = activeFile,
-            language = activeFile.extension,
-            content = selection.text,
-            startLine = selection.startLine + 1,
-            endLine = selection.endLine + 1
-        )
-    }
-
-    fun snapshotCurrentFileContext(): MessageContext.CurrentFile? {
-        val context = snapshotActiveFileContextOrNull() ?: return null
-
-        return MessageContext.CurrentFile(
-            fileName = context.file.name,
-            language = context.language,
-            content = context.content
-        )
-    }
-
-    fun snapshotSelectedCodeContext(): MessageContext.SelectedCode? {
-        val selection = snapshotActiveSelectedCodeContextOrNull() ?: return null
-
-        return MessageContext.SelectedCode(
-            fileName = selection.file.name,
-            language = selection.language,
-            content = selection.content,
-            startLine = selection.startLine,
-            endLine = selection.endLine
-        )
-    }
 
     /**
      * 在当前光标位置插入文本

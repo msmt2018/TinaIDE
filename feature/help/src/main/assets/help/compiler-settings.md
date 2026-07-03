@@ -144,6 +144,12 @@
 
 如果第三方库是用不同 NDK 版本构建的，可以导入对应 sysroot 后切换到它，避免 C++ runtime 不匹配。
 
+注意：
+
+- 这里切换的是“编译和运行所用的 NDK / sysroot 运行时”
+- 它不会自动把 NDK 共享库模板的默认运行目标改成共享库本体
+- 如果你运行时看到的还是测试输出，通常要去检查运行配置，而不是只改这里
+
 ### Sysroot 状态
 
 这里是状态展示项，告诉你当前激活的 NDK Runtime / sysroot 是否已经安装。
@@ -230,6 +236,23 @@
 1. 当前激活工具链是否真的切过去了
 2. Sysroot 是否已安装
 3. 当前项目构建参数是不是仍然不匹配
+
+### 我改了源码，为什么运行还是像旧模板
+
+先检查：
+
+1. 文件是否已经保存到磁盘
+2. 运行配置当前选择的是不是测试目标
+3. 当前 NDK Runtime 是否只是切了 sysroot，而没有切换运行目标
+4. 如果是 NDK 共享库模板，默认运行目标本来就可能是测试可执行文件
+
+如果仍然无法判断根因，打开 **设置 → 开发者选项 → 诊断日志 → 构建诊断日志** 后重新运行一次。重点看这些字段：
+
+- `saveAll done`：确认编译前是否保存了编辑器修改
+- `cmake selectTarget`：确认 CMake 实际选择的 target
+- `planner decision=skip/build`：确认是命中缓存还是触发重建，以及原因
+- `compile_commands input collect`：确认 compile_commands 是否参与 tracked input
+- `launch dispatch start`：确认最终启动的是哪个 artifact
 
 ### 什么时候该直接重新部署环境
 

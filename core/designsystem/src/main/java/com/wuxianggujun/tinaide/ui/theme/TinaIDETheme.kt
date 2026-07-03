@@ -49,6 +49,11 @@ fun TinaIDETheme(
         AppTheme.LIGHT -> LightColors.colorScheme()
         AppTheme.DARK -> DarkColors.colorScheme()
         AppTheme.GRAY -> GrayColors.colorScheme()
+        AppTheme.SAKURA -> RikkaHubInspiredColorSchemes.sakura()
+        AppTheme.OCEAN -> RikkaHubInspiredColorSchemes.ocean()
+        AppTheme.SPRING -> RikkaHubInspiredColorSchemes.spring()
+        AppTheme.AUTUMN -> RikkaHubInspiredColorSchemes.autumn()
+        AppTheme.BLACK -> RikkaHubInspiredColorSchemes.black()
         AppTheme.AUTO -> if (isSystemDark) DarkColors.colorScheme() else LightColors.colorScheme()
     }
 

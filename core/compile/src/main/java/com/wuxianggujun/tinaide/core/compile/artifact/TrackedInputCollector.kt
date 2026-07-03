@@ -1,12 +1,14 @@
 package com.wuxianggujun.tinaide.core.compile.artifact
 
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
+import com.wuxianggujun.tinaide.core.lang.CxxFileSupport
 import java.io.File
 
 /**
  * 收集参与增量判定的输入文件。
  *
  * 这里不区分“源码”还是“构建脚本”：
- * 只要文件变化会影响最终产物，就应进入 tracked inputs。
+ * 只要文件变化会影响最终产物，就应该进入 tracked inputs。
  */
 internal object TrackedInputCollector {
 
@@ -19,6 +21,16 @@ internal object TrackedInputCollector {
         "out",
     )
 
+    private val CMAKE_SOURCE_EXTENSIONS: Set<String> =
+        CxxFileSupport.clangdTranslationUnitExtensions + CxxFileSupport.headerExtensions
+
+    fun collectSingleFileInputs(projectRoot: File, source: File): List<File> {
+        val projectHeaders = walkProjectFiles(projectRoot) { file ->
+            file.extension.lowercase() in CxxFileSupport.headerExtensions
+        }
+        return mergeUniqueFiles(listOf(source) + projectHeaders)
+    }
+
     fun collectMakeInputs(projectRoot: File, sourceExtensions: Set<String>): List<File> {
         val makefiles = listOf("Makefile", "makefile", "GNUmakefile")
             .map { File(projectRoot, it) }
@@ -28,12 +40,57 @@ internal object TrackedInputCollector {
         return mergeUniqueFiles(makefiles + sourceFiles)
     }
 
-    fun collectCMakeInputs(projectRoot: File, targetSources: List<File>): List<File> {
+    fun collectCMakeCompileInputs(
+        projectRoot: File,
+        buildDir: File,
+        targetNames: Set<String>,
+        targetSources: List<File>,
+    ): List<File> {
+        val compileCommandsInputs = CompileCommandsInputCollector.collect(projectRoot, buildDir, targetNames)
+        return if (compileCommandsInputs != null) {
+            val merged = mergeUniqueFiles(
+                targetSources +
+                    compileCommandsInputs.databaseFile +
+                    compileCommandsInputs.sources
+            )
+            BuildDiagnosticsLog.i {
+                "tracked inputs cmake: using compile_commands database=${compileCommandsInputs.databaseFile.absolutePath} " +
+                    "targetSources=${targetSources.size} compileCommandSources=${compileCommandsInputs.sources.size} " +
+                    "merged=${merged.size}"
+            }
+            merged
+        } else {
+            val projectSources = walkProjectFiles(projectRoot) { file ->
+                file.extension.lowercase() in CMAKE_SOURCE_EXTENSIONS
+            }
+            val merged = mergeUniqueFiles(targetSources + projectSources)
+            BuildDiagnosticsLog.i {
+                "tracked inputs cmake: compile_commands unavailable, fallback project scan " +
+                    "targetSources=${targetSources.size} projectSources=${projectSources.size} merged=${merged.size}"
+            }
+            merged
+        }
+    }
+
+    fun collectCMakeReconfigureInputs(projectRoot: File): List<File> {
+        val projectSources = walkProjectFiles(projectRoot) { file ->
+            file.extension.lowercase() in CMAKE_SOURCE_EXTENSIONS
+        }
         val cmakeScripts = walkProjectFiles(projectRoot) { file ->
             file.name == "CMakeLists.txt" || file.extension.lowercase() == "cmake"
         }
-        return mergeUniqueFiles(targetSources + cmakeScripts)
+        return mergeUniqueFiles(projectSources + cmakeScripts)
     }
+
+    fun collectCMakeInputs(
+        projectRoot: File,
+        buildDir: File,
+        targetNames: Set<String>,
+        targetSources: List<File>,
+    ): List<File> = mergeUniqueFiles(
+        collectCMakeCompileInputs(projectRoot, buildDir, targetNames, targetSources) +
+            collectCMakeReconfigureInputs(projectRoot)
+    )
 
     private fun walkProjectFiles(
         projectRoot: File,

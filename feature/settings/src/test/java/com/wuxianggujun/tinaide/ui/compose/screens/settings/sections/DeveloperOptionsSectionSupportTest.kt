@@ -17,6 +17,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isFalse()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isFalse()
         assertThat(state.lspClangdStartupLogControlEnabled).isFalse()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isFalse()
         assertThat(state.gestureTraceControlEnabled).isFalse()
@@ -35,6 +36,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isTrue()
         assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
         assertThat(state.gestureTraceControlEnabled).isTrue()
@@ -53,6 +55,7 @@ class DeveloperOptionsSectionSupportTest {
         )
 
         assertThat(state.lspCompileCommandsSelectionLogControlEnabled).isTrue()
+        assertThat(state.buildDiagnosticsLogControlEnabled).isTrue()
         assertThat(state.lspClangdStartupLogControlEnabled).isTrue()
         assertThat(state.editorTouchDiagnosticsControlEnabled).isTrue()
         assertThat(state.gestureTraceControlEnabled).isTrue()
@@ -147,7 +150,6 @@ class DeveloperOptionsSectionSupportTest {
                 updatedAt = "   ",
                 configRefreshIntervalSecs = 600,
                 features = FeatureFlags(
-                    feedbackEnabled = true,
                     pluginMarketEnabled = false,
                     packageManagerEnabled = true,
                     developerOptionsEnabled = false
@@ -163,7 +165,6 @@ class DeveloperOptionsSectionSupportTest {
         assertThat(preview.version).isEqualTo(12)
         assertThat(preview.updatedAt).isNull()
         assertThat(preview.configRefreshIntervalSecs).isEqualTo(600)
-        assertThat(preview.feedbackEnabled).isTrue()
         assertThat(preview.pluginMarketEnabled).isFalse()
         assertThat(preview.packageManagerEnabled).isTrue()
         assertThat(preview.developerOptionsEnabled).isFalse()

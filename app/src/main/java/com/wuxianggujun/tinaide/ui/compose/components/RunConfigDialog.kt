@@ -43,6 +43,7 @@ import com.wuxianggujun.tinaide.core.compile.TargetInfo
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
 import com.wuxianggujun.tinaide.core.ndk.AndroidNativeToolchainManager
+import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.ndk.displayLabel
 import com.wuxianggujun.tinaide.core.ndk.displayName
 import com.wuxianggujun.tinaide.core.ndk.displayVersionLabel
@@ -85,6 +86,10 @@ fun RunConfigDialog(
     var compilerDropdownExpanded by remember { mutableStateOf(false) }
     var toolchainId by remember { mutableStateOf(config.toolchainId) }
     var toolchainDropdownExpanded by remember { mutableStateOf(false) }
+    var sysrootProfileId by remember {
+        mutableStateOf(config.sysrootProfileId?.trim()?.takeIf { it.isNotEmpty() })
+    }
+    var sysrootProfileDropdownExpanded by remember { mutableStateOf(false) }
     var customCCompiler by remember { mutableStateOf(config.customCCompiler.orEmpty()) }
     var customCppCompiler by remember { mutableStateOf(config.customCppCompiler.orEmpty()) }
 
@@ -92,7 +97,11 @@ fun RunConfigDialog(
     val context = LocalContext.current
     val toolchainManager = remember { AndroidNativeToolchainManager(context.applicationContext) }
     val configManager = remember { toolchainManager.getConfigManager() }
+    val sysrootManager = remember { AndroidSysrootManager(context.applicationContext) }
+    val currentArch = remember { AndroidSysrootManager.Companion.Arch.current() }
     var toolchainConfig by remember { mutableStateOf(com.wuxianggujun.tinaide.core.ndk.InstalledToolchainConfig(null, emptyList())) }
+    var sysrootProfiles by remember { mutableStateOf(emptyList<com.wuxianggujun.tinaide.core.ndk.SysrootProfileInfo>()) }
+    var activeSysrootProfileId by remember { mutableStateOf<String?>(null) }
     var clangAvailable by remember { mutableStateOf<Boolean?>(null) }
     var gccAvailable by remember { mutableStateOf<Boolean?>(null) }
     var customAvailable by remember { mutableStateOf<Boolean?>(null) }
@@ -109,8 +118,20 @@ fun RunConfigDialog(
     }
 
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            toolchainConfig = configManager.readConfig()
+        val loadedToolchainConfig = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            configManager.readConfig()
+        }
+        val loadedSysrootProfiles = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            sysrootManager.listProfiles(currentArch)
+        }
+        val loadedActiveSysrootProfileId = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            sysrootManager.getActiveProfile(currentArch)?.id
+        }
+        toolchainConfig = loadedToolchainConfig
+        sysrootProfiles = loadedSysrootProfiles
+        activeSysrootProfileId = loadedActiveSysrootProfileId
+        if (sysrootProfileId != null && loadedSysrootProfiles.none { it.id == sysrootProfileId }) {
+            sysrootProfileId = null
         }
         val installed = toolchainManager.isInstalled()
         val binDir = toolchainManager.getBinDir()
@@ -214,8 +235,26 @@ fun RunConfigDialog(
         buildSystem == BuildSystem.SINGLE_FILE
     var sysrootApiLevelInput by remember { mutableStateOf(config.sysrootApiLevel?.toString().orEmpty()) }
     val parsedSysrootApiLevel = sysrootApiLevelInput.trim().toIntOrNull()
+    val effectiveSysrootProfileId = sysrootProfileId ?: activeSysrootProfileId
+    val effectiveSysrootProfile = remember(effectiveSysrootProfileId, sysrootProfiles) {
+        effectiveSysrootProfileId
+            ?.let { selectedId -> sysrootProfiles.firstOrNull { it.id == selectedId } }
+    }
+    val supportedSysrootApiLevels = remember(effectiveSysrootProfile) {
+        effectiveSysrootProfile?.apiLevels.orEmpty().distinct().sorted()
+    }
+    val fallbackSysrootApiMin = 21
+    val fallbackSysrootApiMax = 99
+    val sysrootApiMin = supportedSysrootApiLevels.firstOrNull()
+        ?: fallbackSysrootApiMin
+    val sysrootApiMax = supportedSysrootApiLevels.lastOrNull()
+        ?: fallbackSysrootApiMax
     val isSysrootApiLevelValid = sysrootApiLevelInput.isBlank() ||
-        (parsedSysrootApiLevel != null && parsedSysrootApiLevel in 21..35)
+        (
+            parsedSysrootApiLevel != null &&
+                parsedSysrootApiLevel in sysrootApiMin..sysrootApiMax &&
+                (supportedSysrootApiLevels.isEmpty() || parsedSysrootApiLevel in supportedSysrootApiLevels)
+            )
     val compilerConfirmEnabled = when (compilerType) {
         CompilerType.CLANG -> clangAvailable != false
         CompilerType.GCC -> gccAvailable != false
@@ -266,6 +305,7 @@ fun RunConfigDialog(
                                     sourceFilePath = sourceFilePath.trim(),
                                     compilerType = compilerType,
                                     toolchainId = toolchainId,
+                                    sysrootProfileId = sysrootProfileId,
                                     customCCompiler = RunConfiguration.normalizeCompilerPath(customCCompiler),
                                     customCppCompiler = RunConfiguration.normalizeCompilerPath(customCppCompiler),
                                     sysrootApiLevel = parsedSysrootApiLevel,
@@ -449,6 +489,85 @@ fun RunConfigDialog(
                                 },
                                 leadingIcon = {
                                     if (toolchainId == toolchain.id) {
+                                        Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Per-run NDK runtime override; empty means following the global active sysroot.
+            if (isNativeBuildSystem && sysrootProfiles.isNotEmpty()) {
+                ExposedDropdownMenuBox(
+                    expanded = sysrootProfileDropdownExpanded,
+                    onExpandedChange = { sysrootProfileDropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = sysrootProfileId
+                            ?.let { selectedId ->
+                                sysrootProfiles.firstOrNull { it.id == selectedId }?.displayLabel(context)
+                                    ?: selectedId
+                            }
+                            ?: stringResource(Strings.run_config_sysroot_profile_global),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(Strings.run_config_sysroot_profile_label)) },
+                        supportingText = {
+                            Text(
+                                text = stringResource(Strings.run_config_sysroot_profile_desc),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = sysrootProfileDropdownExpanded
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                    )
+                    TinaExposedDropdownMenu(
+                        expanded = sysrootProfileDropdownExpanded,
+                        onDismissRequest = { sysrootProfileDropdownExpanded = false }
+                    ) {
+                        TinaDropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(stringResource(Strings.run_config_sysroot_profile_global))
+                                    activeSysrootProfileId
+                                        ?.let { activeId -> sysrootProfiles.firstOrNull { it.id == activeId } }
+                                        ?.let { activeProfile ->
+                                            Text(
+                                                text = activeProfile.displayLabel(context),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                }
+                            },
+                            onClick = {
+                                sysrootProfileId = null
+                                sysrootProfileDropdownExpanded = false
+                            },
+                            leadingIcon = {
+                                if (sysrootProfileId == null) {
+                                    Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        )
+                        TinaDropdownMenuDivider()
+                        sysrootProfiles.forEach { profile ->
+                            TinaDropdownMenuItem(
+                                text = { Text(profile.displayLabel(context)) },
+                                onClick = {
+                                    sysrootProfileId = profile.id
+                                    sysrootProfileDropdownExpanded = false
+                                },
+                                leadingIcon = {
+                                    if (sysrootProfileId == profile.id) {
                                         Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
@@ -830,12 +949,20 @@ fun RunConfigDialog(
                                 )
                             )
                         } else {
-                            Text(
-                                text = stringResource(
+                            val errorText = if (supportedSysrootApiLevels.isNotEmpty()) {
+                                stringResource(
+                                    com.wuxianggujun.tinaide.core.i18n.R.string.run_config_sysroot_api_level_error_supported_values,
+                                    supportedSysrootApiLevels.joinToString(", ")
+                                )
+                            } else {
+                                stringResource(
                                     com.wuxianggujun.tinaide.core.i18n.R.string.run_config_sysroot_api_level_error_range,
-                                    21,
-                                    35
-                                ),
+                                    sysrootApiMin,
+                                    sysrootApiMax
+                                )
+                            }
+                            Text(
+                                text = errorText,
                                 color = MaterialTheme.colorScheme.error
                             )
                         }

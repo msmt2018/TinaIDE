@@ -1,5 +1,7 @@
 package com.wuxianggujun.tinaide.core.logging
 
+import android.app.ActivityManager
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Process
@@ -76,8 +78,9 @@ object LogExportUtils {
         }
 
         if (policy.includes(LogBundleSource.LOGCAT)) {
-            // 服务器上传只取当前 App 进程，既补足非 Timber 日志，也避免混入用户运行输出。
+            // 服务器上传只按 TinaIDE 相关进程 pid 收集，不回退到全局 logcat。
             addLogcatToZip(
+                context = context,
                 zipOut = zipOut,
                 fileName = policy.logcatEntryName,
                 allowGlobalFallback = policy.allowGlobalLogcatFallback
@@ -180,6 +183,7 @@ object LogExportUtils {
      * 添加 Logcat 日志到 ZIP。
      */
     private fun addLogcatToZip(
+        context: Context,
         zipOut: ZipOutputStream,
         fileName: String,
         allowGlobalFallback: Boolean
@@ -190,27 +194,58 @@ object LogExportUtils {
 
             zipOut.write("=== Logcat Dump ===\n".toByteArray(Charsets.UTF_8))
 
-            val pid = Process.myPid()
             var wroteLines = 0
 
-            fun dump(cmd: Array<String>) {
-                val process = Runtime.getRuntime().exec(cmd)
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+            fun dump(command: List<String>): Int {
+                var commandLines = 0
+                val process = runCatching {
+                    ProcessBuilder(command)
+                        .redirectErrorStream(true)
+                        .start()
+                }.getOrElse { throwable ->
+                    zipOut.write(
+                        "(failed to start logcat: ${throwable.message ?: throwable.javaClass.simpleName})\n"
+                            .toByteArray(Charsets.UTF_8)
+                    )
+                    return 0
+                }
+                BufferedReader(InputStreamReader(process.inputStream, Charsets.UTF_8)).use { reader ->
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
                         zipOut.write((line + "\n").toByteArray(Charsets.UTF_8))
                         wroteLines++
+                        commandLines++
                     }
                 }
-                runCatching { process.waitFor() }
+                val exitCode = runCatching { process.waitFor() }.getOrNull()
+                if (exitCode != null && exitCode != 0) {
+                    zipOut.write("(logcat exited with code $exitCode)\n".toByteArray(Charsets.UTF_8))
+                }
+                return commandLines
             }
 
-            dump(arrayOf("logcat", "-d", "--pid=$pid", "-t", "10000"))
+            val commands = LogcatDumpPlanner.buildCommands(
+                LogcatDumpPlanner.collectTargets(context)
+            )
+            if (commands.isEmpty()) {
+                zipOut.write(
+                    "\n=== no TinaIDE process pid available for logcat collection ===\n"
+                        .toByteArray(Charsets.UTF_8)
+                )
+            }
+
+            commands.forEach { plan ->
+                zipOut.write("\n=== ${plan.label} ===\n".toByteArray(Charsets.UTF_8))
+                if (dump(plan.command) == 0) {
+                    zipOut.write("(no logcat output for this process)\n".toByteArray(Charsets.UTF_8))
+                }
+            }
+
             if (wroteLines == 0 && allowGlobalFallback) {
                 zipOut.write("\n=== logcat --pid produced no output, falling back to global dump ===\n".toByteArray(Charsets.UTF_8))
-                dump(arrayOf("logcat", "-d", "-t", "10000"))
+                dump(listOf("logcat", "-d", "-t", "10000", "-v", "threadtime"))
             } else if (wroteLines == 0) {
-                zipOut.write("\n=== logcat --pid produced no output; global dump skipped for privacy ===\n".toByteArray(Charsets.UTF_8))
+                zipOut.write("\n=== TinaIDE process logcat produced no output; global dump skipped for privacy ===\n".toByteArray(Charsets.UTF_8))
             }
 
             zipOut.closeEntry()
@@ -526,3 +561,126 @@ object LogExportUtils {
         }
     }
 }
+
+internal object LogcatDumpPlanner {
+    private const val DEFAULT_TAIL_LINES = 10000
+    private const val MAX_TARGETS = 8
+    private val runtimeTagFilters = listOf(
+        "TINA_USER_OUTPUT:*",
+        "SDL:*",
+        "System.out:*",
+        "System.err:*",
+        "AndroidRuntime:*",
+        "libc:*"
+    )
+
+    fun collectTargets(context: Context): List<LogcatDumpTarget> {
+        val packageName = context.packageName
+        val currentProcessName = Application.getProcessName().orEmpty()
+            .takeIf { it.isNotBlank() }
+            ?: packageName
+        val targets = mutableListOf(
+            LogcatDumpTarget(
+                pid = Process.myPid(),
+                processName = currentProcessName,
+                source = "current"
+            )
+        )
+
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        activityManager?.runningAppProcesses
+            .orEmpty()
+            .filter { process -> isTinaProcess(packageName, process.processName) }
+            .forEach { process ->
+                targets += LogcatDumpTarget(
+                    pid = process.pid,
+                    processName = process.processName,
+                    source = "running"
+                )
+            }
+
+        LogProcessRegistry.loadRecentRecords(context).forEach { record ->
+            if (CrashLogPrivacyClassifier.isUserRuntimeProcess(packageName, record.processName)) {
+                targets += LogcatDumpTarget(
+                    pid = record.pid,
+                    processName = record.processName,
+                    source = "recent-runtime"
+                )
+            }
+        }
+
+        return normalizeTargets(packageName, targets)
+    }
+
+    fun buildCommands(
+        targets: List<LogcatDumpTarget>,
+        tailLines: Int = DEFAULT_TAIL_LINES
+    ): List<LogcatDumpCommand> = targets
+        .asSequence()
+        .filter { target -> target.pid > 0 && target.processName.isNotBlank() }
+        .take(MAX_TARGETS)
+        .map { target ->
+            val command = mutableListOf(
+                "logcat",
+                "-d",
+                "--pid=${target.pid}",
+                "-t",
+                tailLines.toString(),
+                "-v",
+                "threadtime"
+            )
+            if (target.isUserRuntime) {
+                command += "-s"
+                command += runtimeTagFilters
+            }
+            LogcatDumpCommand(
+                label = "process=${target.processName} pid=${target.pid} source=${target.source}",
+                command = command
+            )
+        }
+        .toList()
+
+    internal fun normalizeTargets(
+        packageName: String,
+        targets: List<LogcatDumpTarget>
+    ): List<LogcatDumpTarget> {
+        val merged = linkedMapOf<Int, LogcatDumpTarget>()
+        for (target in targets) {
+            if (target.pid <= 0 || !isTinaProcess(packageName, target.processName)) continue
+            val isUserRuntime = CrashLogPrivacyClassifier.isUserRuntimeProcess(packageName, target.processName)
+            if (target.source == "recent-runtime" && !isUserRuntime) continue
+            val normalized = target.copy(
+                isUserRuntime = target.isUserRuntime || isUserRuntime
+            )
+            val existing = merged[target.pid]
+            merged[target.pid] = if (existing == null) {
+                normalized
+            } else {
+                existing.copy(
+                    source = listOf(existing.source, normalized.source)
+                        .distinct()
+                        .joinToString("+"),
+                    isUserRuntime = existing.isUserRuntime || normalized.isUserRuntime
+                )
+            }
+        }
+        return merged.values.take(MAX_TARGETS)
+    }
+
+    private fun isTinaProcess(packageName: String, processName: String?): Boolean {
+        if (packageName.isBlank() || processName.isNullOrBlank()) return false
+        return processName == packageName || processName.startsWith("$packageName:")
+    }
+}
+
+internal data class LogcatDumpTarget(
+    val pid: Int,
+    val processName: String,
+    val source: String,
+    val isUserRuntime: Boolean = false
+)
+
+internal data class LogcatDumpCommand(
+    val label: String,
+    val command: List<String>
+)

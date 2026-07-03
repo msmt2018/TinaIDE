@@ -188,6 +188,7 @@ if ($script:Failures.Count -eq 0) {
         $requiredEntries = @(
             "android-sysroot/.version",
             "android-sysroot/usr/include",
+            "android-sysroot/usr/include/android/api-level.h",
             "android-sysroot/usr/lib/$expectedTriple/libc++_shared.so"
         )
         foreach ($entry in $requiredEntries) {

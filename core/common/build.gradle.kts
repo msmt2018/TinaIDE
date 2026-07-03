@@ -1,6 +1,6 @@
 plugins {
     id("tina.android.library")
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.android.legacy.kapt)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -9,11 +9,11 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:i18n"))
-    implementation(project(":core:model"))
-    implementation(project(":tina-exec:integration"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:model"))
+    implementation(project.dependencies.project(":tina-exec:integration"))
     // PtyProcess 依赖 Termux JNI
-    implementation(project(":termux-terminal:terminal-emulator"))
+    implementation(project.dependencies.project(":termux-terminal:terminal-emulator"))
     // Koin DI — api 传递给所有依赖 core:common 的模块
     api(platform(libs.koin.bom))
     api(libs.koin.core)
@@ -28,5 +28,5 @@ dependencies {
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    kapt(libs.room.compiler)
 }

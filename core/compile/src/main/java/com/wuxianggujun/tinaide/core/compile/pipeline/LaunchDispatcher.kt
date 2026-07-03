@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.core.compile.pipeline
 
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.compile.OutputMode
 import com.wuxianggujun.tinaide.core.compile.action.LaunchIntent
 import com.wuxianggujun.tinaide.core.compile.artifact.Artifact
@@ -36,6 +37,12 @@ class LaunchDispatcher(
         require(intent !is LaunchIntent.None) {
             "LaunchDispatcher.dispatch should not be called with LaunchIntent.None"
         }
+        BuildDiagnosticsLog.i {
+            "launch dispatch start intent=${intent.diagnosticsName()} outputMode=${(intent as? LaunchIntent.Run)?.outputMode ?: ""} " +
+                "artifact=${artifact.absolutePath} kind=${artifact.kind} target=${artifact.id.targetName} cached=$artifactWasCached " +
+                "contentHash=${artifact.contentHash.shortHash()} trackedHash=${artifact.fingerprint.trackedInputsHash.shortHash()} " +
+                "sysroot=${artifact.fingerprint.sysrootProfileId.orEmpty()} api=${artifact.fingerprint.sysrootApiLevel}"
+        }
         emitter.emit(BuildEvent.Launch.Started(artifact))
 
         val outcome: LaunchOutcome = when (intent) {
@@ -54,16 +61,37 @@ class LaunchDispatcher(
         }
 
         return when (outcome) {
-            is LaunchOutcome.Prepared -> BuildReport.Success(
-                artifact = artifact,
-                descriptor = outcome.descriptor,
-                summary = if (artifactWasCached) "launched from cached artifact" else "launched freshly built artifact",
-            )
-            is LaunchOutcome.Failed -> BuildReport.LaunchFailed(
-                reason = outcome.reason,
-                artifact = artifact,
-                artifactWasCached = artifactWasCached,
-            )
+            is LaunchOutcome.Prepared -> {
+                BuildDiagnosticsLog.i {
+                    "launch dispatch prepared descriptor=${outcome.descriptor::class.simpleName} " +
+                        "artifact=${artifact.absolutePath} cached=$artifactWasCached"
+                }
+                BuildReport.Success(
+                    artifact = artifact,
+                    descriptor = outcome.descriptor,
+                    summary = if (artifactWasCached) "launched from cached artifact" else "launched freshly built artifact",
+                )
+            }
+            is LaunchOutcome.Failed -> {
+                BuildDiagnosticsLog.w {
+                    "launch dispatch failed intent=${intent.diagnosticsName()} artifact=${artifact.absolutePath} " +
+                        "cached=$artifactWasCached reason=${outcome.reason}"
+                }
+                BuildReport.LaunchFailed(
+                    reason = outcome.reason,
+                    artifact = artifact,
+                    artifactWasCached = artifactWasCached,
+                )
+            }
         }
     }
+
+    private fun LaunchIntent.diagnosticsName(): String = when (this) {
+        is LaunchIntent.Run -> "Run"
+        LaunchIntent.Debug -> "Debug"
+        is LaunchIntent.Terminal -> "Terminal"
+        LaunchIntent.None -> "None"
+    }
+
+    private fun String.shortHash(): String = take(12)
 }

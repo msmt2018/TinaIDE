@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.network.server.ServerConfigResponse
 
 internal data class DeveloperDiagnosticsControlsState(
+    val buildDiagnosticsLogControlEnabled: Boolean,
     val lspCompileCommandsSelectionLogControlEnabled: Boolean,
     val lspClangdStartupLogControlEnabled: Boolean,
     val editorTouchDiagnosticsControlEnabled: Boolean,
@@ -39,7 +40,6 @@ internal data class DeveloperServerConfigPreview(
     val version: Long,
     val updatedAt: String?,
     val configRefreshIntervalSecs: Long,
-    val feedbackEnabled: Boolean,
     val pluginMarketEnabled: Boolean,
     val packageManagerEnabled: Boolean,
     val developerOptionsEnabled: Boolean,
@@ -76,6 +76,7 @@ internal object DeveloperOptionsSectionSupport {
         val diagnosticsControlsEnabled = diagnosticsEnabled
         val touchSubControlsEnabled = diagnosticsEnabled && editorTouchDiagnosticsEnabled
         return DeveloperDiagnosticsControlsState(
+            buildDiagnosticsLogControlEnabled = diagnosticsControlsEnabled,
             lspCompileCommandsSelectionLogControlEnabled = diagnosticsControlsEnabled,
             lspClangdStartupLogControlEnabled = diagnosticsControlsEnabled,
             editorTouchDiagnosticsControlEnabled = diagnosticsControlsEnabled,
@@ -138,7 +139,6 @@ internal object DeveloperOptionsSectionSupport {
         version = config.version,
         updatedAt = config.updatedAt?.takeUnless { it.isBlank() },
         configRefreshIntervalSecs = config.configRefreshIntervalSecs,
-        feedbackEnabled = config.features.feedbackEnabled,
         pluginMarketEnabled = config.features.pluginMarketEnabled,
         packageManagerEnabled = config.features.packageManagerEnabled,
         developerOptionsEnabled = config.features.developerOptionsEnabled,

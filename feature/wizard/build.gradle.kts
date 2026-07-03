@@ -15,15 +15,15 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:compile"))
-    implementation(project(":core:config"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:model"))
-    implementation(project(":core:plugin"))
-    implementation(project(":core:project"))
-    implementation(project(":core:storage"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:compile"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:model"))
+    implementation(project.dependencies.project(":core:plugin"))
+    implementation(project.dependencies.project(":core:project"))
+    implementation(project.dependencies.project(":core:storage"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.activity.compose)
@@ -32,6 +32,6 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.ui)
     implementation(libs.lifecycle.viewmodel)
-    implementation(project(":immersionbar-local"))
-    implementation(project(":immersionbar-ktx-local"))
+    implementation(project.dependencies.project(":immersionbar-local"))
+    implementation(project.dependencies.project(":immersionbar-ktx-local"))
 }

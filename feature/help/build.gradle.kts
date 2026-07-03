@@ -15,11 +15,11 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:model"))
-    implementation(project(":core:network"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:model"))
+    implementation(project.dependencies.project(":core:network"))
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
     implementation(libs.timber)

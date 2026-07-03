@@ -5,7 +5,6 @@ import android.app.Application
 import android.app.Application.ActivityLifecycleCallbacks
 import android.content.Context
 import com.itsaky.androidide.treesitter.TreeSitter
-import com.wuxianggujun.tinaide.ai.di.aiModule
 import com.wuxianggujun.tinaide.core.compile.di.compileModule
 import com.wuxianggujun.tinaide.core.config.IConfigManager
 import com.wuxianggujun.tinaide.core.config.di.configModule
@@ -13,6 +12,7 @@ import com.wuxianggujun.tinaide.core.crash.CrashLogAutoUploader
 import com.wuxianggujun.tinaide.core.crash.NativeCrashHandler
 import com.wuxianggujun.tinaide.core.debug.di.debugModule
 import com.wuxianggujun.tinaide.core.i18n.AppStrings
+import com.wuxianggujun.tinaide.core.logging.LogProcessRegistry
 import com.wuxianggujun.tinaide.core.logging.TinaTimber
 import com.wuxianggujun.tinaide.core.proot.PRootBootstrap
 import com.wuxianggujun.tinaide.core.proot.di.prootModule
@@ -67,15 +67,6 @@ class TinaApplication : Application() {
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
 
-        // 初始化 Timber 日志框架（尽早初始化以捕获所有日志）
-        TinaTimber.initialize(
-            context = this,
-            isDebug = BuildConfig.DEBUG,
-            logDir = com.wuxianggujun.tinaide.storage.ProjectPaths.ensureDir(
-                com.wuxianggujun.tinaide.storage.ProjectPaths.getLogsRoot(this)
-            ),
-        )
-
         // 初始化 xCrash（Native 崩溃捕获）
         // 必须在 attachBaseContext 中尽早调用
         val processName = Application.getProcessName()
@@ -95,14 +86,29 @@ class TinaApplication : Application() {
         )
         NativeCrashHandler.setCrashDisplayer(
             if (crashSource != null) {
-                NativeCrashHandler.CrashDisplayer { context, crashReport ->
-                    CrashActivity.start(context, crashReport, crashSource)
+                NativeCrashHandler.CrashDisplayer { context, crashReport, crashLogFileName ->
+                    CrashActivity.start(
+                        context = context,
+                        crashReport = crashReport,
+                        source = crashSource,
+                        crashLogFileName = crashLogFileName,
+                    )
                 }
             } else {
                 null
             }
         )
         NativeCrashHandler.install(this)
+
+        // 初始化 Timber 日志框架（尽早初始化以捕获所有日志）
+        TinaTimber.initialize(
+            context = this,
+            isDebug = BuildConfig.DEBUG,
+            logDir = com.wuxianggujun.tinaide.storage.ProjectPaths.ensureDir(
+                com.wuxianggujun.tinaide.storage.ProjectPaths.getLogsRoot(this)
+            ),
+        )
+        LogProcessRegistry.recordProcess(this, android.os.Process.myPid(), processName)
     }
 
     override fun onCreate() {
@@ -159,7 +165,6 @@ class TinaApplication : Application() {
                 debugModule,
                 prootModule,
                 compileModule,
-                aiModule,
                 appModule,
                 appViewModelModule,
             )

@@ -11,6 +11,7 @@ import com.wuxianggujun.tinaide.plugin.script.api.PluginApiRegistry
 import com.wuxianggujun.tinaide.plugin.script.api.PluginCommandRegistry
 import com.wuxianggujun.tinaide.plugin.script.api.PluginEventBus
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -73,7 +74,7 @@ class ScriptPluginManager private constructor(
         this.projectRootProvider = provider
     }
 
-    private val runtimes = mutableMapOf<String, ScriptPluginRuntime>()
+    private val runtimes = ConcurrentHashMap<String, ScriptPluginRuntime>()
 
     private val _pluginStates = MutableStateFlow<Map<String, ScriptPluginInfo>>(emptyMap())
     val pluginStates: StateFlow<Map<String, ScriptPluginInfo>> = _pluginStates.asStateFlow()

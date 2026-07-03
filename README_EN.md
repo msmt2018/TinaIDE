@@ -267,7 +267,7 @@ Mapping files are only archived locally by the public build logic.
 TinaIDE/
 ├── app/                # App shell, startup, navigation, cross-module wiring
 ├── core/               # Shared runtime: compile, LSP, storage, plugin, security
-├── feature/            # User-facing slices: editor, settings, AI, help, workspace
+├── feature/            # User-facing slices: editor, settings, help, workspace
 ├── external/           # Local source dependencies and submodules
 ├── server/             # Public placeholder; backend moved to a private repo
 ├── docs/               # Project documentation

@@ -29,7 +29,7 @@
 - 内建 CMake / Make 语言服务：`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/BuiltinLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/CMakeLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/MakeLanguageServiceSession.kt`
 - LSP 会话与连接提供者：`core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/LspClientSession.kt`
 - 插件 LSP：`core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspPluginManager.kt`
-- AI 工具注册：`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolInitializer.kt`、`feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolRegistry.kt`
+- RikkaHub 入口：`app/src/main/java/com/wuxianggujun/tinaide/rikkahub/RikkaHubLauncher.kt`、`external/rikkahub`
 - 帮助文档入口：`feature/help/src/main/java/com/wuxianggujun/tinaide/core/help/HelpRepository.kt`
 - PRoot / Linux 环境：`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootBootstrap.kt`、`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/SelfHostedLinuxDistroRuntime.kt`、`core/linux-distro/src/main/assets/linux-distro/manifest.json`
 

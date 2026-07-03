@@ -10,8 +10,6 @@ import com.wuxianggujun.tinaide.core.network.OkHttpClientProvider
 import com.wuxianggujun.tinaide.core.security.ServerConfigHmacVerifier
 import com.wuxianggujun.tinaide.core.serialization.JsonSerializer
 import com.wuxianggujun.tinaide.core.serialization.MessagePackCodec
-import com.wuxianggujun.tinaide.data.model.FeedbackRequest
-import com.wuxianggujun.tinaide.data.model.FeedbackResponse
 import java.io.File
 import java.io.IOException
 import kotlin.math.abs
@@ -162,8 +160,6 @@ class TinaServerApi private constructor(
             ApiResult.Error(-1, e.message ?: Strings.error_unknown.str())
         }
     }
-
-    suspend fun submitFeedback(request: FeedbackRequest): ApiResult<FeedbackResponse> = post("/api/feedbacks", request)
 
     suspend fun healthCheck(): ApiResult<HealthResponse> = get("/health", expectEnvelope = false)
 
@@ -357,8 +353,6 @@ data class ServerConfigResponse(
 
 @Serializable
 data class FeatureFlags(
-    @SerialName("feedback_enabled")
-    val feedbackEnabled: Boolean = true,
     @SerialName("plugin_market_enabled")
     val pluginMarketEnabled: Boolean = true,
     @SerialName("package_manager_enabled")

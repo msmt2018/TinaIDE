@@ -7,9 +7,9 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:network"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:network"))
     implementation(libs.kotlinx.coroutines)
     implementation(libs.androidx.appcompat)
     implementation(libs.timber)

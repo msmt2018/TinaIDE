@@ -37,6 +37,159 @@
 - 本项目不使用 `Unreleased` / `未发布` 区块。
 - 所有变更必须归档到明确的版本号区块（版本号来源：`version.properties` 的 `versionName`）。
 
+## [0.18.10] - 2026-06-29
+
+### Added
+
+- 设置页新增内嵌 RikkaHub AI 设置入口，TinaIDE 开源版现在可以在统一设置页中直接打开 RikkaHub 的模型、渠道和偏好设置。
+- 编辑器侧滑栏新增 RikkaHub AI 标签页，支持在项目文件、Git 状态和 AI 聊天之间切换。
+- RikkaHub embedded 首次加载新增同主题 loading、失败态和重试入口，初始化失败时不再无限转圈。
+- Hex Viewer 新增 Reverse Action Pipeline：把当前 offset、选区、分析结果和二进制发现项统一映射为可复制动作，覆盖只读分析、反汇编预览、Frida Hook、LLDB 断点、Markdown 报告和 JSON 报告。
+- Hex Viewer 新增 JNI/APK 分析报告：汇总 DEX native 方法、APK native library、JNI 注册线索、Native API、loadLibrary 候选字符串、ELF 风险和工作台发现项。
+- 右侧二进制发现项栏新增报告入口，可复制 Markdown 或 JSON 报告，用于逆向笔记、问题单和后续 AI 分析。
+
+### Changed
+
+- RikkaHub embedded 主题改为跟随 TinaIDE 的 Material 3 主题配置，移除 RikkaHub 独立版的主题、更新、捐赠和商店相关入口，降低开源客户端里的无效功能干扰。
+- AI 侧滑栏输入框改为键盘感知布局：键盘弹出时隐藏底部标签栏并提供收起键盘按钮，减少输入框被遮挡或底部留白过大的情况。
+- 设置页恢复 TinaIDE 自身的 TopBar 与页面滚动体验，避免继续套用不匹配的 RikkaHub 大标题折叠样式。
+- 主题配置与启动初始化链路同步调整，RikkaHub embedded、设置页和主界面会使用同一套 TinaIDE 主题状态。
+- 命令弹窗的 Rizin/radare2、Frida 和 LLDB 模板改为从统一 action content 读取，减少 UI 里分叉生成脚本的重复逻辑。
+- JNI/APK 报告当前只复制到剪贴板，不直接写入项目文件，避免新增存储权限和路径风险。
+
+### Fixed
+
+- 修复打开 AI 设置页时可能出现白屏闪烁或首帧卡顿的问题，RikkaHub 初始化改为异步 warmup 后再挂载页面。
+- 修复 AI 侧滑栏打开输入法后无法顺畅切回项目/Git 侧滑栏的问题。
+- 修复主编辑视图底部栏与 AI 输入框在输入法弹出时互相顶起或遮挡的布局问题。
+- 修复 RikkaHub embedded Release 构建的 consumer ProGuard 规则，避免 app 级 `-dontobfuscate` 被错误传递给宿主导致 AGP 拒绝打包。
+- 修复 Release workflow 在 GitHub Actions 上执行 R8 minify 时可能因 Gradle 内存不足或单步超时导致发版失败的问题。
+
+### Removed
+
+- 移除应用内反馈页面、反馈模型、反馈仓库和对应帮助入口；当前开源客户端不再依赖已停用的反馈服务器。
+- 移除 RikkaHub embedded 中不适合 TinaIDE 内嵌场景的独立版更新检查、捐赠、商店跳转和自带主题配置页面。
+
+### Documentation
+
+- 更新 `docs/guides/Hex-Viewer-Design.md`，补充 Reverse Action Pipeline、JNI/APK 报告弹窗和报告边界。
+- 更新 App 内帮助文档，说明 AI 能力由内嵌 RikkaHub 承担，并移除反馈服务器相关指引。
+
+### Tests
+
+- 扩展 `HexBinaryWorkbenchTest`，覆盖 action pipeline、JNI/APK 报告模型、Markdown/JSON 格式输出和 loadLibrary 候选字符串。
+
+### Verification
+
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryWorkbenchTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+- 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`，验证 RikkaHub embedded、设置页与主 App 集成编译通过。
+- 已执行 `./gradlew :rikkahub:embedded:exportReleaseConsumerProguardFiles --console=plain "-Ptina.autoIncrementReleaseVersion=false"`，验证 RikkaHub embedded 的 Release consumer ProGuard 规则可导出。
+- 已触发 GitHub Actions `Release Build`，验证 Release workflow 的 R8 内存与超时配置进入远端发版流程。
+
+## [0.18.9] - 2026-06-29
+
+### Added
+
+- Hex Viewer 工作台新增二进制发现项导航：统一汇总 ELF 风险、JNI 注册线索、Native API 导入、DEX native 方法、APK native marker、APK entry name 风险、混淆启发式和 analysis signals，按严重度排序后在右侧分析栏顶部展示。
+- 发现项支持 offset 跳转、批量标记书签，并可直接打开命令弹窗生成针对单个发现项的逆向脚本。
+- 命令弹窗新增 Rizin/radare2 只读分析脚本和 `pd` 反汇编预览脚本，默认不包含 `wx` 写命令，避免把 patch 脚本和只读分析混在一起。
+- 命令弹窗新增 Frida Hook 模板和 LLDB breakpoint/memory/disassemble 模板；从发现项打开时优先使用发现项 offset 和可用的 JNI/native symbol。
+
+### Documentation
+
+- 更新 `docs/guides/Hex-Viewer-Design.md`，补充发现项导航、只读逆向脚本、Frida/LLDB 模板以及“不在 App 内直接执行外部逆向工具”的边界。
+
+### Tests
+
+- 新增 `HexBinaryWorkbenchTest`，覆盖发现项严重度排序、APK native marker 绝对 offset、只读脚本避免 `wx` 写命令，以及 Frida/LLDB 模板生成。
+
+### Verification
+
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryWorkbenchTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+
+## [0.18.8] - 2026-06-27
+
+### Added
+
+- 新增内嵌 RikkaHub AI 入口：TinaIDE 开源版通过编辑器侧边栏直接打开 APK 内部的 RikkaHub 界面，AI 聊天、模型和渠道配置由 RikkaHub 承担。
+- 重做 Hex Viewer：采用分块读取和缓存，不再把大文件一次性读入内存；支持 ASCII/UTF-8/十六进制通配搜索、offset 跳转历史、选区 Inspector、多格式导出、offset 书签、staged patch 队列和 radare2 `wx` patch 脚本复制。
+- 新增 Hex Viewer 二进制分析工作台布局：宽屏可把分析结果停靠到右侧，窄屏自动回退到弹窗，主十六进制网格继续占满剩余空间，避免工具按钮和分析结果挤占编辑器。
+- 新增 Rizin/radare2 命令弹窗：可从当前 offset、选区和 staged patch 队列生成 `s`、`px`、`wx` 脚本，当前仅复制脚本文本，后续可接插件式执行器。
+- 新增 Hex 二进制分析面板：支持文件指纹、字节分布、重复字节段、magic signature、字符串提取、熵图、DEX 结构、APK/ZIP 结构、ELF 元数据和可跳转 analysis signals。
+- 新增 ELF/SO 分析线索：解析 Program Header、Section、Dynamic Symbols、依赖、Notes/Build ID、hardening、风险提示、relocation、PLT/GOT linkage、动态链接器步骤、JNI 注册线索和 Native API 导入分类。
+- 新增 APK 分析线索：解析 central directory、local header 一致性、entry name 风险、Signing Block、二进制 Manifest、resources.arsc、内嵌 DEX 摘要和 `lib/**/*.so` native 摘要。
+- 新增混淆与保护器提示：覆盖 OLLVM marker、反调试、反注入/动态插桩、高熵低字符串密度、符号剥离，以及常见 Android 加壳/保护器字符串线索。
+
+### Changed
+
+- Gradle/AGP 构建脚本迁移到 AGP built-in Kotlin 路径，移除 `android.builtInKotlin=false`、`android.newDsl=false`、旧 `org.jetbrains.kotlin.android` 和 KSP 插件配置，Room compiler 改用 AGP `legacy-kapt` 兼容路径，减少 Android Studio Sync/Build 阶段的弃用告警。
+- 主工程、RikkaHub included build 和 tree-sitter included build 统一更新 Gradle 9/AGP 9 DSL：项目依赖改为明确的 `DependencyHandler.project(":path")` 调用，`srcDir(...)` 改为 `directories.add(...)`，并移除不再需要的 configuration-on-demand 与 type-safe project accessors 预览配置。
+- 修复 tree-sitter included build 在 AGP 9 下继续读取旧 `BaseExtension` 导致 `:app:compileArm64DebugKotlin` 配置失败的问题，改用公开的 `ApplicationExtension` / `LibraryExtension` DSL。
+
+- TinaIDE 开源版移除内置 AI 聊天、渠道、会话仓储和工具调用系统，设置页、帮助文档和侧边栏入口同步改为 RikkaHub 使用方式。
+- RikkaHub 作为 `external/rikkahub` included build 纳入工程，并通过 `rikkahub-embedded` library 打包进 TinaIDE，避免继续维护两套 AI 实现。
+- 调整 RikkaHub 和 Tree-sitter included build 的构建兼容性：补充国内 Maven/NPM 镜像、缺少 `google-services.json` 时跳过 Firebase 插件、Windows pnpm 构建支持，以及 Kotlin compilerOptions JVM target 写法。
+- 更新项目架构、模块说明、开发指南和 App 内帮助内容，明确 RikkaHub 边界、`feature:viewer` 的二进制查看职责和第三方许可保留要求。
+
+### Removed
+
+- 删除 `feature:ai` 模块、AI 数据库实体/DAO、AI 配置模型、AI 设置页、AI 抽屉面板、AI 工具回调与相关测试。
+- 删除旧版低效 Hex 行模型测试，改由新的 Hex byte row、文件数据管理、搜索、选区 Inspector、导出和二进制分析测试覆盖。
+
+### Documentation
+
+- 新增并更新 `docs/guides/Hex-Viewer-Design.md`，记录 Hex Viewer 的 r2droid 风格设计取舍、二进制分析工作台布局、Rizin/radare2 命令入口、当前能力边界、后续扩展建议和开源致谢。
+- 新增 `docs/third-party-notices/r2droid-MIT-LICENSE.txt`，保留 r2droid 的 MIT License 文本并在文档中致谢。
+- 更新 RikkaHub 接入文档与 App 内已知问题说明，补充 `:rikkahub:embedded:compileDebugKotlin` 静态验证命令、子模块提交顺序，以及 AGP 9.2.1 内部 project dependency notation 弃用告警的判断口径。
+
+### Verification
+
+- 已执行 `./gradlew help --warning-mode all --build-cache --console=plain`。
+
+- 已执行 `py tools/i18n/check_all.py`。
+- 已执行 `./gradlew :feature:viewer:ktlintFormat --console=plain`。
+- 已执行 `./gradlew :feature:viewer:ktlintCheck --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexBinaryAnalysisTest" --console=plain`。
+- 已执行 `./gradlew :feature:viewer:testDebugUnitTest --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexViewerLayoutPolicyTest" --tests "com.wuxianggujun.tinaide.ui.compose.viewer.HexByteRowTest" --console=plain`。
+- 已执行 `./gradlew :app:compileArm64DebugKotlin --console=plain`。
+- 已执行 `./gradlew :rikkahub:embedded:compileDebugKotlin --offline --build-cache --console=plain --warning-mode all`；未运行真机测试。
+
+## [0.18.7] - 2026-06-23
+
+### Added
+
+- 新增开发者选项中的“构建诊断日志”开关，可在启用诊断日志后记录保存结果、CMake 目标选择、增量缓存判定、`compile_commands.json` 参与情况和最终启动产物，便于定位“源码已改但仍像旧产物”的问题。
+
+### Changed
+
+- 原生 CMake、Make 和单文件编译统一使用受控的构建进程运行器，补齐超时、输出流关闭、强制终止和命令临时目录清理，减少构建取消或超时后的残留进程/临时文件风险。
+- CMake 构建规划增加更完整的 target、输入指纹和 artifact 诊断摘要；NDK 共享库模板运行时会更明确地区分测试可执行文件与共享库目标，SDL 场景优先修正到共享库目标。
+- Lua 插件运行时改为串行保护 Lua 状态访问，并让运行时、事件总线和 API 注册清理在并发销毁/调用场景下更稳定。
+
+### Fixed
+
+- 崩溃页现在会立即尝试补传主进程 tombstone，并继续保留 JobScheduler 兜底重试；已上报和用户 native runtime 崩溃会继续做去重/跳过处理，避免重复或误传。
+- 调整应用启动早期 xCrash、Timber 与进程记录初始化顺序，降低崩溃阶段日志链路竞态。
+- 插件权限拒绝日志区分“未声明”和“未授权”，并带上 API namespace/method 上下文，便于插件开发者定位权限配置问题。
+
+### Documentation
+
+- 更新构建、编译器设置、新建项目和已知问题帮助文档，说明 NDK 共享库模板默认目标、源码保存检查、构建诊断日志入口以及构建临时资源清理边界。
+
+### Verification
+
+- 已执行 `git diff --check`。
+- 按本次要求未运行 Gradle 测试或构建；新补充的构建进程、崩溃日志上传、插件运行时并发和开发者选项支持测试需由后续 CI/本地验证覆盖。
+
 ## [0.18.6] - 2026-06-18
 
 ### Fixed

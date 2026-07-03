@@ -1,12 +1,16 @@
 package com.wuxianggujun.tinaide.core.compile.strategy
 
 import android.content.Context
+import com.wuxianggujun.tinaide.core.compile.AndroidLinkerCompatibilityFlags
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnostic
 import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticParser
 import com.wuxianggujun.tinaide.core.compile.BuildOptions
+import com.wuxianggujun.tinaide.core.compile.BuildProcessRunner
+import com.wuxianggujun.tinaide.core.compile.BuildResourceCleaner
 import com.wuxianggujun.tinaide.core.compile.BuildSystem
 import com.wuxianggujun.tinaide.core.compile.CompileTimeoutConfig
 import com.wuxianggujun.tinaide.core.compile.CompilerType
+import com.wuxianggujun.tinaide.core.compile.NativeSysrootPreparer
 import com.wuxianggujun.tinaide.core.compile.TargetInfo
 import com.wuxianggujun.tinaide.core.compile.artifact.Artifact
 import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactId
@@ -14,6 +18,7 @@ import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactKind
 import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactSpec
 import com.wuxianggujun.tinaide.core.compile.artifact.BuildFingerprint
 import com.wuxianggujun.tinaide.core.compile.artifact.SourceRef
+import com.wuxianggujun.tinaide.core.compile.artifact.TrackedInputCollector
 import com.wuxianggujun.tinaide.core.compile.event.BuildEvent
 import com.wuxianggujun.tinaide.core.compile.event.BuildEventEmitter
 import com.wuxianggujun.tinaide.core.i18n.Strings
@@ -28,7 +33,7 @@ import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
 import com.wuxianggujun.tinaide.project.NativeBuildFlagTokenizer
 import java.io.File
 import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 /**
@@ -154,6 +159,7 @@ class SingleFileStrategy(
             expectedPath = File(ctx.buildDir, outputFileName),
             kind = kind,
             sources = listOf(source),
+            reconfigureSources = TrackedInputCollector.collectSingleFileInputs(ctx.projectRoot, source),
         )
     }
 
@@ -225,12 +231,17 @@ class SingleFileStrategy(
             return fail(emitter, msg)
         }
 
-        validateSysrootForBuild(isCpp, apiLevel)?.let { err ->
+        NativeSysrootPreparer.ensureInstalled(appContext, options.sysrootProfileId)?.let { err ->
+            Timber.tag(TAG).e(err)
+            return fail(emitter, err, BuildDiagnosticParser.parse(err))
+        }
+        validateSysrootForBuild(isCpp, apiLevel, options.sysrootProfileId)?.let { err ->
             Timber.tag(TAG).e(err)
             return fail(emitter, err, BuildDiagnosticParser.parse(err))
         }
 
-        val sysrootFlags = buildSysrootFlags(isCpp, apiLevel)
+        val sysrootFlags = buildSysrootFlags(isCpp, apiLevel, options.sysrootProfileId)
+        val linkerCompatibilityFlags = AndroidLinkerCompatibilityFlags.forCurrentTarget(apiLevel)
         val packagePaths = InstalledPackagePathResolver.resolve(appContext, ctx.projectRoot)
         val extraCompileFlags = NativeBuildFlagTokenizer.tokenize(
             if (isCpp) options.nativeCppFlags else options.nativeCFlags
@@ -254,6 +265,7 @@ class SingleFileStrategy(
             add("-Wall")
             addAll(extraCompileFlags)
             addAll(sysrootFlags)
+            addAll(linkerCompatibilityFlags)
             for (dir in packagePaths.includeDirs) add("-I${dir.absolutePath}")
             for (dir in packagePaths.libDirs) add("-L${dir.absolutePath}")
             for (library in packagePaths.linkLibraries) add("-l$library")
@@ -366,7 +378,9 @@ class SingleFileStrategy(
         timeout: Long,
         options: BuildOptions,
         onOutput: ((String) -> Unit)? = null,
-    ): CommandResult = try {
+    ): CommandResult {
+        val commandTempDir = BuildResourceCleaner.createCommandTempDir(appContext.cacheDir, "single-file")
+        return try {
         val executable = command[0]
         val args = command.drop(1)
         val fullCommand = NativeExecutableRunner.buildCommand(executable = executable, args = args)
@@ -377,7 +391,7 @@ class SingleFileStrategy(
                 this,
                 nativeLibDir,
                 toolchainManager.getBinDir(options.toolchainId).absolutePath,
-                tmpDir = appContext.cacheDir.absolutePath,
+                tmpDir = commandTempDir.absolutePath,
                 homeDir = appContext.filesDir.absolutePath,
             )
             NativeExecutableRunner.applyRecommendedTinaExec(
@@ -397,34 +411,29 @@ class SingleFileStrategy(
             toolchainBinDir = toolchainManager.getBinDir(options.toolchainId).absolutePath,
         )
 
-        val process = processBuilder.start()
-        val output = StringBuilder()
-        process.inputStream.bufferedReader().use { reader ->
-            reader.lineSequence().forEach { line ->
-                output.appendLine(line)
+        val result = BuildProcessRunner.run(
+            processBuilder = processBuilder,
+            commandLabel = "single-file:${File(executable).name}",
+            timeoutMs = timeout,
+            onOutputLine = { line ->
                 onOutput?.invoke(line)
                 Timber.tag(TAG).v(line)
-            }
-        }
+            },
+        )
 
-        val finished = process.waitFor(timeout, TimeUnit.MILLISECONDS)
-        val exitCode = if (finished) {
-            process.exitValue()
-        } else {
-            process.destroy()
-            -1
-        }
-        if (!finished) Timber.tag(TAG).w("Native compile command timed out after %d ms", timeout)
-        if (exitCode != 0) {
+        if (result.timedOut) Timber.tag(TAG).w("Native compile command timed out after %d ms", timeout)
+        if (result.exitCode != 0) {
             NativeExecutableRunner.logFailureDiagnostics(
                 tag = TAG,
                 executable = executable,
-                output = output.toString(),
+                output = result.output,
                 toolchainBinDir = toolchainManager.getBinDir().absolutePath,
             )
         }
 
-        CommandResult(exitCode = exitCode, output = output.toString())
+        CommandResult(exitCode = result.exitCode, output = result.output)
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         Timber.tag(TAG).e(e, "Failed to execute native compile command")
         NativeExecutableRunner.logFailureDiagnostics(
@@ -434,6 +443,9 @@ class SingleFileStrategy(
             toolchainBinDir = toolchainManager.getBinDir().absolutePath,
         )
         CommandResult(exitCode = -1, output = Strings.compile_exec_exception.strOr(appContext, e.message ?: ""))
+    } finally {
+        BuildResourceCleaner.cleanupCommandTempDir(commandTempDir)
+    }
     }
 
     private suspend fun appendClangTraceDiagnostics(
@@ -597,17 +609,24 @@ class SingleFileStrategy(
         output.contains("No such file or directory", ignoreCase = true) ||
         output.contains("clang frontend command failed", ignoreCase = true)
 
-    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int): List<String> {
+    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int, profileId: String?): List<String> {
         val sysrootManager = AndroidSysrootManager(appContext)
         val arch = AndroidSysrootManager.Companion.Arch.current()
-        return sysrootManager.getCompilerFlags(apiLevel = apiLevel, arch = arch, isCpp = isCpp)
+        return sysrootManager.getCompilerFlags(
+            apiLevel = apiLevel,
+            arch = arch,
+            isCpp = isCpp,
+            profileId = profileId
+        )
     }
 
-    private fun validateSysrootForBuild(isCpp: Boolean, apiLevel: Int): String? {
+    private fun validateSysrootForBuild(isCpp: Boolean, apiLevel: Int, profileId: String?): String? {
         val sysrootManager = AndroidSysrootManager(appContext)
         val arch = AndroidSysrootManager.Companion.Arch.current()
-        val sysrootDir = sysrootManager.getSysrootDir(arch)
-        if (!sysrootManager.isInstalled(arch)) return Strings.compile_sysroot_missing.strOr(appContext, sysrootDir.absolutePath)
+        val sysrootDir = sysrootManager.getSysrootDir(arch, profileId)
+        if (!sysrootManager.isInstalled(arch, profileId)) {
+            return Strings.compile_sysroot_missing.strOr(appContext, sysrootDir.absolutePath)
+        }
         val apiLevelHeader = File(sysrootDir, "usr/include/android/api-level.h")
         if (!apiLevelHeader.isFile) return Strings.compile_sysroot_missing_header.strOr(appContext, apiLevelHeader.absolutePath)
         if (isCpp) {
@@ -660,11 +679,8 @@ class SingleFileStrategy(
         }
     }
 
-    private fun captureSourceRef(file: File, projectRoot: File): SourceRef = SourceRef(
-        relativePath = file.toRelativeString(projectRoot),
-        mtime = file.lastModified(),
-        size = file.length(),
-    )
+    private fun captureSourceRef(file: File, projectRoot: File): SourceRef =
+        SourceRef.capture(file, projectRoot)
 
     private suspend fun fail(
         emitter: BuildEventEmitter,

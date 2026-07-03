@@ -177,7 +177,6 @@ fun PluginLogScreen(
     } else {
         "${stringResource(Strings.plugin_log_title)} (${filteredLogs.size})"
     }
-
     Scaffold(
         topBar = {
             TinaTopBar(

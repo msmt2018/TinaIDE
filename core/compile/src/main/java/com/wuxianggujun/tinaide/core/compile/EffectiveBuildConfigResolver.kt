@@ -4,6 +4,7 @@ import android.content.Context
 import com.wuxianggujun.tinaide.core.compile.action.LaunchIntent
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.linux.LinuxRunModePolicy
+import com.wuxianggujun.tinaide.core.ndk.AndroidNativeToolchainManager
 import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.project.CppStandard
 import com.wuxianggujun.tinaide.project.ProjectMetadata
@@ -57,12 +58,21 @@ internal object EffectiveBuildConfigResolver {
         val optimizationLevel = normalizeOptimizationLevel(Prefs.compilerOptimizationLevel)
         val parallelJobs = resolveParallelJobs(input.buildSystem)
         val projectMetadata = runCatching { ProjectMetadataStore.read(input.projectRoot) }.getOrNull()
+        val toolchainId = input.runConfig.toolchainId?.trim()?.takeIf { it.isNotBlank() }
+            ?: input.appContext
+                ?.let { context ->
+                    runCatching {
+                        AndroidNativeToolchainManager(context).getConfigManager().getActiveToolchainId()
+                    }.getOrNull()
+                }
+        val runConfigSysrootProfileId = input.runConfig.sysrootProfileId?.trim()?.takeIf { it.isNotBlank() }
         val sysrootProfileId = input.appContext
             ?.let { context ->
                 runCatching {
-                    AndroidSysrootManager(context).getActiveProfile()?.id
+                    AndroidSysrootManager(context).resolveProfileId(runConfigSysrootProfileId)
                 }.getOrNull()
             }
+            ?: runConfigSysrootProfileId
         val sysrootResolution = ProjectSysrootApiLevelResolver.resolve(
             projectRoot = input.projectRoot,
             runConfigApiLevel = input.runConfig.sysrootApiLevel
@@ -83,7 +93,7 @@ internal object EffectiveBuildConfigResolver {
             cmakeBuildType = cmakeBuildType,
             cmakeGenerator = cmakeGenerator,
             compilerType = input.runConfig.compilerType,
-            toolchainId = input.runConfig.toolchainId,
+            toolchainId = toolchainId,
             sysrootProfileId = sysrootProfileId,
             customCCompiler = RunConfiguration.normalizeCompilerPath(input.runConfig.customCCompiler),
             customCppCompiler = RunConfiguration.normalizeCompilerPath(input.runConfig.customCppCompiler),

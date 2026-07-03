@@ -521,7 +521,9 @@ class PluginManager(
                 zipFile = zipFile,
                 buildSystem = buildSystem,
                 primaryLanguage = parseProjectLanguage(template.primaryLanguage),
-                isNdkTemplate = template.isNdkTemplate
+                isNdkTemplate = template.isNdkTemplate,
+                defaultRunTargetName = template.defaultRunTargetName,
+                defaultSdlTargetName = template.defaultSdlTargetName,
             )
         )
     }

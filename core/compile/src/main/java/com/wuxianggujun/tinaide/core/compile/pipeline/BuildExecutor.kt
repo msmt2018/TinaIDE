@@ -19,7 +19,10 @@ class BuildExecutor {
         plan: BuildPlan.Build,
         ctx: BuildContext,
         emitter: BuildEventEmitter,
-    ): ExecutionOutcome = plan.strategy.execute(ctx, plan.spec, plan.fingerprint, emitter)
+    ): ExecutionOutcome {
+        val executionContext = ctx.copy(buildReason = plan.reason)
+        return plan.strategy.execute(executionContext, plan.spec, plan.fingerprint, emitter)
+    }
 
     suspend fun clean(
         plan: BuildPlan.CleanOnly,

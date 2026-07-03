@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
@@ -41,7 +40,7 @@ val buildProotFromSource = providers.gradleProperty("tina.buildProotFromSource")
 
 android {
     namespace = "com.wuxianggujun.tinaide"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.wuxianggujun.tinaide"
@@ -173,9 +172,9 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("src/main/jniLibs")
+            jniLibs.directories.add("src/main/jniLibs")
             if (!buildProotFromSource) {
-                jniLibs.srcDir("src/prebuiltProot/jniLibs")
+                jniLibs.directories.add("src/prebuiltProot/jniLibs")
             }
         }
     }
@@ -224,29 +223,6 @@ android {
         }
     }
 
-    // 为不同 ABI 的 APK 设置不同的 versionCode / 文件名
-    // Google Play 多 APK 分发要求每个 APK 有唯一的 versionCode
-    // arm64-v8a: versionCode + 2；x86_64: versionCode + 1
-    applicationVariants.all {
-        val variant = this
-        val targetAbi = when (variant.flavorName) {
-            "arm64" -> "arm64-v8a"
-            "x86_64" -> "x86_64"
-            else -> null
-        }
-        outputs.all {
-            val output = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
-            val abiVersionCode = when (targetAbi) {
-                "arm64-v8a" -> 2
-                "x86_64" -> 1
-                else -> 0
-            }
-            output.versionCodeOverride = variant.versionCode * 10 + abiVersionCode
-            if (targetAbi != null) {
-                output.outputFileName = "app-$targetAbi-${variant.buildType.name}.apk"
-            }
-        }
-    }
 }
 
 androidComponents {
@@ -257,6 +233,30 @@ androidComponents {
             ?: return@beforeVariants
         if (!buildAllAbiRequested && abiFlavor != localDevAbi) {
             variantBuilder.enable = false
+        }
+    }
+    onVariants(selector().all()) { variant ->
+        val targetAbi = when (
+            variant.productFlavors
+                .firstOrNull { (dimension, _) -> dimension == "abi" }
+                ?.second
+        ) {
+            "arm64" -> "arm64-v8a"
+            "x86_64" -> "x86_64"
+            else -> null
+        }
+        val abiVersionCode = when (targetAbi) {
+            "arm64-v8a" -> 2
+            "x86_64" -> 1
+            else -> 0
+        }
+        variant.outputs.forEach { output ->
+            output.versionCode.orNull?.let { baseVersionCode ->
+                output.versionCode.set(baseVersionCode * 10 + abiVersionCode)
+            }
+            if (targetAbi != null) {
+                output.outputFileName.set("app-$targetAbi-${variant.buildType}.apk")
+            }
         }
     }
 }
@@ -287,44 +287,43 @@ dependencies {
     implementation(libs.androidx.activity)
 
     // ===== 内部模块 =====
-    implementation(project(":core:apk-builder"))
-    implementation(project(":core:common"))
-    implementation(project(":core:compile"))
-    implementation(project(":core:config"))
-    implementation(project(":core:database"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:crash"))
-    implementation(project(":core:debug"))
-    implementation(project(":core:git"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:logging"))
-    implementation(project(":core:lsp"))
-    implementation(project(":core:ndk"))
-    implementation(project(":core:network"))
-    implementation(project(":core:packages"))
-    implementation(project(":core:plugin"))
-    implementation(project(":core:project"))
-    implementation(project(":core:storage"))
-    implementation(project(":core:proot"))
-    implementation(project(":core:search"))
-    implementation(project(":core:text-engine"))
-    implementation(project(":core:tree-sitter"))
-    implementation(project(":core:editor-view"))
-    implementation(project(":core:editor-lsp"))
+    implementation(project.dependencies.project(":core:apk-builder"))
+    implementation(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:compile"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:database"))
+    implementation(project.dependencies.project(":core:designsystem"))
+    implementation(project.dependencies.project(":core:crash"))
+    implementation(project.dependencies.project(":core:debug"))
+    implementation(project.dependencies.project(":core:git"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:logging"))
+    implementation(project.dependencies.project(":core:lsp"))
+    implementation(project.dependencies.project(":core:ndk"))
+    implementation(project.dependencies.project(":core:network"))
+    implementation(project.dependencies.project(":core:packages"))
+    implementation(project.dependencies.project(":core:plugin"))
+    implementation(project.dependencies.project(":core:project"))
+    implementation(project.dependencies.project(":core:storage"))
+    implementation(project.dependencies.project(":core:proot"))
+    implementation(project.dependencies.project(":core:search"))
+    implementation(project.dependencies.project(":core:text-engine"))
+    implementation(project.dependencies.project(":core:tree-sitter"))
+    implementation(project.dependencies.project(":core:editor-view"))
+    implementation(project.dependencies.project(":core:editor-lsp"))
 
     // ===== 功能层 =====
-    implementation(project(":feature:ai"))
-    implementation(project(":feature:editor"))
-    implementation(project(":feature:help"))
-    implementation(project(":feature:output"))
-    implementation(project(":feature:packages"))
-    implementation(project(":feature:projectlist"))
-    implementation(project(":feature:settings"))
-    implementation(project(":feature:terminal"))
-    implementation(project(":feature:tutorial"))
-    implementation(project(":feature:viewer"))
-    implementation(project(":feature:wizard"))
-    implementation(project(":feature:workspace"))
+    implementation(project.dependencies.project(":feature:editor"))
+    implementation(project.dependencies.project(":feature:help"))
+    implementation(project.dependencies.project(":feature:output"))
+    implementation(project.dependencies.project(":feature:packages"))
+    implementation(project.dependencies.project(":feature:projectlist"))
+    implementation(project.dependencies.project(":feature:settings"))
+    implementation(project.dependencies.project(":feature:terminal"))
+    implementation(project.dependencies.project(":feature:tutorial"))
+    implementation(project.dependencies.project(":feature:viewer"))
+    implementation(project.dependencies.project(":feature:wizard"))
+    implementation(project.dependencies.project(":feature:workspace"))
 
     // Koin DI
     implementation(libs.koin.android)
@@ -332,6 +331,12 @@ dependencies {
 
     // Kotlin Serialization
     implementation(libs.kotlinx.serialization.json)
+
+    // Embedded RikkaHub UI and runtime. Resolved from external/rikkahub via composite build.
+    implementation("me.rerere.rikkahub:rikkahub-embedded") {
+        exclude(group = "com.termux.termux-app", module = "terminal-emulator")
+        exclude(group = "com.termux.termux-app", module = "terminal-view")
+    }
 
     // LuaJava Android native runtime. core:plugin owns the Java API dependency;
     // the app must package liblua54.so for script/hybrid plugins.
@@ -342,10 +347,10 @@ dependencies {
     // 因此保留对 :core:tree-sitter 的依赖即可（grammar jars 通过传递依赖到达 classpath）。
 
     // CMake 解析器
-    implementation(project(":core:cmake"))
+    implementation(project.dependencies.project(":core:cmake"))
 
     // Termux 终端模块（Apache 2.0 许可证）
-    implementation(project(":termux-terminal:terminal-view"))
+    implementation(project.dependencies.project(":termux-terminal:terminal-view"))
 
     // Kotlin Coroutines for async operations
     implementation(libs.kotlinx.coroutines)
@@ -365,8 +370,8 @@ dependencies {
     implementation(libs.activity.compose)
 
     // 沉浸式状态栏和导航栏（本地源码模块，避免 JitPack 网络超时）
-    implementation(project(":immersionbar-local"))
-    implementation(project(":immersionbar-ktx-local"))
+    implementation(project.dependencies.project(":immersionbar-local"))
+    implementation(project.dependencies.project(":immersionbar-ktx-local"))
 
     // Android rsync - 用于远程 LSP 项目同步（增量传输）
     // https://github.com/ribbons/android-rsync

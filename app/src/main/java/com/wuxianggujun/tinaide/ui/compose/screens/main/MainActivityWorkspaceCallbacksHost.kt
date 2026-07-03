@@ -29,7 +29,6 @@ internal fun rememberMainActivityWorkspaceCallbacksHost(
     onProjectNotOpen = workspaceActions::onProjectNotOpen,
     onGitCommitSuccess = workspaceActions::onGitCommitSuccess,
     onGitInitSuccess = workspaceActions::onGitInitSuccess,
-    onOpenAiSettings = workspaceActions::openAiSettings,
     onPersistRunConfigManager = onPersistRunConfigManager,
     onNoOpenFile = workspaceActions::onNoOpenFile,
     onUnsupportedEditor = workspaceActions::onUnsupportedEditor,

@@ -82,6 +82,7 @@ class SdlRuntimeResolverTest {
                     "libvulkan.so",
                     "libaaudio.so",
                     "libcamera2ndk.so",
+                    "libc++_shared.so",
                 ),
                 mainLibrary = main,
                 sdlLibrary = sdl

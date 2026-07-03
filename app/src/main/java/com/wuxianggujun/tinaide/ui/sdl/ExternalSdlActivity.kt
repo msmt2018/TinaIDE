@@ -26,8 +26,10 @@ import com.wuxianggujun.tinaide.MainActivity
 import com.wuxianggujun.tinaide.core.compile.SdlOrientation
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
+import com.wuxianggujun.tinaide.core.logging.LogProcessRegistry
 import com.wuxianggujun.tinaide.ui.compose.components.FloatingOverlay
 import com.wuxianggujun.tinaide.ui.runtime.NativeLaunchEnvironment
+import com.wuxianggujun.tinaide.ui.runtime.NativeStdStreamRedirect
 import com.wuxianggujun.tinaide.ui.theme.TinaIDETheme
 import java.io.File
 import org.libsdl.app.SDLActivity
@@ -133,6 +135,8 @@ class ExternalSdlActivity :
     // region Lifecycle
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        LogProcessRegistry.recordCurrentProcess(this)
+
         // Must restore before super.onCreate (while lifecycle is INITIALIZED)
         savedStateRegistryController.performRestore(savedInstanceState)
 
@@ -166,6 +170,7 @@ class ExternalSdlActivity :
         // 运行时成功启动后，任何正常 finish 都应回到 MainActivity，而不是回到启动器。
         returnToParentOnFinish = true
         applySdlOrientation()
+        NativeStdStreamRedirect.start()
 
         super.onCreate(savedInstanceState)
 
@@ -207,6 +212,7 @@ class ExternalSdlActivity :
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         viewModelStoreField.clear()
         super.onDestroy()
+        NativeStdStreamRedirect.stop()
         launchEnvironmentOwnerId?.let(NativeLaunchEnvironment::clear)
         launchEnvironmentOwnerId = null
     }

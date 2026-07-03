@@ -26,30 +26,30 @@ class SettingsActivitySupportTest {
         val application = RuntimeEnvironment.getApplication()
 
         val rootIntent = SettingsActivitySupport.buildStartIntent(application)
-        val feedbackIntent = SettingsActivitySupport.buildStartIntent(
+        val helpIntent = SettingsActivitySupport.buildStartIntent(
             application,
-            SettingsRoute.Feedback,
+            SettingsRoute.Help,
             "plugin-quick-start",
             "tinaide.plugin.cpp-snippets",
         )
 
         assertThat(rootIntent.component?.className).isEqualTo(SettingsActivity::class.java.name)
-        assertThat(feedbackIntent.component?.className).isEqualTo(SettingsActivity::class.java.name)
+        assertThat(helpIntent.component?.className).isEqualTo(SettingsActivity::class.java.name)
         assertThat(rootIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
             .isEqualTo(Intent.FLAG_ACTIVITY_NEW_TASK)
-        assertThat(feedbackIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+        assertThat(helpIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
             .isEqualTo(Intent.FLAG_ACTIVITY_NEW_TASK)
         assertThat(SettingsActivitySupport.extractInitialRouteId(rootIntent)).isNull()
-        assertThat(SettingsActivitySupport.extractInitialRouteId(feedbackIntent))
-            .isEqualTo(SettingsRoute.Feedback.route)
+        assertThat(SettingsActivitySupport.extractInitialRouteId(helpIntent))
+            .isEqualTo(SettingsRoute.Help.route)
         assertThat(SettingsActivitySupport.extractInitialHelpDocumentId(rootIntent)).isNull()
-        assertThat(SettingsActivitySupport.extractInitialHelpDocumentId(feedbackIntent))
+        assertThat(SettingsActivitySupport.extractInitialHelpDocumentId(helpIntent))
             .isEqualTo("plugin-quick-start")
         assertThat(SettingsActivitySupport.extractInitialPluginDetailId(rootIntent)).isNull()
-        assertThat(SettingsActivitySupport.extractInitialPluginDetailId(feedbackIntent))
+        assertThat(SettingsActivitySupport.extractInitialPluginDetailId(helpIntent))
             .isEqualTo("tinaide.plugin.cpp-snippets")
         assertThat(SettingsActivitySupport.extractInitialPackageSearchQuery(rootIntent)).isNull()
-        assertThat(SettingsActivitySupport.extractInitialPackageSearchQuery(feedbackIntent)).isNull()
+        assertThat(SettingsActivitySupport.extractInitialPackageSearchQuery(helpIntent)).isNull()
     }
 
     @Test
@@ -138,7 +138,6 @@ class SettingsActivitySupportTest {
             SettingsRoute.PluginMarketplace,
             SettingsRoute.PluginLog,
             SettingsRoute.Help,
-            SettingsRoute.Feedback,
             SettingsRoute.Developer,
             SettingsRoute.About
         )

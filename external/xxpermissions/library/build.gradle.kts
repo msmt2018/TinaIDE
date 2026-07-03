@@ -25,5 +25,5 @@ android {
 dependencies {
     compileOnly("androidx.fragment:fragment:1.8.8")
     // DeviceCompat - 本地模块（避免 JitPack 依赖）
-    implementation(project(":devicecompat-local"))
+    implementation(project.dependencies.project(":devicecompat-local"))
 }

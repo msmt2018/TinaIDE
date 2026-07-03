@@ -21,11 +21,13 @@ class EditorStateSemanticTokensTest {
 
         state.replaceSemanticTokens(tokens)
         val firstVersion = state.semanticTokensVersion
+        val firstStylingVersion = state.effectiveStylingVersion
         state.replaceSemanticTokens(tokens)
 
         assertThat(state.semanticTokens).isEqualTo(tokens)
         assertThat(state.semanticTokensByLine[0]).isEqualTo(tokens)
         assertThat(state.semanticTokensVersion).isEqualTo(firstVersion)
+        assertThat(state.effectiveStylingVersion).isEqualTo(firstStylingVersion)
     }
 
     @Test
@@ -55,6 +57,28 @@ class EditorStateSemanticTokensTest {
         assertThat(state.semanticTokensByLine.keys).containsExactly(0, 2)
         assertThat(state.semanticTokensByLine[2]).containsExactly(mergedToken)
         assertThat(state.semanticTokensVersion).isEqualTo(versionBeforeMerge + 1)
+    }
+
+    @Test
+    fun stylingVersion_shouldBumpForSyntaxAndSemanticChanges() {
+        val state = createState()
+
+        state.notifyHighlightChanged()
+        val afterSyntaxHighlight = state.effectiveStylingVersion
+
+        state.replaceSemanticTokens(
+            listOf(
+                SemanticToken(
+                    line = 0,
+                    startColumn = 0,
+                    length = 5,
+                    tokenType = SemanticTokenType.KEYWORD
+                )
+            )
+        )
+
+        assertThat(afterSyntaxHighlight).isEqualTo(1L)
+        assertThat(state.effectiveStylingVersion).isEqualTo(afterSyntaxHighlight + 1)
     }
 
     @Test

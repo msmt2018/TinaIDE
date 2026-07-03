@@ -101,6 +101,14 @@ class ToolchainConfigManager(private val context: Context) {
     }
 
     /**
+     * 获取当前激活的工具链 ID。
+     */
+    fun getActiveToolchainId(): String? {
+        val config = readConfig()
+        return config.activeToolchain?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    /**
      * 切换激活的工具链
      */
     fun switchToolchain(id: String): Result<Unit> {

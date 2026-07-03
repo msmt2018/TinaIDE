@@ -7,29 +7,26 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * 应用主题枚举
  *
- * 支持四种主题模式：
+ * 支持多种主题模式：
  * - LIGHT: 浅色主题
  * - DARK: 深色主题（纯黑背景 #121212）
  * - GRAY: 灰色主题（深灰背景 #2D2D2D，减少视觉疲劳）
+ * - SAKURA / OCEAN / SPRING / AUTUMN / BLACK: RikkaHub 风格预设主题
  * - AUTO: 跟随系统主题
  */
 enum class AppTheme {
     LIGHT,
     DARK,
     GRAY,
+    SAKURA,
+    OCEAN,
+    SPRING,
+    AUTUMN,
+    BLACK,
     AUTO;
 
     companion object {
-        /**
-         * 从字符串转换为 AppTheme
-         * @param value 主题名称字符串（大小写不敏感）
-         * @return 对应的 AppTheme，无效值默认返回 DARK
-         */
-        fun fromString(value: String): AppTheme = try {
-            valueOf(value.uppercase())
-        } catch (e: IllegalArgumentException) {
-            LIGHT // 默认浅色主题
-        }
+        val DEFAULT: AppTheme = LIGHT
     }
 }
 
@@ -54,7 +51,7 @@ enum class AppTheme {
  * ```
  */
 object ThemeManager {
-    private val _themeFlow = MutableStateFlow(AppTheme.LIGHT)
+    private val _themeFlow = MutableStateFlow(AppTheme.DEFAULT)
 
     /**
      * 主题状态流，供外部订阅
@@ -79,9 +76,9 @@ object ThemeManager {
 
     /**
      * 初始化主题（从持久化存储恢复）
-     * @param savedTheme 保存的主题字符串（例如 "DARK"、"LIGHT"）
+     * @param savedTheme 保存的主题枚举
      */
-    fun initialize(savedTheme: String) {
-        _themeFlow.value = AppTheme.fromString(savedTheme)
+    fun initialize(savedTheme: AppTheme) {
+        _themeFlow.value = savedTheme
     }
 }

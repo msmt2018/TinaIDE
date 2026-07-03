@@ -4,10 +4,13 @@ import android.content.Context
 import com.wuxianggujun.tinaide.cmake.CMake
 import com.wuxianggujun.tinaide.cmake.CMakeDoc
 import com.wuxianggujun.tinaide.cmake.analysis.CMakeAnalyzer
+import com.wuxianggujun.tinaide.core.compile.BuildDiagnosticsLog
 import com.wuxianggujun.tinaide.core.compile.BuildOptions
 import com.wuxianggujun.tinaide.core.compile.BuildResult
 import com.wuxianggujun.tinaide.core.compile.BuildSystem
+import com.wuxianggujun.tinaide.core.compile.CleanResult
 import com.wuxianggujun.tinaide.core.compile.CMakeBuildTypeOption
+import com.wuxianggujun.tinaide.core.compile.CMakeConfigurationIdentity
 import com.wuxianggujun.tinaide.core.compile.CMakeGeneratorOption
 import com.wuxianggujun.tinaide.core.compile.CompileTimeoutConfig
 import com.wuxianggujun.tinaide.core.compile.ConfigureResult
@@ -18,6 +21,7 @@ import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactId
 import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactKind
 import com.wuxianggujun.tinaide.core.compile.artifact.ArtifactSpec
 import com.wuxianggujun.tinaide.core.compile.artifact.BuildFingerprint
+import com.wuxianggujun.tinaide.core.compile.artifact.FingerprintCalculator
 import com.wuxianggujun.tinaide.core.compile.artifact.SourceRef
 import com.wuxianggujun.tinaide.core.compile.artifact.TrackedInputCollector
 import com.wuxianggujun.tinaide.core.compile.cmake.CMakeBuildExecutor
@@ -56,6 +60,22 @@ class CMakeStrategy(
 
     companion object {
         private const val TAG = "CMakeStrategy"
+
+        internal fun shouldCleanBeforeBuild(reason: String?): Boolean {
+            val normalized = reason.normalizedBuildReason()
+            if (normalized.isEmpty()) return false
+            return normalized == "force rebuild requested" ||
+                normalized == "no cached artifact" ||
+                normalized == "cached artifact file missing" ||
+                normalized.startsWith("fingerprint changed:") ||
+                normalized.startsWith("tracked input changed") ||
+                normalized.startsWith("tracked input missing")
+        }
+
+        internal fun shouldForceReconfigureForReason(reason: String?): Boolean =
+            "reconfigureInputsHash" in reason.normalizedBuildReason()
+
+        private fun String?.normalizedBuildReason(): String = orEmpty().trim()
     }
 
     private val sharedTimeoutConfig: CompileTimeoutConfig = timeoutConfig ?: CompileTimeoutConfig(context)
@@ -80,12 +100,21 @@ class CMakeStrategy(
 
     override suspend fun describeOutput(ctx: BuildContext): ArtifactSpec? {
         val all = loadTargets(ctx.projectRoot, ctx.buildDir)
+        BuildDiagnosticsLog.i {
+            "cmake describeOutput targets loaded project=${ctx.projectRoot.absolutePath} " +
+                "requested=${ctx.target.orEmpty()} preferSharedLibraryForRun=${ctx.options.preferSharedLibraryForRun} " +
+                "count=${all.size} targets=${all.diagnosticsSummary()}"
+        }
         if (all.isEmpty()) {
             Timber.tag(TAG).w("describeOutput: no targets in %s", ctx.projectRoot.absolutePath)
+            BuildDiagnosticsLog.w { "cmake describeOutput failed: no targets project=${ctx.projectRoot.absolutePath}" }
             return null
         }
-        val selected = selectTarget(all, ctx.target) ?: run {
+        val selected = selectTarget(all, ctx.target, ctx.options) ?: run {
             Timber.tag(TAG).w("describeOutput: cannot resolve target=%s", ctx.target)
+            BuildDiagnosticsLog.w {
+                "cmake describeOutput failed: cannot resolve target requested=${ctx.target.orEmpty()} targets=${all.diagnosticsSummary()}"
+            }
             return null
         }
 
@@ -100,9 +129,16 @@ class CMakeStrategy(
         val sourceFiles = selected.sources
             .map { relative -> File(ctx.projectRoot, relative) }
             .filter { it.isFile }
-        val trackedInputs = TrackedInputCollector.collectCMakeInputs(ctx.projectRoot, sourceFiles)
+        val targetClosure = resolveTargetClosure(selected, all)
+        val compileInputs = TrackedInputCollector.collectCMakeCompileInputs(
+            projectRoot = ctx.projectRoot,
+            buildDir = ctx.buildDir,
+            targetNames = targetClosure,
+            targetSources = sourceFiles,
+        )
+        val reconfigureInputs = TrackedInputCollector.collectCMakeReconfigureInputs(ctx.projectRoot)
 
-        return ArtifactSpec(
+        val spec = ArtifactSpec(
             id = ArtifactId(
                 projectId = ctx.projectId,
                 targetName = selected.name,
@@ -110,8 +146,15 @@ class CMakeStrategy(
             ),
             expectedPath = File(ctx.buildDir, expectedFileName),
             kind = kind,
-            sources = trackedInputs,
+            sources = compileInputs,
+            reconfigureSources = reconfigureInputs,
         )
+        BuildDiagnosticsLog.i {
+            "cmake describeOutput selected=${selected.diagnosticsSummary()} targetClosure=${targetClosure.sorted().joinToString("|")} " +
+                "kind=$kind expected=${spec.expectedPath.absolutePath} targetSourceFiles=${sourceFiles.size} " +
+                "compileInputs=${compileInputs.size} reconfigureInputs=${reconfigureInputs.size}"
+        }
+        return spec
     }
 
     override suspend fun execute(
@@ -128,7 +171,14 @@ class CMakeStrategy(
 
         // 1. 需要时重新 configure(CMakeCache 变旧 / 参数变更 / 元数据变更)
         lastResolvedRunMode = options.resolvedRunMode
-        if (needsReconfigure(ctx.projectRoot, ctx.buildDir, optionsWithProgress)) {
+        val forceReconfigure = shouldForceReconfigureForReason(ctx.buildReason)
+        if (forceReconfigure) {
+            BuildDiagnosticsLog.i {
+                "cmake force reconfigure before build reason=${ctx.buildReason.orEmpty()} " +
+                    "target=${spec.id.targetName}"
+            }
+        }
+        if (forceReconfigure || needsReconfigure(ctx.projectRoot, ctx.buildDir, optionsWithProgress)) {
             emitter.emit(BuildEvent.Build.ConfigureStarted(spec.id.targetName))
             onProgress(Strings.cmake_progress_reconfiguring.strOr(context))
             val cfgStart = System.currentTimeMillis()
@@ -138,6 +188,10 @@ class CMakeStrategy(
                 return reportFailure(emitter, cfgResult.message, emptyList(), cfgResult.message)
             }
             emitter.emit(BuildEvent.Build.ConfigureCompleted(System.currentTimeMillis() - cfgStart))
+        }
+
+        cleanExistingOutputBeforeBuild(ctx, spec, optionsWithProgress)?.let { message ->
+            return reportFailure(emitter, message, emptyList(), message)
         }
 
         // 2. build
@@ -161,7 +215,7 @@ class CMakeStrategy(
         } else {
             // 完整清理:委托给对应执行器以享有各自的清理语义
             if (isNativeMode(lastResolvedRunMode)) {
-                nativeExecutor.clean(ctx.buildDir)
+                nativeExecutor.clean(ctx.buildDir, ctx.options.toolchainId)
             } else {
                 prootExecutor.clean(ctx.buildDir)
             }
@@ -199,6 +253,7 @@ class CMakeStrategy(
             toolchainId = options.toolchainId,
             cCompilerPath = customCCompiler,
             cxxCompilerPath = customCppCompiler,
+            sysrootProfileId = options.sysrootProfileId,
             sysrootApiLevel = options.sysrootApiLevel,
             cFlags = options.nativeCFlags,
             cppFlags = options.nativeCppFlags,
@@ -233,6 +288,8 @@ class CMakeStrategy(
             compilerType = options.compilerType,
             cCompilerPath = cCompiler,
             cxxCompilerPath = cxxCompiler,
+            sysrootProfileId = options.sysrootProfileId,
+            sysrootApiLevel = options.sysrootApiLevel,
             cFlags = options.nativeCFlags,
             cppFlags = options.nativeCppFlags,
             ldFlags = options.nativeLdFlags,
@@ -257,6 +314,7 @@ class CMakeStrategy(
             generator = mapNativeGenerator(options.cmakeGenerator),
             parallelJobs = resolveParallelJobs(options.parallelJobs),
             toolchainId = options.toolchainId,
+            sysrootProfileId = options.sysrootProfileId,
             sysrootApiLevel = options.sysrootApiLevel,
             onProgress = options.onProgress,
         )
@@ -280,6 +338,42 @@ class CMakeStrategy(
         parallelJobs = resolveParallelJobs(options.parallelJobs),
         progress = options.onProgress ?: {},
     )
+
+    private suspend fun cleanExistingOutputBeforeBuild(
+        ctx: BuildContext,
+        spec: ArtifactSpec,
+        options: BuildOptions,
+    ): String? {
+        if (!shouldCleanBeforeBuild(ctx.buildReason)) return null
+
+        val target = spec.id.targetName.takeIf { it.isNotBlank() } ?: ctx.target.orEmpty()
+        BuildDiagnosticsLog.i {
+            "cmake prebuild clean start target=$target reason=${ctx.buildReason.orEmpty()} " +
+                "artifact=${spec.expectedPath.absolutePath}"
+        }
+        val result = if (isNativeMode(options.resolvedRunMode)) {
+            nativeExecutor.clean(ctx.buildDir, options.toolchainId)
+        } else {
+            prootExecutor.clean(ctx.buildDir)
+        }
+        return when (result) {
+            CleanResult.Success -> {
+                BuildDiagnosticsLog.i {
+                    "cmake prebuild clean success target=$target artifact=${spec.expectedPath.absolutePath}"
+                }
+                null
+            }
+            is CleanResult.Error -> {
+                val message = result.message.ifBlank {
+                    Strings.compile_cmake_clear_build_dir_failed.strOr(context)
+                }
+                BuildDiagnosticsLog.w {
+                    "cmake prebuild clean failed target=$target reason=${ctx.buildReason.orEmpty()} message=$message"
+                }
+                message
+            }
+        }
+    }
 
     // ---------- needsReconfigure ----------
 
@@ -314,12 +408,32 @@ class CMakeStrategy(
             val cachedBuildType = buildTypeRegex.find(cacheContent)?.groupValues?.get(1)?.trim()
             val expectedBuildType = options.cmakeBuildType.cmakeValue
             if (cachedBuildType == null || cachedBuildType != expectedBuildType) return true
+
+            CMakeConfigurationIdentity.from(options).asCMakeCacheEntries().forEach { (key, expectedValue) ->
+                val cachedValue = readCMakeCacheValue(cacheContent, key) ?: return true
+                if (cachedValue != expectedValue) {
+                    Timber.tag(TAG).d(
+                        "CMake cache identity mismatch: %s cached=%s expected=%s",
+                        key,
+                        cachedValue,
+                        expectedValue
+                    )
+                    return true
+                }
+            }
         } catch (e: Exception) {
             Timber.tag(TAG).w("Failed to read CMakeCache.txt: %s", e.message)
             return true
         }
         return false
     }
+
+    private fun readCMakeCacheValue(cacheContent: String, key: String): String? =
+        Regex("""(?m)^${Regex.escape(key)}:[A-Z_]+=(.*)$""")
+            .find(cacheContent)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
 
     private fun resolveExpectedCompilerConfig(options: BuildOptions): Pair<String, String> {
         if (!isNativeMode(options.resolvedRunMode)) {
@@ -365,18 +479,26 @@ class CMakeStrategy(
                     val analysis = CMakeAnalyzer(doc).analyze()
                     return doc.targets.map { target ->
                         val targetType = mapTargetType(target.type)
-                        val properties = analysis.targets[target.name]?.properties.orEmpty()
+                        val targetAnalysis = analysis.targets[target.name]
+                        val properties = targetAnalysis?.properties.orEmpty()
                         val outputName = when (targetType) {
                             TargetInfo.Type.SHARED_LIBRARY -> properties["LIBRARY_OUTPUT_NAME"] ?: properties["OUTPUT_NAME"]
                             TargetInfo.Type.STATIC_LIBRARY -> properties["ARCHIVE_OUTPUT_NAME"] ?: properties["OUTPUT_NAME"]
                             TargetInfo.Type.EXECUTABLE -> properties["RUNTIME_OUTPUT_NAME"] ?: properties["OUTPUT_NAME"]
                             else -> properties["OUTPUT_NAME"]
                         }
+                        val dependencies = buildList {
+                            targetAnalysis?.linkLibraries
+                                ?.map { it.library }
+                                ?.let(::addAll)
+                            targetAnalysis?.dependencies?.let(::addAll)
+                        }.distinct()
                         TargetInfo(
                             name = target.name,
                             type = targetType,
                             sources = target.sources,
                             outputName = outputName,
+                            dependencies = dependencies,
                         )
                     }
                 }
@@ -395,6 +517,23 @@ class CMakeStrategy(
         }
     }
 
+    private fun resolveTargetClosure(target: TargetInfo, allTargets: List<TargetInfo>): Set<String> {
+        val byName = allTargets.associateBy { it.name }
+        val visited = linkedSetOf<String>()
+
+        fun visit(targetName: String) {
+            if (!visited.add(targetName)) return
+            byName[targetName]
+                ?.dependencies
+                .orEmpty()
+                .filter { dependencyName -> dependencyName in byName }
+                .forEach(::visit)
+        }
+
+        visit(target.name)
+        return visited
+    }
+
     private suspend fun wrapArtifact(
         ctx: BuildContext,
         spec: ArtifactSpec,
@@ -407,19 +546,34 @@ class CMakeStrategy(
             ?: spec.expectedPath.takeIf { it.isFile }
         if (artifactFile == null) {
             val reason = "CMake reported success but artifact missing (expected ${spec.expectedPath.absolutePath})"
+            BuildDiagnosticsLog.w {
+                "cmake wrap artifact failed: reported success but artifact missing " +
+                    "reported=${success.outputPath.orEmpty()} expected=${spec.expectedPath.absolutePath}"
+            }
             emitter.emit(BuildEvent.Build.CompileFailed(reason, emptyList()))
             return ExecutionOutcome.Failure(reason)
         }
+        val refreshedSpec = refreshTrackedInputSpec(ctx, spec)
+        val refreshedFingerprint = if (refreshedSpec == spec) {
+            fingerprint
+        } else {
+            FingerprintCalculator().compute(ctx, refreshedSpec)
+        }
         val artifact = Artifact(
-            id = spec.id,
+            id = refreshedSpec.id,
             absolutePath = artifactFile.absolutePath,
-            kind = spec.kind,
+            kind = refreshedSpec.kind,
             contentHash = computeContentHash(artifactFile),
-            fingerprint = fingerprint,
-            sources = spec.sources.map { captureSourceRef(it, ctx.projectRoot) },
+            fingerprint = refreshedFingerprint,
+            sources = refreshedSpec.sources.map { captureSourceRef(it, ctx.projectRoot) },
             compiledAt = System.currentTimeMillis(),
             buildTimeMs = elapsedMs,
         )
+        BuildDiagnosticsLog.i {
+            "cmake wrap artifact success target=${artifact.id.targetName} artifact=${artifact.absolutePath} " +
+                "kind=${artifact.kind} elapsedMs=$elapsedMs sources=${artifact.sources.size} " +
+                "contentHash=${artifact.contentHash.take(12)} trackedHash=${artifact.fingerprint.trackedInputsHash.take(12)}"
+        }
         emitter.emit(BuildEvent.Build.CompileCompleted(artifact))
         return ExecutionOutcome.Success(artifact, success.message)
     }
@@ -439,12 +593,79 @@ class CMakeStrategy(
         )
     }
 
-    private fun selectTarget(all: List<TargetInfo>, requested: String?): TargetInfo? {
-        if (!requested.isNullOrBlank()) return all.firstOrNull { it.name == requested }
-        return all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE }
-            ?: all.firstOrNull { it.type != TargetInfo.Type.OTHER }
-            ?: all.firstOrNull()
+    private suspend fun refreshTrackedInputSpec(ctx: BuildContext, spec: ArtifactSpec): ArtifactSpec {
+        val all = loadTargets(ctx.projectRoot, ctx.buildDir)
+        val selected = all.firstOrNull { it.name == spec.id.targetName } ?: run {
+            BuildDiagnosticsLog.w {
+                "cmake refresh tracked inputs skipped: target missing target=${spec.id.targetName} targets=${all.diagnosticsSummary()}"
+            }
+            return spec
+        }
+        val sourceFiles = selected.sources
+            .map { relative -> File(ctx.projectRoot, relative) }
+            .filter { it.isFile }
+        val targetClosure = resolveTargetClosure(selected, all)
+        val compileInputs = TrackedInputCollector.collectCMakeCompileInputs(
+            projectRoot = ctx.projectRoot,
+            buildDir = ctx.buildDir,
+            targetNames = targetClosure,
+            targetSources = sourceFiles,
+        )
+        val reconfigureInputs = TrackedInputCollector.collectCMakeReconfigureInputs(ctx.projectRoot)
+        BuildDiagnosticsLog.i {
+            "cmake refresh tracked inputs target=${selected.name} targetClosure=${targetClosure.sorted().joinToString("|")} " +
+                "oldCompileInputs=${spec.sources.size} newCompileInputs=${compileInputs.size} " +
+                "oldReconfigureInputs=${spec.reconfigureSources.size} newReconfigureInputs=${reconfigureInputs.size}"
+        }
+        return spec.copy(
+            sources = compileInputs,
+            reconfigureSources = reconfigureInputs,
+        )
     }
+
+    private fun selectTarget(all: List<TargetInfo>, requested: String?, options: BuildOptions): TargetInfo? {
+        val selected = if (!requested.isNullOrBlank()) {
+            all.firstOrNull { it.name == requested }
+        } else {
+            if (options.preferSharedLibraryForRun) {
+                all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY && !it.isAuxiliaryTarget() }
+                    ?: all.firstOrNull { it.type == TargetInfo.Type.SHARED_LIBRARY }
+            } else {
+                all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE && !it.isAuxiliaryTarget() }
+                    ?: all.firstOrNull { it.type == TargetInfo.Type.EXECUTABLE }
+            }
+                ?: all.firstOrNull { it.type != TargetInfo.Type.OTHER }
+                ?: all.firstOrNull()
+        }
+        BuildDiagnosticsLog.i {
+            "cmake selectTarget requested=${requested.orEmpty()} preferSharedLibraryForRun=${options.preferSharedLibraryForRun} " +
+                "selected=${selected?.diagnosticsSummary().orEmpty()} candidates=${all.diagnosticsSummary()}"
+        }
+        return selected
+    }
+
+    private fun TargetInfo.isAuxiliaryTarget(): Boolean {
+        val normalized = name.trim().lowercase()
+        return normalized == "test" ||
+            normalized == "tests" ||
+            normalized.endsWith("_test") ||
+            normalized.endsWith("-test") ||
+            normalized.endsWith("_tests") ||
+            normalized.endsWith("-tests")
+    }
+
+    private fun List<TargetInfo>.diagnosticsSummary(limit: Int = 12): String =
+        if (isEmpty()) {
+            "<none>"
+        } else {
+            take(limit).joinToString(separator = ";") { it.diagnosticsSummary() } +
+                if (size > limit) ";...(+${size - limit})" else ""
+        }
+
+    private fun TargetInfo.diagnosticsSummary(): String =
+        "$name:$type:aux=${isAuxiliaryTarget()}:sources=${sources.size}:deps=${
+            dependencies.joinToString(separator = "|", limit = 4)
+        }:output=${outputName.orEmpty()}"
 
     private fun mapKind(type: TargetInfo.Type): ArtifactKind = when (type) {
         TargetInfo.Type.EXECUTABLE -> ArtifactKind.EXECUTABLE
@@ -494,11 +715,8 @@ class CMakeStrategy(
         return "$buildType-$generator"
     }
 
-    private fun captureSourceRef(file: File, projectRoot: File): SourceRef = SourceRef(
-        relativePath = file.toRelativeString(projectRoot),
-        mtime = file.lastModified(),
-        size = file.length(),
-    )
+    private fun captureSourceRef(file: File, projectRoot: File): SourceRef =
+        SourceRef.capture(file, projectRoot)
 
     private fun computeContentHash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

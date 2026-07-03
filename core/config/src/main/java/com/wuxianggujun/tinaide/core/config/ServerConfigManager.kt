@@ -16,7 +16,7 @@ import timber.log.Timber
 /**
  * 匿名服务端配置管理器。
  *
- * 开源版保留功能开关、反馈、日志上传等服务端能力，但不再读取登录或会员配置。
+ * 开源版保留功能开关、日志上传等服务端能力，但不再读取登录或会员配置。
  */
 object ServerConfigManager {
     private const val TAG = "ServerConfigManager"
@@ -101,8 +101,6 @@ object ServerConfigManager {
 
     fun getConfigVersion(): Long = _config.value?.version ?: 0
 
-    fun isFeedbackEnabled(): Boolean = getCurrentConfig().features.feedbackEnabled
-
     fun isPluginMarketEnabled(): Boolean = getCurrentConfig().features.pluginMarketEnabled
 
     fun isPackageManagerEnabled(): Boolean = getCurrentConfig().features.packageManagerEnabled
@@ -165,7 +163,6 @@ object ServerConfigManager {
         updatedAt = null,
         configRefreshIntervalSecs = 300,
         features = FeatureFlags(
-            feedbackEnabled = true,
             pluginMarketEnabled = true,
             packageManagerEnabled = true,
             developerOptionsEnabled = true

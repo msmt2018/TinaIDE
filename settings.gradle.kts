@@ -44,10 +44,9 @@ fun isLocalTestOrHelpTask(taskName: String): Boolean {
 fun isTreeSitterIndependentLocalTestRequest(): Boolean =
     requestedGradleTasks.isNotEmpty() &&
         requestedGradleTasks.all { taskName ->
-            isLocalTestOrHelpTask(taskName) &&
+                    isLocalTestOrHelpTask(taskName) &&
                 (
-                    isTaskUnderModule(taskName, ":core:plugin") ||
-                        isTaskUnderModule(taskName, ":feature:ai")
+                    isTaskUnderModule(taskName, ":core:plugin")
                     )
         }
 
@@ -59,17 +58,8 @@ if (shouldIncludeTreeSitterComposite) {
     ensureIncludedBuildLocalProperties(file("external/tina-android-tree-sitter"))
 }
 
-enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
-
 pluginManagement {
     includeBuild("build-logic")
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id == "com.google.devtools.ksp") {
-                useModule("com.google.devtools.ksp:symbol-processing-gradle-plugin:${requested.version}")
-            }
-        }
-    }
     val preferOfficialRepositories = System.getenv("CI").equals("true", ignoreCase = true)
     repositories {
         if (preferOfficialRepositories) {
@@ -134,6 +124,18 @@ if (shouldIncludeTreeSitterComposite) {
     logger.lifecycle("Skipping tina-android-tree-sitter included build for isolated local tests.")
 }
 
+val rikkahubBuildDir = file("external/rikkahub")
+if (rikkahubBuildDir.isDirectory) {
+    ensureIncludedBuildLocalProperties(rikkahubBuildDir)
+    includeBuild(rikkahubBuildDir) {
+        dependencySubstitution {
+            substitute(module("me.rerere.rikkahub:rikkahub-embedded")).using(project(":embedded"))
+        }
+    }
+} else {
+    logger.lifecycle("Skipping RikkaHub included build because external/rikkahub is missing.")
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     val preferOfficialRepositories = System.getenv("CI").equals("true", ignoreCase = true)
@@ -190,7 +192,6 @@ include(":core:editor-view")
 include(":core:editor-lsp")
 
 // ===== 功能层 =====
-include(":feature:ai")
 include(":feature:editor")
 include(":feature:help")
 include(":feature:output")

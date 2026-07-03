@@ -22,7 +22,9 @@ class ProjectMetadataStoreNormalizationTest {
                   "cppStandard": "c++20",
                   "nativeApiLevel": 99,
                   "nativeIncludeDirs": ["  third_party/SDL3/include ", "", "third_party/SDL3/include"],
-                  "nativeCFlags": "-O2\n\n -DDEBUG "
+                  "nativeCFlags": "-O2\n\n -DDEBUG ",
+                  "defaultRunTargetName": "  demo_test  ",
+                  "defaultSdlTargetName": "  demo  "
                 }
                 """.trimIndent()
             )
@@ -30,15 +32,18 @@ class ProjectMetadataStoreNormalizationTest {
             val metadata = ProjectMetadataStore.read(projectRoot)
             requireNotNull(metadata)
 
-            assertThat(metadata.schemaVersion).isEqualTo(2)
+            assertThat(metadata.schemaVersion).isEqualTo(3)
             assertThat(metadata.cppStandard).isEqualTo("CPP_20")
             assertThat(metadata.nativeApiLevel).isNull()
             assertThat(metadata.nativeIncludeDirs).containsExactly("third_party/SDL3/include")
             assertThat(metadata.nativeCFlags).isEqualTo("-O2 -DDEBUG")
+            assertThat(metadata.defaultRunTargetName).isEqualTo("demo_test")
+            assertThat(metadata.defaultSdlTargetName).isEqualTo("demo")
 
             val persisted = readProjectMetadata(projectRoot)
-            assertThat(persisted).contains("\"schemaVersion\": 2")
+            assertThat(persisted).contains("\"schemaVersion\": 3")
             assertThat(persisted).contains("\"cppStandard\": \"CPP_20\"")
+            assertThat(persisted).contains("\"defaultRunTargetName\": \"demo_test\"")
         } finally {
             projectRoot.deleteRecursively()
         }
@@ -60,7 +65,7 @@ class ProjectMetadataStoreNormalizationTest {
             assertThat(wrote).isTrue()
 
             val persisted = readProjectMetadata(projectRoot)
-            assertThat(persisted).contains("\"schemaVersion\": 2")
+            assertThat(persisted).contains("\"schemaVersion\": 3")
             assertThat(persisted).contains("\"cppStandard\": \"gnu++2b\"")
         } finally {
             projectRoot.deleteRecursively()

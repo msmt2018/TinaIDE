@@ -24,6 +24,8 @@ class ProjectTemplateMetadataReaderTest {
                       "buildSystem": "cmake",
                       "primaryLanguage": "c++",
                       "ndkTemplate": true,
+                      "defaultRunTargetName": "{{PROJECT_NAME}}_test",
+                      "defaultSdlTargetName": "{{PROJECT_NAME}}",
                       "variables": {
                         "AUTHOR": "TinaIDE",
                         "EMPTY": "",
@@ -43,6 +45,8 @@ class ProjectTemplateMetadataReaderTest {
             assertThat(metadata?.buildSystem).isEqualTo(ProjectBuildSystem.CMAKE)
             assertThat(metadata?.primaryLanguage).isEqualTo(ProjectLanguage.CPP)
             assertThat(metadata?.isNdkTemplate).isTrue()
+            assertThat(metadata?.defaultRunTargetName).isEqualTo("{{PROJECT_NAME}}_test")
+            assertThat(metadata?.defaultSdlTargetName).isEqualTo("{{PROJECT_NAME}}")
             assertThat(metadata?.variables).containsExactly("AUTHOR", "TinaIDE")
         } finally {
             zipFile.delete()

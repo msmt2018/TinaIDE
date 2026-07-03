@@ -1,24 +1,40 @@
 package com.wuxianggujun.tinaide.ui.compose.screens.settings.sections
 
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.config.AppTheme
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import org.junit.Test
 
 class AppearanceSettingsSectionSupportTest {
 
     @Test
-    fun resolveThemeLabel_shouldMapKnownThemesAndFallbackToDark() {
+    fun resolveThemeLabel_shouldMapThemeEnums() {
         assertThat(
-            AppearanceSettingsSectionSupport.resolveThemeLabel("GRAY")
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.GRAY)
         ).isEqualTo(Strings.theme_gray)
         assertThat(
-            AppearanceSettingsSectionSupport.resolveThemeLabel("LIGHT")
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.LIGHT)
         ).isEqualTo(Strings.theme_light)
         assertThat(
-            AppearanceSettingsSectionSupport.resolveThemeLabel("AUTO")
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.AUTO)
         ).isEqualTo(Strings.theme_auto)
         assertThat(
-            AppearanceSettingsSectionSupport.resolveThemeLabel("unexpected")
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.SAKURA)
+        ).isEqualTo(Strings.theme_sakura)
+        assertThat(
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.OCEAN)
+        ).isEqualTo(Strings.theme_ocean)
+        assertThat(
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.SPRING)
+        ).isEqualTo(Strings.theme_spring)
+        assertThat(
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.AUTUMN)
+        ).isEqualTo(Strings.theme_autumn)
+        assertThat(
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.BLACK)
+        ).isEqualTo(Strings.theme_black)
+        assertThat(
+            AppearanceSettingsSectionSupport.resolveThemeLabel(AppTheme.DARK)
         ).isEqualTo(Strings.theme_dark)
     }
 
@@ -27,33 +43,38 @@ class AppearanceSettingsSectionSupportTest {
         assertThat(
             AppearanceSettingsSectionSupport.buildThemeOptions()
         ).containsExactly(
-            AppearanceOptionSpec("DARK", Strings.theme_dark),
-            AppearanceOptionSpec("LIGHT", Strings.theme_light),
-            AppearanceOptionSpec("GRAY", Strings.theme_gray),
-            AppearanceOptionSpec("AUTO", Strings.theme_auto)
+            AppearanceThemeOptionSpec(AppTheme.DARK, Strings.theme_dark),
+            AppearanceThemeOptionSpec(AppTheme.LIGHT, Strings.theme_light),
+            AppearanceThemeOptionSpec(AppTheme.GRAY, Strings.theme_gray),
+            AppearanceThemeOptionSpec(AppTheme.SAKURA, Strings.theme_sakura),
+            AppearanceThemeOptionSpec(AppTheme.OCEAN, Strings.theme_ocean),
+            AppearanceThemeOptionSpec(AppTheme.SPRING, Strings.theme_spring),
+            AppearanceThemeOptionSpec(AppTheme.AUTUMN, Strings.theme_autumn),
+            AppearanceThemeOptionSpec(AppTheme.BLACK, Strings.theme_black),
+            AppearanceThemeOptionSpec(AppTheme.AUTO, Strings.theme_auto)
         ).inOrder()
     }
 
     @Test
     fun themeChangeDecisions_shouldOnlyApplyOnActualChangesAndRecreateForGray() {
         assertThat(
-            AppearanceSettingsSectionSupport.shouldApplyThemeChange("DARK", "DARK")
+            AppearanceSettingsSectionSupport.shouldApplyThemeChange(AppTheme.DARK, AppTheme.DARK)
         ).isFalse()
         assertThat(
-            AppearanceSettingsSectionSupport.shouldApplyThemeChange("DARK", "LIGHT")
+            AppearanceSettingsSectionSupport.shouldApplyThemeChange(AppTheme.DARK, AppTheme.LIGHT)
         ).isTrue()
 
         assertThat(
-            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange("DARK", "LIGHT")
+            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(AppTheme.DARK, AppTheme.LIGHT)
         ).isFalse()
         assertThat(
-            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange("GRAY", "LIGHT")
+            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(AppTheme.GRAY, AppTheme.LIGHT)
         ).isTrue()
         assertThat(
-            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange("LIGHT", "GRAY")
+            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(AppTheme.LIGHT, AppTheme.GRAY)
         ).isTrue()
         assertThat(
-            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange("GRAY", "GRAY")
+            AppearanceSettingsSectionSupport.shouldRecreateForThemeChange(AppTheme.GRAY, AppTheme.GRAY)
         ).isFalse()
     }
 

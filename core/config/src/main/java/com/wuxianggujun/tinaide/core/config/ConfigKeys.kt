@@ -6,7 +6,7 @@ package com.wuxianggujun.tinaide.core.config
 sealed class ConfigKey<T>(val key: String, val default: T) {
 
     // UI 相关
-    object Theme : ConfigKey<String>("ui.theme", "LIGHT")
+    object Theme : ConfigKey<AppTheme>("ui.theme", AppTheme.DEFAULT)
     object DebugToolbarPositionMode : ConfigKey<String>(
         key = "ui.debug.toolbar.position",
         default = "bottom"
@@ -28,12 +28,12 @@ sealed class ConfigKey<T>(val key: String, val default: T) {
     // ========== 日志 / 诊断 ==========
 
     /**
-     * 是否启用崩溃日志自动上传。
-     * 默认关闭；用户明确开启后才后台上报。
+     * 是否启用 TinaIDE 主进程崩溃日志自动上传。
+     * 默认开启；用户 native runtime 崩溃仍由隐私策略拦截，不会上报。
      */
     object CrashAutoUploadEnabled : ConfigKey<Boolean>(
         key = "logs.crash.auto_upload",
-        default = false
+        default = true
     )
 
     /** 最近一次已上报的 tombstone 文件名（用于去重）。 */

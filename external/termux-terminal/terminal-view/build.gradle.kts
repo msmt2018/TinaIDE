@@ -13,7 +13,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -25,6 +25,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.annotation)
-    api(project(":termux-terminal:terminal-emulator"))
+    api(project.dependencies.project(":termux-terminal:terminal-emulator"))
     testImplementation(libs.junit)
 }

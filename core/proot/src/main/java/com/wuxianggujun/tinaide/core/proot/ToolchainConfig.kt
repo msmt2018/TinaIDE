@@ -1,17 +1,16 @@
 package com.wuxianggujun.tinaide.core.proot
 
 import android.content.Context
+import android.os.Parcel
 import android.os.Parcelable
 import com.wuxianggujun.tinaide.core.i18n.Strings
 import com.wuxianggujun.tinaide.core.i18n.strOr
-import kotlinx.parcelize.Parcelize
 
 /**
  * 工具链配置
  *
  * 用于存储用户选择的工具链组件
  */
-@Parcelize
 data class ToolchainConfig(
     // 编译器选择
     val installClang: Boolean = true,
@@ -35,7 +34,31 @@ data class ToolchainConfig(
     val installGit: Boolean = true,
     val installClangFormat: Boolean = true
 ) : Parcelable {
+    private constructor(parcel: Parcel) : this(
+        installClang = parcel.readInt() != 0,
+        installGcc = parcel.readInt() != 0,
+        installLld = parcel.readInt() != 0,
+        installGnuLd = parcel.readInt() != 0,
+        installLldb = parcel.readInt() != 0,
+        installGdb = parcel.readInt() != 0,
+        installClangd = parcel.readInt() != 0,
+        installLlvm = parcel.readInt() != 0,
+        installLibcxx = parcel.readInt() != 0,
+        installCmake = parcel.readInt() != 0,
+        installNinja = parcel.readInt() != 0,
+        installMake = parcel.readInt() != 0,
+        installGit = parcel.readInt() != 0,
+        installClangFormat = parcel.readInt() != 0
+    )
+
     companion object {
+        @JvmField
+        val CREATOR: Parcelable.Creator<ToolchainConfig> = object : Parcelable.Creator<ToolchainConfig> {
+            override fun createFromParcel(parcel: Parcel): ToolchainConfig = ToolchainConfig(parcel)
+
+            override fun newArray(size: Int): Array<ToolchainConfig?> = arrayOfNulls(size)
+        }
+
         /**
          * 推荐配置（适合大多数用户）
          * Clang + LLD + LLDB + 所有必装组件
@@ -48,6 +71,25 @@ data class ToolchainConfig(
             installLldb = true,
             installGdb = false
         )
+    }
+
+    override fun describeContents(): Int = 0
+
+    override fun writeToParcel(parcel: Parcel, flags: Int) {
+        parcel.writeInt(if (installClang) 1 else 0)
+        parcel.writeInt(if (installGcc) 1 else 0)
+        parcel.writeInt(if (installLld) 1 else 0)
+        parcel.writeInt(if (installGnuLd) 1 else 0)
+        parcel.writeInt(if (installLldb) 1 else 0)
+        parcel.writeInt(if (installGdb) 1 else 0)
+        parcel.writeInt(if (installClangd) 1 else 0)
+        parcel.writeInt(if (installLlvm) 1 else 0)
+        parcel.writeInt(if (installLibcxx) 1 else 0)
+        parcel.writeInt(if (installCmake) 1 else 0)
+        parcel.writeInt(if (installNinja) 1 else 0)
+        parcel.writeInt(if (installMake) 1 else 0)
+        parcel.writeInt(if (installGit) 1 else 0)
+        parcel.writeInt(if (installClangFormat) 1 else 0)
     }
 
     /**

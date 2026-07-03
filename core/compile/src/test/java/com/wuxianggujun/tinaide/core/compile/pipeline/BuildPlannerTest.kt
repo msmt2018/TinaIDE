@@ -180,18 +180,83 @@ class BuildPlannerTest {
     }
 
     @Test
+    fun `ifNeeded with empty cached source refs yields Build`() = runTest {
+        val sourceFile = File(projectRoot, "main.c").apply {
+            writeText("int main() { return 0; }")
+        }
+        val spec = defaultSpec(sources = listOf(sourceFile))
+        val cached = newArtifact(
+            fingerprint = calculator.compute(newContext(), spec),
+            sources = emptyList(),
+        )
+        store.put(cached)
+        strategy.describeOutputOverride = { spec }
+
+        val plan = planner.plan(CompileRequest(BuildIntent.IfNeeded, LaunchIntent.None), newContext())
+        assertThat(plan).isInstanceOf(BuildPlan.Build::class.java)
+        assertThat((plan as BuildPlan.Build).reason).contains("tracked input missing from cached artifact")
+    }
+
+    @Test
     fun `ifNeeded fully matched yields Skip`() = runTest {
         val sourceFile = File(projectRoot, "main.c").apply {
             writeText("int main() {}")
         }
         val cached = newArtifact(
-            sources = listOf(SourceRef("main.c", mtime = sourceFile.lastModified(), size = sourceFile.length())),
+            sources = listOf(sourceRefOf(sourceFile)),
             compiledAt = System.currentTimeMillis() + 10_000L,
         )
         store.put(cached)
 
         val plan = planner.plan(CompileRequest(BuildIntent.IfNeeded, LaunchIntent.None), newContext())
         assertThat(plan).isInstanceOf(BuildPlan.Skip::class.java)
+    }
+
+    @Test
+    fun `ifNeeded with same timestamp and size but changed content yields Build`() = runTest {
+        val sourceFile = File(projectRoot, "main.c").apply {
+            writeText("int main() { return 0; }")
+        }
+        val capturedTimestamp = sourceFile.lastModified()
+        val cached = newArtifact(
+            sources = listOf(sourceRefOf(sourceFile)),
+            compiledAt = capturedTimestamp + 10_000L,
+        )
+        store.put(cached)
+
+        sourceFile.writeText("int main() { return 1; }")
+        sourceFile.setLastModified(capturedTimestamp)
+
+        val plan = planner.plan(CompileRequest(BuildIntent.IfNeeded, LaunchIntent.None), newContext())
+        assertThat(plan).isInstanceOf(BuildPlan.Build::class.java)
+        assertThat((plan as BuildPlan.Build).reason).contains("trackedInputsHash")
+    }
+
+    @Test
+    fun `ifNeeded with reconfigure input hash mismatch yields Build`() = runTest {
+        val sourceFile = File(projectRoot, "main.c").apply {
+            writeText("int main() {}")
+        }
+        val cmakeFile = File(projectRoot, "CMakeLists.txt").apply {
+            writeText("add_executable(app main.c)")
+        }
+        val spec = defaultSpec(
+            sources = listOf(sourceFile),
+        ).copy(
+            reconfigureSources = listOf(cmakeFile),
+        )
+        val cached = newArtifact(
+            fingerprint = calculator.compute(newContext(), spec),
+            sources = listOf(sourceRefOf(sourceFile)),
+        )
+        store.put(cached)
+        strategy.describeOutputOverride = { spec }
+
+        cmakeFile.writeText("add_executable(app main.c)\n")
+
+        val plan = planner.plan(CompileRequest(BuildIntent.IfNeeded, LaunchIntent.None), newContext())
+        assertThat(plan).isInstanceOf(BuildPlan.Build::class.java)
+        assertThat((plan as BuildPlan.Build).reason).contains("reconfigureInputsHash")
     }
 
     @Test
@@ -265,11 +330,7 @@ class BuildPlannerTest {
         sources = sources,
     )
 
-    private fun sourceRefOf(file: File): SourceRef = SourceRef(
-        relativePath = file.toRelativeString(projectRoot),
-        mtime = file.lastModified(),
-        size = file.length(),
-    )
+    private fun sourceRefOf(file: File): SourceRef = SourceRef.capture(file, projectRoot)
 
     // ---------- fakes ----------
 

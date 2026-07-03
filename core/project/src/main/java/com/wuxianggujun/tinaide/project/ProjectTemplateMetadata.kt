@@ -17,6 +17,8 @@ data class ProjectTemplateMetadata(
     val buildSystem: ProjectBuildSystem? = null,
     val primaryLanguage: ProjectLanguage? = null,
     val isNdkTemplate: Boolean? = null,
+    val defaultRunTargetName: String? = null,
+    val defaultSdlTargetName: String? = null,
     val variables: Map<String, String> = emptyMap(),
 ) {
     internal fun hasAnyField(): Boolean = name != null ||
@@ -25,6 +27,8 @@ data class ProjectTemplateMetadata(
         buildSystem != null ||
         primaryLanguage != null ||
         isNdkTemplate != null ||
+        defaultRunTargetName != null ||
+        defaultSdlTargetName != null ||
         variables.isNotEmpty()
 }
 
@@ -62,6 +66,18 @@ object ProjectTemplateMetadataReader {
             buildSystem = parseBuildSystem(root.firstString("buildSystem", "build_system")),
             primaryLanguage = parseLanguage(root.firstString("primaryLanguage", "primary_language")),
             isNdkTemplate = root.firstBoolean("ndkTemplate", "ndk_template", "isNdkTemplate"),
+            defaultRunTargetName = root.firstString(
+                "defaultRunTargetName",
+                "default_run_target_name",
+                "defaultRunTarget",
+                "default_run_target"
+            ),
+            defaultSdlTargetName = root.firstString(
+                "defaultSdlTargetName",
+                "default_sdl_target_name",
+                "defaultSdlTarget",
+                "default_sdl_target"
+            ),
             variables = root.stringMap("variables"),
         )
         return metadata.takeIf { it.hasAnyField() }

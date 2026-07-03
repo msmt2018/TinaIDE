@@ -72,20 +72,11 @@ internal fun MainActivityWorkspaceSection(
     val openCommandPalette = { showCommandPalette = true }
     val dismissCommandPalette = { showCommandPalette = false }
 
-    val currentAiChatViewModel = mainActivityHostEffects(
-        context = activity,
-        lifecycleScope = lifecycleScope,
+    mainActivityHostEffects(
         projectContext = projectContext,
         fileTreeState = fileTreeState,
         gitViewModel = gitViewModel,
         uiScope = uiScope,
-        editorContainerState = editorContainerState,
-        bottomPanelViewModel = bottomPanelViewModel,
-        processManager = processManager,
-        buildUiState = buildUiState,
-        editorManager = editorManager,
-        outputManager = outputManager,
-        bottomPanelController = bottomPanelController,
     )
 
     val workspaceUi = rememberMainActivityWorkspaceUi(
@@ -141,7 +132,6 @@ internal fun MainActivityWorkspaceSection(
         editorContainerState = editorContainerState,
         dialogState = dialogState,
         gitDialogState = gitDialogState,
-        currentAiChatViewModel = currentAiChatViewModel,
         drawerState = drawerState,
         buildUiState = buildUiState,
         hostCommandExecutor = workspaceUi.hostCommandExecutor,

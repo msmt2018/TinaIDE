@@ -1,7 +1,6 @@
 plugins {
     id("tina.android.library")
     alias(libs.plugins.kotlin.serialization)
-    id("kotlin-parcelize")
 }
 
 android {
@@ -10,16 +9,16 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
-    api(project(":core:common"))
-    implementation(project(":core:config"))
-    implementation(project(":core:i18n"))
-    implementation(project(":core:linux-distro"))
-    implementation(project(":core:model"))
-    implementation(project(":core:ndk"))
-    implementation(project(":core:network"))
-    implementation(project(":core:security"))
-    implementation(project(":core:storage"))
-    implementation(project(":tina-exec:integration"))
+    api(project.dependencies.project(":core:common"))
+    implementation(project.dependencies.project(":core:config"))
+    implementation(project.dependencies.project(":core:i18n"))
+    implementation(project.dependencies.project(":core:linux-distro"))
+    implementation(project.dependencies.project(":core:model"))
+    implementation(project.dependencies.project(":core:ndk"))
+    implementation(project.dependencies.project(":core:network"))
+    implementation(project.dependencies.project(":core:security"))
+    implementation(project.dependencies.project(":core:storage"))
+    implementation(project.dependencies.project(":tina-exec:integration"))
     implementation(libs.timber)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.okhttp)

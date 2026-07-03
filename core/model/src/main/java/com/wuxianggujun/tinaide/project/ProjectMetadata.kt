@@ -76,7 +76,7 @@ data class ProjectMetadata(
      * - 新写入始终使用 2
      * - 读取阶段由 ProjectMetadataStore 做当前 schema 的字段归一化
      */
-    val schemaVersion: Int = 2,
+    val schemaVersion: Int = 3,
     val id: String,
     val displayName: String,
     val createdAt: Long,
@@ -111,7 +111,11 @@ data class ProjectMetadata(
     /** 原生链接库参数（项目级） */
     val nativeLdLibs: String = "",
     /** CMake 额外参数（项目级） */
-    val nativeCMakeArgs: List<String> = emptyList()
+    val nativeCMakeArgs: List<String> = emptyList(),
+    /** Default target for normal build/run flows, usually an executable. */
+    val defaultRunTargetName: String? = null,
+    /** Default target for SDL graphical run flows, usually a shared library. */
+    val defaultSdlTargetName: String? = null
 ) {
     /**
      * 获取 C++ 标准枚举值（默认 C++17）
@@ -191,6 +195,10 @@ data class ProjectMetadata(
      */
     fun normalizedNativeCMakeArgs(): List<String> = normalizeStringEntries(nativeCMakeArgs)
 
+    fun normalizedDefaultRunTargetName(): String? = normalizeTargetName(defaultRunTargetName)
+
+    fun normalizedDefaultSdlTargetName(): String? = normalizeTargetName(defaultSdlTargetName)
+
     private fun normalizePathEntries(entries: List<String>): List<String> = normalizeStringEntries(entries)
 
     private fun normalizeStringEntries(entries: List<String>): List<String> {
@@ -210,4 +218,8 @@ data class ProjectMetadata(
             .joinToString(" ")
             .trim()
     }
+
+    private fun normalizeTargetName(value: String?): String? = value
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
 }

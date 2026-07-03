@@ -17,7 +17,7 @@ android {
 }
 
 dependencies {
-    api(project(":xxpermissions-local"))
+    api(project.dependencies.project(":xxpermissions-local"))
     api("androidx.fragment:fragment:1.8.8") {
         exclude(group = "org.jetbrains.kotlin")
     }

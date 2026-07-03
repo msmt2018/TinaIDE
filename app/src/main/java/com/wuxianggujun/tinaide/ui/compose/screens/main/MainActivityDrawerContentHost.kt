@@ -2,13 +2,11 @@ package com.wuxianggujun.tinaide.ui.compose.screens.main
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.wuxianggujun.tinaide.ai.viewmodel.AiChatViewModel
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
 import com.wuxianggujun.tinaide.file.IProjectContext
 import com.wuxianggujun.tinaide.ui.GitStatusHelper
 import com.wuxianggujun.tinaide.ui.GitViewModel
 import com.wuxianggujun.tinaide.ui.MainActivityActionsDelegate
-import com.wuxianggujun.tinaide.ui.compose.components.DrawerAiCallbacks
 import com.wuxianggujun.tinaide.ui.compose.components.DrawerContent
 import com.wuxianggujun.tinaide.ui.compose.components.DrawerFileCallbacks
 import com.wuxianggujun.tinaide.ui.compose.components.DrawerGitCallbacks
@@ -33,7 +31,6 @@ internal fun MainActivityDrawerContentHost(
     actionsDelegate: MainActivityActionsDelegate,
     gitUiState: GitUiState,
     gitDialogState: GitDialogState,
-    currentAiChatViewModel: AiChatViewModel,
     hostCommandExecutor: HostCommandExecutor?,
     drawerState: SwipeableDrawerState,
     uiScope: CoroutineScope,
@@ -50,6 +47,7 @@ internal fun MainActivityDrawerContentHost(
         fileTreeState = fileTreeState,
         pluginManager = koinInject(),
         hostCommandExecutor = hostCommandExecutor,
+        drawerOpen = drawerState.isOpen,
         fileCallbacks = DrawerFileCallbacks(
             onFileClick = { file ->
                 editorContainerState.openFile(file)
@@ -170,18 +168,5 @@ internal fun MainActivityDrawerContentHost(
             recentCommitMessages = gitUiState.recentCommitMessages,
             onClearCommitMessageHistory = gitViewModel::clearRecentCommitMessages,
         ),
-        aiChatViewModel = currentAiChatViewModel,
-        aiCallbacks = DrawerAiCallbacks(
-            onInsertCode = { code ->
-                editorContainerState.insertTextAtCursor(code)
-            },
-            onGetCurrentFile = {
-                editorContainerState.snapshotCurrentFileContext()
-            },
-            onGetSelectedCode = {
-                editorContainerState.snapshotSelectedCodeContext()
-            },
-            onOpenSettings = callbacks.onOpenAiSettings,
-        )
     )
 }

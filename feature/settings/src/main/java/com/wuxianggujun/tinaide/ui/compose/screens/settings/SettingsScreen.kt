@@ -44,7 +44,6 @@ import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionHea
 import com.wuxianggujun.tinaide.ui.compose.components.TinaDropdownMenuSectionTitle
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AboutSettingsSection
-import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AiSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.AppearanceSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.CompilerSettingsSection
 import com.wuxianggujun.tinaide.ui.compose.screens.settings.sections.DeveloperOptionsSection
@@ -85,7 +84,6 @@ sealed class SettingsRoute(val route: String, val title: Int) {
     data object PluginMarketplace : SettingsRoute("plugin_marketplace", Strings.plugin_marketplace_title)
     data object PluginLog : SettingsRoute("plugin_log", Strings.plugin_log_title)
     data object Help : SettingsRoute("help", Strings.settings_title_help)
-    data object Feedback : SettingsRoute("feedback", Strings.feedback_title)
     data object Developer : SettingsRoute("developer", Strings.settings_title_developer)
     data object About : SettingsRoute("about", Strings.settings_title_about)
 }
@@ -106,8 +104,8 @@ fun SettingsScreen(
     onNavigateTo: (SettingsRoute) -> Unit,
     // Composable slots for screens that live outside this module
     helpContent: (@Composable (onBack: () -> Unit) -> Unit)? = null,
-    feedbackContent: (@Composable (onBack: () -> Unit) -> Unit)? = null,
     packagesContent: (@Composable (onBack: () -> Unit) -> Unit)? = null,
+    aiSettingsContent: (@Composable (onBack: () -> Unit) -> Unit)? = null,
     // Navigation callbacks for Activity launches
     onNavigateToDependencyInstall: () -> Unit = {},
     onNavigateToPRootLog: () -> Unit = {},
@@ -116,14 +114,14 @@ fun SettingsScreen(
     val routeResolution = remember(
         currentRoute,
         helpContent,
-        feedbackContent,
-        packagesContent
+        packagesContent,
+        aiSettingsContent
     ) {
         SettingsScreenSupport.resolveRouteResolution(
             currentRoute = currentRoute,
             hasHelpContent = helpContent != null,
-            hasFeedbackContent = feedbackContent != null,
-            hasPackagesContent = packagesContent != null
+            hasPackagesContent = packagesContent != null,
+            hasAiSettingsContent = aiSettingsContent != null
         )
     }
 
@@ -138,11 +136,6 @@ fun SettingsScreen(
     when (routeResolution.host) {
         SettingsScreenHost.HelpContent -> {
             helpContent?.invoke(onNavigateBack)
-            return
-        }
-
-        SettingsScreenHost.FeedbackContent -> {
-            feedbackContent?.invoke(onNavigateBack)
             return
         }
 
@@ -179,6 +172,11 @@ fun SettingsScreen(
 
         SettingsScreenHost.PackagesContent -> {
             packagesContent?.invoke(onNavigateBack)
+            return
+        }
+
+        SettingsScreenHost.AiSettingsContent -> {
+            aiSettingsContent?.invoke(onNavigateBack)
             return
         }
 
@@ -226,7 +224,6 @@ fun SettingsScreen(
     val isPluginDetail = currentRoute == SettingsRoute.Plugins && selectedPluginIdForDetail != null
     // 是否处于插件管理模式
     val isPluginManage = currentRoute == SettingsRoute.Plugins && isPluginManageMode
-
     if (showLinuxEnvironmentInstallPrompt) {
         TinaConfirmDialog(
             title = stringResource(Strings.settings_linux_system),
@@ -425,7 +422,6 @@ fun SettingsScreen(
                     SettingsScrollableContent.Terminal -> TerminalSettingsSection(
                         linuxEnvironmentEnabled = settingsState.linuxEnvironmentEnabled
                     )
-                    SettingsScrollableContent.Ai -> AiSettingsSection()
                     SettingsScrollableContent.Appearance -> AppearanceSettingsSection(settingsViewModel)
                     SettingsScrollableContent.Keyboard -> KeyboardSettingsSection()
                     SettingsScrollableContent.Developer -> DeveloperOptionsSection(

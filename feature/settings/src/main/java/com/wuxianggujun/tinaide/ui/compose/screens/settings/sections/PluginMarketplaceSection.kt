@@ -69,8 +69,8 @@ import com.wuxianggujun.tinaide.ui.compose.components.DetailHeaderCard
 import com.wuxianggujun.tinaide.ui.compose.components.DetailIconPlaceholder
 import com.wuxianggujun.tinaide.ui.compose.components.DetailInfoCard
 import com.wuxianggujun.tinaide.ui.compose.components.TinaBackHandlers
-import com.wuxianggujun.tinaide.ui.compose.components.TinaShapes
 import com.wuxianggujun.tinaide.ui.compose.components.TinaSpacing
+import com.wuxianggujun.tinaide.ui.compose.components.TinaShapes
 import com.wuxianggujun.tinaide.ui.compose.components.TinaTopBar
 import com.wuxianggujun.tinaide.ui.compose.components.tinaBackAction
 
@@ -593,7 +593,6 @@ private fun PluginDetailScreen(
         hasUpdate = hasUpdate,
         downloadProgress = downloadProgress,
     )
-
     Scaffold(
         topBar = {
             TinaTopBar(

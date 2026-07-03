@@ -51,6 +51,8 @@ import com.wuxianggujun.tinaide.plugin.lsp.LspPluginManager
 import com.wuxianggujun.tinaide.plugin.lsp.LspPluginReadinessDiagnostic
 import com.wuxianggujun.tinaide.plugin.lsp.LspServerConfig
 import com.wuxianggujun.tinaide.plugin.lsp.PluginLspConnectionProvider
+import com.wuxianggujun.tinaide.project.CppStandard
+import com.wuxianggujun.tinaide.project.ProjectMetadataStore
 import com.wuxianggujun.tinaide.ui.compose.components.EditorStatus
 import java.io.File
 import java.net.URI
@@ -157,6 +159,11 @@ class LspEditorManager {
     private data class CompileSetupKey(
         val projectHint: String,
         val languageId: String,
+        val runMode: LinuxRunModePolicy.RunMode,
+        val toolchainId: String,
+        val sysrootProfileId: String?,
+        val sysrootApiLevel: Int,
+        val cppStandardFlag: String,
     )
 
     private data class CompileSetup(
@@ -1475,14 +1482,22 @@ class LspEditorManager {
         compileDatabaseProvider ?: CompileDatabaseProvider(context).also { compileDatabaseProvider = it }
     }
 
-    private fun buildCompileSetupKey(file: File, projectRootPath: String?): CompileSetupKey {
-        val projectHint = projectRootPath
-            ?.takeIf { it.isNotBlank() }
-            ?: file.parentFile?.absolutePath
-            ?: file.absolutePath
+    private fun buildCompileSetupKey(
+        file: File,
+        projectRootPath: String?,
+        provider: CompileDatabaseProvider,
+    ): CompileSetupKey {
+        val workspaceRoot = resolveCompileWorkspaceRoot(file, projectRootPath)
+        val projectHint = resolveCompileProjectHint(file, projectRootPath)
+        val runtimeIdentity = provider.resolveRuntimeIdentity(workspaceRoot)
         return CompileSetupKey(
             projectHint = projectHint,
-            languageId = languageIdForFile(file)
+            languageId = languageIdForFile(file),
+            runMode = resolveClangdRunMode(),
+            toolchainId = runtimeIdentity.toolchainId,
+            sysrootProfileId = runtimeIdentity.sysrootProfileId,
+            sysrootApiLevel = runtimeIdentity.sysrootApiLevel,
+            cppStandardFlag = resolveCppStandardFlag(workspaceRoot),
         )
     }
 
@@ -1493,14 +1508,23 @@ class LspEditorManager {
     }
 
     private fun invalidateCompileSetupsForProject(file: File, projectRootPath: String?) {
-        val projectHint = projectRootPath
-            ?.takeIf { it.isNotBlank() }
-            ?: file.parentFile?.absolutePath
-            ?: file.absolutePath
+        val projectHint = resolveCompileProjectHint(file, projectRootPath)
         synchronized(stateLock) {
             compileSetupCache.keys.removeAll { key -> key.projectHint == projectHint }
         }
     }
+
+    private fun resolveCompileProjectHint(file: File, projectRootPath: String?): String {
+        val workspaceRoot = resolveCompileWorkspaceRoot(file, projectRootPath)
+        return workspaceRoot?.stablePath()
+            ?: projectRootPath
+                ?.takeIf { it.isNotBlank() }
+                ?.let { File(it).stablePath() }
+            ?: file.parentFile?.stablePath()
+            ?: file.stablePath()
+    }
+
+    private fun File.stablePath(): String = runCatching { canonicalPath }.getOrDefault(absolutePath)
 
     private fun nextRequestGeneration(tabId: String): List<CompletableFuture<*>> =
         tabRequestTracker.invalidateTab(tabId)
@@ -1532,7 +1556,8 @@ class LspEditorManager {
         projectRootPath: String?,
     ): CompileSetup? {
         val startedAt = System.nanoTime()
-        val key = buildCompileSetupKey(file, projectRootPath)
+        val compileProvider = getCompileDatabaseProvider(context)
+        val key = buildCompileSetupKey(file, projectRootPath, compileProvider)
         synchronized(stateLock) {
             compileSetupCache[key]
         }?.let { cached ->
@@ -1566,7 +1591,6 @@ class LspEditorManager {
             }?.let { cached -> return cached }
 
             compileSetupTasks[key]?.takeIf { it.isActive } ?: lspScope.async(Dispatchers.IO) {
-                val compileProvider = getCompileDatabaseProvider(context)
                 val prepared = compileProvider.prepare(file, projectRootPath) ?: return@async null
                 val ensured = compileProvider.ensureWithResult(prepared) ?: return@async null
                 CompileSetup(
@@ -1609,9 +1633,37 @@ class LspEditorManager {
         runCatching {
             val provider = getCompileDatabaseProvider(context)
             val currentFingerprint = provider.computePackageFingerprint(cached.prepared.workspaceRoot)
-            currentFingerprint == cached.prepared.packageFingerprint
+            val currentRuntimeIdentity = provider.resolveRuntimeIdentity(cached.prepared.workspaceRoot)
+            currentFingerprint == cached.prepared.packageFingerprint &&
+                currentRuntimeIdentity.toolchainId == cached.prepared.toolchainId &&
+                currentRuntimeIdentity.sysrootProfileId == cached.prepared.sysrootProfileId &&
+                currentRuntimeIdentity.sysrootApiLevel == cached.prepared.sysrootApiLevel &&
+                resolveCppStandardFlag(cached.prepared.workspaceRoot) == cached.prepared.desiredCppStandard.flag
         }.getOrDefault(true)
     }
+
+    private fun resolveCompileWorkspaceRoot(file: File, projectRootPath: String?): File? {
+        val candidate = projectRootPath
+            ?.takeIf { it.isNotBlank() }
+            ?.let { File(it) }
+            ?.takeIf { it.isDirectory }
+
+        if (candidate != null) {
+            val candidatePath = runCatching { candidate.canonicalPath }.getOrNull()
+            val filePath = runCatching { file.canonicalPath }.getOrNull()
+            if (candidatePath != null && filePath != null) {
+                val inProject = filePath == candidatePath || filePath.startsWith(candidatePath + File.separator)
+                if (inProject) return candidate
+            }
+        }
+
+        return file.parentFile?.takeIf { it.isDirectory }
+    }
+
+    private fun resolveCppStandardFlag(projectRoot: File?): String =
+        projectRoot
+            ?.let { root -> runCatching { ProjectMetadataStore.read(root)?.getCppStandard()?.flag }.getOrNull() }
+            ?: CppStandard.DEFAULT.flag
 
     private fun startSharedCxxAttach(
         tabId: String,

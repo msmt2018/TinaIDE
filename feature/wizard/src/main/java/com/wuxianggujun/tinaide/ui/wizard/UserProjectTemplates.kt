@@ -57,6 +57,8 @@ internal object UserProjectTemplates {
                 buildSystem = metadata?.buildSystem ?: inspection.buildSystem,
                 primaryLanguage = metadata?.primaryLanguage ?: inspection.primaryLanguage,
                 isNdkTemplate = metadata?.isNdkTemplate ?: false,
+                defaultRunTargetName = metadata?.defaultRunTargetName,
+                defaultSdlTargetName = metadata?.defaultSdlTargetName,
                 variables = metadata?.variables.orEmpty(),
             )
         )

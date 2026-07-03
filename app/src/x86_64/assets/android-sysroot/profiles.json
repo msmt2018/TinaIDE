@@ -3,60 +3,6 @@
     "defaultProfileId":  "builtin-ndk-r27c-x86_64",
     "profiles":  [
                      {
-                         "id":  "builtin-ndk-r25c-x86_64",
-                         "name":  "NDK r25c",
-                         "arch":  "X86_64",
-                         "assetPath":  "android-sysroot/android-sysroot-x86_64-r25c.tar.xz",
-                         "sha256":  "b057626719e08c46e427bdb409c7867d9e88a188377c21a432219f708420452f",
-                         "apiLevels":  [
-                                           21,
-                                           22,
-                                           23,
-                                           24,
-                                           26,
-                                           27,
-                                           28,
-                                           29,
-                                           30,
-                                           31,
-                                           32,
-                                           33
-                                       ],
-                         "toolchainTriple":  "x86_64-linux-android",
-                         "createdAt":  "2026-06-15T02:26:36+00:00",
-                         "default":  false,
-                         "ndkVersion":  "r25c",
-                         "ndkLlvmVersion":  "14.0.7"
-                     },
-                     {
-                         "id":  "builtin-ndk-r26d-x86_64",
-                         "name":  "NDK r26d",
-                         "arch":  "X86_64",
-                         "assetPath":  "android-sysroot/android-sysroot-x86_64-r26d.tar.xz",
-                         "sha256":  "67b78d971f348cd1cba4afee042dc64db862ef40c869acb6071bbfc64881fe42",
-                         "apiLevels":  [
-                                           21,
-                                           22,
-                                           23,
-                                           24,
-                                           25,
-                                           26,
-                                           27,
-                                           28,
-                                           29,
-                                           30,
-                                           31,
-                                           32,
-                                           33,
-                                           34
-                                       ],
-                         "toolchainTriple":  "x86_64-linux-android",
-                         "createdAt":  "2026-06-15T02:29:40+00:00",
-                         "default":  false,
-                         "ndkVersion":  "r26d",
-                         "ndkLlvmVersion":  "17"
-                     },
-                     {
                          "id":  "builtin-ndk-r27c-x86_64",
                          "name":  "NDK r27c",
                          "arch":  "X86_64",
@@ -84,6 +30,35 @@
                          "default":  true,
                          "ndkVersion":  "r27c",
                          "ndkLlvmVersion":  "18"
+                     },
+                     {
+                         "id":  "builtin-ndk-r28c-x86_64",
+                         "name":  "NDK r28c",
+                         "arch":  "X86_64",
+                         "assetPath":  "android-sysroot/android-sysroot-x86_64-r28c.tar.xz",
+                         "sha256":  "7ee16f134455345ec7e13ef09166331dccaf26bd66524fd57675e12d6d3c8190",
+                         "apiLevels":  [
+                                           21,
+                                           22,
+                                           23,
+                                           24,
+                                           25,
+                                           26,
+                                           27,
+                                           28,
+                                           29,
+                                           30,
+                                           31,
+                                           32,
+                                           33,
+                                           34,
+                                           35
+                                       ],
+                         "toolchainTriple":  "x86_64-linux-android",
+                         "createdAt":  "2026-06-19T05:18:12+00:00",
+                         "default":  false,
+                         "ndkVersion":  "r28c",
+                         "ndkLlvmVersion":  "19"
                      }
                  ]
 }

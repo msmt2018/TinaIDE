@@ -60,6 +60,54 @@ class ProjectRunConfigBootstrapperTest {
     }
 
     @Test
+    fun `initializeIfMissing writes explicit terminal target from metadata`() {
+        val projectRoot = createTempProjectRoot()
+        try {
+            ProjectMetadataStore.ensure(
+                projectRoot = projectRoot,
+                displayNameFallback = projectRoot.name,
+                apkExportType = ProjectApkExportType.TERMINAL,
+                defaultRunTargetName = "demo_test",
+                defaultSdlTargetName = "demo"
+            )
+
+            val initialized = ProjectRunConfigBootstrapper.initializeIfMissing(projectRoot)
+
+            assertThat(initialized).isTrue()
+            assertThat(runConfigFile(projectRoot).exists()).isTrue()
+
+            val manager = RunConfigurationManager.load(projectRoot.absolutePath)
+            assertThat(manager.selectedConfig.outputMode).isEqualTo(OutputMode.TERMINAL)
+            assertThat(manager.selectedConfig.targetName).isEqualTo("demo_test")
+        } finally {
+            projectRoot.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `initializeIfMissing writes sdl target when sdl3 metadata provides one`() {
+        val projectRoot = createTempProjectRoot()
+        try {
+            ProjectMetadataStore.ensure(
+                projectRoot = projectRoot,
+                displayNameFallback = projectRoot.name,
+                apkExportType = ProjectApkExportType.SDL3,
+                defaultRunTargetName = "demo_test",
+                defaultSdlTargetName = "demo"
+            )
+
+            val initialized = ProjectRunConfigBootstrapper.initializeIfMissing(projectRoot)
+
+            assertThat(initialized).isTrue()
+            val manager = RunConfigurationManager.load(projectRoot.absolutePath)
+            assertThat(manager.selectedConfig.outputMode).isEqualTo(OutputMode.SDL)
+            assertThat(manager.selectedConfig.targetName).isEqualTo("demo")
+        } finally {
+            projectRoot.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `initializeIfMissing skips non sdl3 project`() {
         val projectRoot = createTempProjectRoot()
         try {

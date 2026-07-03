@@ -22,6 +22,18 @@ internal class EditorSaveAllNotificationTracker {
     fun resolveSuccessfulTargets(
         results: List<SaveResult>
     ): List<EditorContainerState.ActiveSaveTarget> {
+        val resultTargets = results.mapNotNull { result ->
+            val target = (result as? SaveResult.Success)?.target ?: return@mapNotNull null
+            EditorContainerState.ActiveSaveTarget(
+                tabId = target.tabId,
+                file = target.file
+            )
+        }
+        if (resultTargets.isNotEmpty()) {
+            pendingTargets = emptyList()
+            return resultTargets
+        }
+
         val targets = pendingTargets
         pendingTargets = emptyList()
         if (targets.isEmpty() || results.isEmpty()) return emptyList()

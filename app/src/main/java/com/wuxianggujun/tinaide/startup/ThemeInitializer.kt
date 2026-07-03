@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.startup
 
 import android.content.Context
+import com.wuxianggujun.tinaide.core.config.AppTheme
 import com.wuxianggujun.tinaide.core.config.Prefs
 import com.wuxianggujun.tinaide.core.config.ThemeManager
 import timber.log.Timber
@@ -24,7 +25,7 @@ class ThemeInitializer(private val context: Context) {
             Timber.tag(TAG).i("ThemeManager initialized with theme: %s", savedTheme)
         } catch (t: Throwable) {
             Timber.tag(TAG).e(t, "Failed to initialize ThemeManager")
-            ThemeManager.initialize("LIGHT")
+            ThemeManager.initialize(AppTheme.DEFAULT)
         }
     }
 

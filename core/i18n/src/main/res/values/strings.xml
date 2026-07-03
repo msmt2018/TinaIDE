@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">TinaIDE</string>
   <string name="menu_refresh">刷新</string>
@@ -40,9 +41,10 @@
 
   <string name="settings_title_terminal">终端</string>
   <string name="settings_desc_terminal">终端主题、字体大小、交互行为</string>
-  <string name="settings_title_ai">AI 助手</string>
-  <string name="settings_desc_ai">配置 API Key、服务商、模型</string>
-  <string name="settings_title_git">Git 设置</string>
+  <string name="settings_title_ai">AI 设置</string>
+  <string name="settings_desc_ai">模型、Provider、MCP、助手和聊天偏好</string>
+
+<string name="settings_title_git">Git 设置</string>
   <string name="settings_desc_git">HTTPS 认证与 SSH 密钥管理</string>
 
   <!-- Git Settings Tabs -->
@@ -52,7 +54,7 @@
   <string name="settings_cat_github_registry">GitHub 访问</string>
   <string name="github_registry_proxy_enabled_title">启用 HTTP 代理</string>
   <string name="github_registry_proxy_enabled_desc">通过本地或自建 HTTP 代理访问 GitHub</string>
-  <string name="github_registry_proxy_scope_desc">用于应用更新、插件市场和依赖包 Registry。HTTP 代理负责网络连接；GitHub 镜像 URL 会把 GitHub 链接改写为镜像链接。二者都不会影响 Git HTTPS 认证、SSH 密钥、AI 渠道或 Tina 服务端请求。</string>
+  <string name="github_registry_proxy_scope_desc">用于应用更新、插件市场和依赖包 Registry。HTTP 代理负责网络连接；GitHub 镜像 URL 会把 GitHub 链接改写为镜像链接。二者都不会影响 Git HTTPS 认证、SSH 密钥或 Tina 服务端请求。</string>
   <string name="github_registry_mirror_url_label">GitHub 镜像 URL</string>
   <string name="github_registry_mirror_url_placeholder">https://ghproxy.net/</string>
   <string name="github_registry_mirror_url_error_invalid">GitHub 镜像 URL 格式无效</string>
@@ -78,7 +80,7 @@
   <string name="settings_desc_packages">管理已安装的 Linux 与 Android 开发库</string>
 
   <string name="settings_title_about">关于</string>
-  <string name="settings_desc_about">版本信息、GitHub、开源许可</string>
+  <string name="settings_desc_about">版本信息、GitHub、QQ 群、赞赏、开源许可</string>
 
   <string name="settings_title_developer">开发者选项</string>
   <string name="settings_desc_developer">测试工具、调试功能</string>
@@ -90,6 +92,8 @@
   <string name="dev_options_diagnostics">诊断日志</string>
   <string name="dev_options_diagnostics_enabled">启用诊断日志</string>
   <string name="dev_options_diagnostics_enabled_desc">总开关：关闭后不会输出额外诊断日志（用于减少性能开销/日志量）</string>
+  <string name="dev_options_build_diagnostics_log">构建诊断日志</string>
+  <string name="dev_options_build_diagnostics_log_desc">记录保存、运行目标、增量缓存、compile_commands 和启动产物摘要，用于定位源码修改后仍复用旧产物的问题</string>
   <string name="dev_options_lsp_compile_commands_selection_log">编译数据库选择日志</string>
   <string name="dev_options_lsp_compile_commands_selection_log_desc">记录 compile_commands 的查找、复用和生成摘要，用于确认 LSP 实际吃的是哪一份编译数据库</string>
   <string name="dev_options_lsp_clangd_startup_log">clangd 启动日志</string>
@@ -113,7 +117,7 @@
   <string name="dev_options_editor_lsp_enabled_desc">关闭后不再附加任何编辑器 LSP，可单独观察 Tree-sitter 高亮</string>
   <string name="dev_options_builtin_cmake_lsp_enabled">内置 CMake LSP</string>
   <string name="dev_options_builtin_cmake_lsp_enabled_desc">关闭后不附加内置 CMake 语义补全/语义高亮，便于单测 CMake 的 Tree-sitter 表现</string>
-  <string name="dev_options_ai_chat_message_count">%1$d 条消息</string>
+
   <string name="dialog_title_tina_server_url">TinaServer 地址</string>
   <string name="label_tina_server_url">服务器基础 URL</string>
   <string name="btn_save_and_test">保存并测试</string>
@@ -123,8 +127,7 @@
 
   <!-- Plugin Database Test Screen -->
 
-
-  <!-- Clangd Test Screen -->
+<!-- Clangd Test Screen -->
 
   <!-- Clangd Test - New Features -->
 
@@ -430,8 +433,7 @@
   <string name="lsp_plugin_install_success">工具链安装完成</string>
   <string name="lsp_plugin_install_failed">工具链安装失败：%1$s</string>
 
-
-  <!-- Settings categories -->
+<!-- Settings categories -->
   <string name="settings_cat_editor_behavior">编辑行为</string>
   <string name="settings_cat_editor_performance">性能</string>
   <string name="settings_editor_theme">编辑器主题</string>
@@ -445,10 +447,7 @@
   <!-- Open Source Licenses -->
   <string name="about_licenses_title">开源组件与许可证</string>
 
-
-
-
-  <!-- Output Activity -->
+<!-- Output Activity -->
   <string name="action_clear">清空</string>
 <string name="action_select_all">全选</string>
 <string name="action_scroll_to_bottom">滚动到底部</string>
@@ -720,7 +719,7 @@
 
   <!-- Shell Type Settings -->
   <string name="shell_type_auto">自动检测</string>
-  <string name="shell_type_auto_desc">按优先级自动选择（zsh > bash > sh）</string>
+  <string name="shell_type_auto_desc">按优先级自动选择（zsh &gt; bash &gt; sh）</string>
   <string name="shell_type_sh">Bourne Shell (sh)</string>
   <string name="shell_type_sh_desc">最基础的 Shell，兼容性最好</string>
   <string name="shell_type_bash">Bash</string>
@@ -1275,6 +1274,11 @@
   <string name="theme_light">浅色</string>
   <string name="theme_auto">跟随系统</string>
   <string name="theme_dark">深色</string>
+  <string name="theme_sakura">樱花粉</string>
+  <string name="theme_ocean">海湾蓝</string>
+  <string name="theme_spring">原野绿</string>
+  <string name="theme_autumn">秋黄</string>
+  <string name="theme_black">中性黑</string>
   <string name="settings_cat_theme">主题</string>
   <string name="settings_app_theme">应用主题</string>
   <string name="settings_app_theme_desc">选择应用的整体配色方案</string>
@@ -1292,10 +1296,14 @@
   <string name="error_cannot_open_link">无法打开链接</string>
   <string name="settings_github">GitHub</string>
   <string name="settings_github_desc">查看源代码、提交 Issue</string>
+  <string name="settings_qq_group">QQ 群</string>
+  <string name="settings_qq_group_desc">加入 TinaIDE 交流群</string>
   <string name="about_donation_title">赞赏支持</string>
   <string name="about_donation_desc">如果 TinaIDE 对你有帮助，可以扫码支持项目维护。</string>
   <string name="about_donation_wechat">微信赞赏</string>
   <string name="about_donation_alipay">支付宝赞赏</string>
+  <string name="about_donation_afdian">爱发电</string>
+  <string name="about_donation_afdian_desc">打开爱发电网页支持项目维护</string>
   <string name="settings_cat_legal">法律信息</string>
   <string name="settings_open_source_licenses">开源组件与许可证</string>
   <string name="settings_licenses_desc">查看当前应用使用的开源组件与许可证</string>
@@ -1354,7 +1362,6 @@
   <string name="hint_check_network_storage">请检查网络连接或存储空间后重试</string>
   <string name="btn_retry_install_now">立即重试安装</string>
   <string name="need_help_prefix">需要帮助？</string>
-  <string name="contact_support">联系技术支持</string>
 
   <!-- ABI Mismatch Error -->
   <string name="btn_exit_app">退出应用</string>
@@ -1393,8 +1400,7 @@
   <string name="error_out_of_memory">内存不足，请关闭其他应用后重试</string>
   <string name="error_unknown_with_message">未知错误</string>
 
-
-  <!-- TerminalViewModel -->
+<!-- TerminalViewModel -->
 
   <!-- TerminalActivity -->
   <string name="title_terminal">终端</string>
@@ -1446,6 +1452,661 @@
   <string name="hint_offset_example">例如: 0x1000 或 4096</string>
   <string name="error_invalid_offset">无效的偏移地址</string>
   <string name="error_offset_out_of_range">偏移超出范围 (0 - %1$d)</string>
+  <string name="hex_empty_file">空文件</string>
+  <string name="hex_selected_offset">选中: 0x%1$08X</string>
+  <string name="hex_edit_toggle_desc">切换十六进制编辑模式</string>
+  <string name="hex_keyboard_backspace_desc">删除上一位</string>
+  <string name="hex_keyboard_close_desc">关闭十六进制键盘</string>
+  <string name="hex_read_only_file">文件是只读的，无法编辑</string>
+  <string name="hex_write_failed">写入字节失败</string>
+  <string name="hex_menu_copy_offset">复制偏移</string>
+  <string name="hex_menu_copy_byte">复制字节</string>
+  <string name="hex_menu_copy_ascii">复制 ASCII</string>
+  <string name="hex_menu_edit_here">在此编辑</string>
+  <string name="hex_menu_set_selection_start">设为选区起点</string>
+  <string name="hex_menu_set_selection_end">设为选区终点</string>
+  <string name="hex_menu_export_selection">导出选区</string>
+  <string name="hex_menu_toggle_bookmark">切换书签</string>
+  <string name="hex_search_label">搜索</string>
+  <string name="hex_search_placeholder">ASCII、UTF-8 或 45 4C ??</string>
+  <string name="hex_search_run">搜索</string>
+  <string name="hex_search_previous">上一个</string>
+  <string name="hex_search_next">下一个</string>
+  <string name="hex_search_running">搜索中…</string>
+  <string name="hex_search_results_empty">未找到结果</string>
+  <string name="hex_search_results_count">%1$d / %2$d</string>
+  <string name="hex_search_hint">支持文本、十六进制和 ?? 通配符</string>
+  <string name="hex_search_failed">搜索失败</string>
+  <string name="hex_history_back">后退</string>
+  <string name="hex_history_forward">前进</string>
+  <string name="hex_bookmark_count">书签: %1$d</string>
+  <string name="hex_bookmark_mark">标记</string>
+  <string name="hex_bookmark_mark_all">全部标记</string>
+  <string name="hex_bookmark_mark_visible">标记当前列表</string>
+  <string name="hex_bookmark_unmark">取消标记</string>
+  <string name="hex_bookmark_list">书签列表</string>
+  <string name="hex_bookmarks_title">Offset 书签</string>
+  <string name="hex_bookmarks_summary">%1$d 个 offset 书签</string>
+  <string name="hex_bookmarks_empty">还没有 offset 书签</string>
+  <string name="hex_bookmark_row_meta">偏移 0x%1$08X</string>
+  <string name="hex_bookmark_current">当前选中</string>
+  <string name="hex_bookmark_jump">跳转</string>
+  <string name="hex_bookmark_remove">移除</string>
+  <string name="hex_selection_empty">未设置选区</string>
+  <string name="hex_selection_range">选区: 0x%1$08X-0x%2$08X (%3$d B)</string>
+  <string name="hex_mark_start">起点</string>
+  <string name="hex_mark_end">终点</string>
+  <string name="hex_clear_selection">清除选区</string>
+  <string name="hex_inspect_selection">解析</string>
+  <string name="hex_export_selection">导出</string>
+  <string name="hex_export_title">导出选区</string>
+  <string name="hex_selection_inspect_failed">解析选区失败</string>
+  <string name="hex_selection_inspector_title">选区解析</string>
+  <string name="hex_selection_inspector_range">范围 0x%1$08X - 0x%2$08X · %3$d B</string>
+  <string name="hex_selection_inspector_sample">样本 %1$d / %2$d B</string>
+  <string name="hex_selection_inspector_sample_truncated">样本 %1$d / %2$d B · 已截断</string>
+  <string name="hex_selection_inspector_hex">Hex</string>
+  <string name="hex_selection_inspector_ascii">ASCII</string>
+  <string name="hex_selection_inspector_utf8">UTF-8</string>
+  <string name="hex_selection_inspector_u8">u8</string>
+  <string name="hex_selection_inspector_i8">i8</string>
+  <string name="hex_selection_inspector_u16_le">u16 LE</string>
+  <string name="hex_selection_inspector_u16_be">u16 BE</string>
+  <string name="hex_selection_inspector_u32_le">u32 LE</string>
+  <string name="hex_selection_inspector_u32_be">u32 BE</string>
+  <string name="hex_selection_inspector_u64_le">u64 LE</string>
+  <string name="hex_selection_inspector_u64_be">u64 BE</string>
+  <string name="hex_export_format_hex_dump">Hex dump</string>
+  <string name="hex_export_format_c_array">C 数组</string>
+  <string name="hex_export_format_kotlin_byte_array">Kotlin ByteArray</string>
+  <string name="hex_export_format_base64">Base64</string>
+  <string name="hex_export_format_ascii">ASCII</string>
+  <string name="hex_export_failed">导出选区失败</string>
+  <string name="hex_export_range_too_large">选区过大，最多支持 %1$s</string>
+  <string name="hex_patch_pending">%1$d 个待保存补丁</string>
+  <string name="hex_patch_details">明细</string>
+  <string name="hex_patch_details_title">Patch 队列</string>
+  <string name="hex_patch_details_summary">%1$d 个待保存补丁</string>
+  <string name="hex_patch_details_empty">没有待保存补丁</string>
+  <string name="hex_patch_copy_r2">复制 r2</string>
+  <string name="hex_patch_row_meta">偏移 0x%1$08X</string>
+  <string name="hex_patch_row_change">%1$s -&gt; %2$s</string>
+  <string name="hex_patch_jump">跳转</string>
+  <string name="hex_patch_discard_one">丢弃</string>
+  <string name="hex_patch_undo">撤销</string>
+  <string name="hex_patch_redo">重做</string>
+  <string name="hex_patch_save">保存</string>
+  <string name="hex_patch_discard">放弃</string>
+  <string name="hex_patch_save_failed">保存补丁失败</string>
+  <string name="hint_offset_example_relative">例如 0x100、+0x20 或 -16</string>
+  <string name="hex_workbench_show_analysis_panel">显示分析栏</string>
+  <string name="hex_workbench_hide_analysis_panel">隐藏分析栏</string>
+  <string name="hex_workbench_analysis_panel_title">二进制分析栏</string>
+  <string name="hex_workbench_close_analysis_panel">关闭分析栏</string>
+  <string name="hex_workbench_commands_title">命令</string>
+  <string name="hex_workbench_commands_summary">生成 Rizin/radare2 可复制脚本，用于定位 offset、dump 选区或复用待保存 patch。</string>
+  <string name="hex_workbench_navigation_script">定位脚本</string>
+  <string name="hex_workbench_selection_script">选区 dump 脚本</string>
+  <string name="hex_workbench_patch_script">Patch 脚本</string>
+  <string name="hex_workbench_full_script">完整脚本</string>
+  <string name="hex_workbench_copy_script">复制脚本</string>
+  <string name="hex_workbench_commands_no_selection">尚未设置选区</string>
+  <string name="hex_workbench_commands_no_patches">没有待保存 patch</string>
+  <string name="hex_workbench_read_only_analysis_script">只读分析脚本</string>
+  <string name="hex_workbench_disassembly_preview_script">反汇编预览脚本</string>
+  <string name="hex_workbench_frida_hook_template">Frida Hook 模板</string>
+  <string name="hex_workbench_lldb_breakpoint_template">LLDB 断点模板</string>
+  <string name="hex_workbench_reports_title">报告</string>
+  <string name="hex_workbench_reports_summary">native 方法 %1$d · native 库 %2$d · JNI 线索 %3$d · Native API %4$d</string>
+  <string name="hex_workbench_markdown_report">Markdown 报告</string>
+  <string name="hex_workbench_json_report">JSON 报告</string>
+  <string name="hex_workbench_copy_report">复制报告</string>
+  <string name="hex_workbench_findings_title">发现项</string>
+  <string name="hex_workbench_findings_count">%1$d 项</string>
+  <string name="hex_workbench_findings_empty">暂无可导航的二进制发现项</string>
+  <string name="hex_workbench_active_finding">目标: %1$s · %2$s</string>
+  <string name="hex_workbench_goto_finding">跳转</string>
+  <string name="hex_workbench_finding_kind_elf_risk">ELF 风险</string>
+  <string name="hex_workbench_finding_kind_jni_registration">JNI 注册线索</string>
+  <string name="hex_workbench_finding_kind_native_api">Native API</string>
+  <string name="hex_workbench_finding_kind_dex_native_method">DEX native 方法</string>
+  <string name="hex_workbench_finding_kind_obfuscation">混淆线索</string>
+  <string name="hex_workbench_finding_kind_apk_native_library">APK native 库</string>
+  <string name="hex_workbench_finding_kind_apk_entry_risk">APK 条目风险</string>
+  <string name="hex_workbench_finding_kind_signal">分析信号</string>
+  <string name="hex_workbench_finding_severity_high">高</string>
+  <string name="hex_workbench_finding_severity_warning">警告</string>
+  <string name="hex_workbench_finding_severity_info">信息</string>
+  <string name="hex_analysis_title">分析</string>
+  <string name="hex_analysis_loading">正在分析…</string>
+  <string name="hex_analysis_file_kind">类型: %1$s</string>
+  <string name="hex_analysis_fingerprint_preview">SHA-256: %1$s</string>
+  <string name="hex_fingerprint_dialog_title">文件指纹</string>
+  <string name="hex_fingerprint_size">大小: %1$d 字节 (%2$s)</string>
+  <string name="hex_fingerprint_sha256">SHA-256</string>
+  <string name="hex_fingerprint_sha1">SHA-1</string>
+  <string name="hex_fingerprint_md5">MD5</string>
+  <string name="hex_fingerprint_crc32">CRC32</string>
+  <string name="hex_fingerprint_crc32_value">0x%1$08X</string>
+  <string name="hex_analysis_byte_frequency_preview">字节: %1$d 种 · Top %2$s</string>
+  <string name="hex_byte_frequency_dialog_title">字节分布</string>
+  <string name="hex_byte_frequency_summary">总计 %1$d B · 唯一字节 %2$d / 256</string>
+  <string name="hex_byte_frequency_zero_ff_ratio">00 %1$.2f%% · FF %2$.2f%%</string>
+  <string name="hex_byte_frequency_ascii_ratio">可打印 ASCII: %1$.2f%%</string>
+  <string name="hex_byte_frequency_control_ratio">控制字节: %1$.2f%%</string>
+  <string name="hex_byte_frequency_top_title">Top 字节</string>
+  <string name="hex_byte_frequency_row">%1$d 次 · %2$.2f%%</string>
+  <string name="hex_byte_frequency_empty">没有字节分布数据</string>
+  <string name="hex_byte_frequency_none">无</string>
+  <string name="hex_analysis_repeated_runs_preview">重复段: %1$d · 最长 %2$d B</string>
+  <string name="hex_repeated_runs_dialog_title">重复字节段</string>
+  <string name="hex_repeated_runs_summary">保留 %1$d 个最长段 · 最长 %2$d B</string>
+  <string name="hex_repeated_runs_empty">没有达到阈值的重复字节段</string>
+  <string name="hex_repeated_run_meta">偏移 0x%1$08X · %2$d B</string>
+  <string name="hex_analysis_magic_signatures_preview">签名: %1$d</string>
+  <string name="hex_magic_signatures_dialog_title">嵌入签名</string>
+  <string name="hex_magic_signatures_summary">发现 %1$d 个文件头或结构签名</string>
+  <string name="hex_magic_signatures_empty">没有发现嵌入签名</string>
+  <string name="hex_magic_signature_meta">偏移 0x%1$08X · %2$d B</string>
+  <string name="hex_magic_signature_kind_elf">ELF</string>
+  <string name="hex_magic_signature_kind_dex">DEX</string>
+  <string name="hex_magic_signature_kind_zip_local">ZIP local header</string>
+  <string name="hex_magic_signature_kind_zip_central">ZIP central directory</string>
+  <string name="hex_magic_signature_kind_zip_eocd">ZIP EOCD</string>
+  <string name="hex_magic_signature_kind_png">PNG</string>
+  <string name="hex_magic_signature_kind_jpeg">JPEG</string>
+  <string name="hex_magic_signature_kind_android_resources">Android resources.arsc</string>
+  <string name="hex_magic_signature_kind_sqlite">SQLite</string>
+  <string name="hex_analysis_entropy_max">最大熵: %1$.2f</string>
+  <string name="hex_entropy_map_title">熵图</string>
+  <string name="hex_entropy_show_all">全部熵块 %1$d</string>
+  <string name="hex_entropy_dialog_title">熵块</string>
+  <string name="hex_entropy_filter_count">%1$d / %2$d</string>
+  <string name="hex_entropy_empty">没有匹配的熵块</string>
+  <string name="hex_entropy_filter_all">全部</string>
+  <string name="hex_entropy_filter_low">低</string>
+  <string name="hex_entropy_filter_medium">中</string>
+  <string name="hex_entropy_filter_high">高</string>
+  <string name="hex_entropy_bucket_meta">0x%1$08X - 0x%2$08X · %3$s · %4$.2f</string>
+  <string name="hex_analysis_strings_count">字符串: %1$d</string>
+  <string name="hex_analysis_dex_summary">DEX %1$s · 文件 %2$d B · 头部 %3$d B</string>
+  <string name="hex_analysis_dex_counts">字符串 %1$d · 类型 %2$d · 原型 %3$d · 字段 %4$d · 方法 %5$d · 类 %6$d</string>
+  <string name="hex_analysis_dex_native_methods">native 方法 %1$d</string>
+  <string name="hex_analysis_dex_string_item">#%1$d %2$s</string>
+  <string name="hex_dex_strings_show_all">DEX 字符串 %1$d</string>
+  <string name="hex_dex_strings_dialog_title">DEX 字符串</string>
+  <string name="hex_dex_strings_filter_label">过滤 DEX 字符串</string>
+  <string name="hex_dex_strings_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_strings_empty">没有匹配的 DEX 字符串</string>
+  <string name="hex_dex_string_meta">#%1$d · string_id 0x%2$08X · data 0x%3$08X</string>
+  <string name="hex_dex_types_show_all">DEX 类型 %1$d</string>
+  <string name="hex_dex_types_dialog_title">DEX 类型</string>
+  <string name="hex_dex_types_filter_label">过滤 DEX 类型</string>
+  <string name="hex_dex_types_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_types_empty">没有匹配的 DEX 类型</string>
+  <string name="hex_dex_type_meta">#%1$d · type_id 0x%2$08X · descriptor #%3$d</string>
+  <string name="hex_dex_protos_show_all">DEX 原型 %1$d</string>
+  <string name="hex_dex_protos_dialog_title">DEX 原型</string>
+  <string name="hex_dex_protos_filter_label">过滤 DEX 原型</string>
+  <string name="hex_dex_protos_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_protos_empty">没有匹配的 DEX 原型</string>
+  <string name="hex_dex_proto_meta">#%1$d · proto_id 0x%2$08X · shorty %3$s (#%4$d) · return #%5$d · params 0x%6$08X</string>
+  <string name="hex_dex_fields_show_all">DEX 字段 %1$d</string>
+  <string name="hex_dex_fields_dialog_title">DEX 字段</string>
+  <string name="hex_dex_fields_filter_label">过滤 DEX 字段</string>
+  <string name="hex_dex_fields_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_fields_empty">没有匹配的 DEX 字段</string>
+  <string name="hex_dex_field_display">%1$s.%2$s: %3$s</string>
+  <string name="hex_dex_field_meta">#%1$d · field_id 0x%2$08X · class #%3$d · type #%4$d · name #%5$d</string>
+  <string name="hex_dex_methods_show_all">DEX 方法 %1$d</string>
+  <string name="hex_dex_methods_dialog_title">DEX 方法</string>
+  <string name="hex_dex_methods_filter_label">过滤 DEX 方法</string>
+  <string name="hex_dex_methods_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_methods_empty">没有匹配的 DEX 方法</string>
+  <string name="hex_dex_method_display">%1$s.%2$s %3$s</string>
+  <string name="hex_dex_method_meta">#%1$d · method_id 0x%2$08X · class #%3$d · proto #%4$d (%5$s) · name #%6$d</string>
+  <string name="hex_dex_classes_show_all">DEX 类 %1$d</string>
+  <string name="hex_dex_classes_dialog_title">DEX 类</string>
+  <string name="hex_dex_classes_filter_label">过滤 DEX 类</string>
+  <string name="hex_dex_classes_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_classes_empty">没有匹配的 DEX 类</string>
+  <string name="hex_dex_class_meta">#%1$d · class_def 0x%2$08X · class #%3$d · flags 0x%4$08X · super %5$s · data 0x%6$08X</string>
+  <string name="hex_dex_class_source">source: %1$s</string>
+  <string name="hex_dex_class_data_methods_show_all">DEX 代码方法 %1$d</string>
+  <string name="hex_dex_class_data_methods_dialog_title">DEX class data 方法</string>
+  <string name="hex_dex_class_data_methods_filter_label">过滤 DEX class data 方法</string>
+  <string name="hex_dex_class_data_methods_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_class_data_methods_empty">没有匹配的 DEX class data 方法</string>
+  <string name="hex_dex_class_data_method_display">%1$s.%2$s %3$s</string>
+  <string name="hex_dex_class_data_method_meta">#%1$d · %2$s · method #%3$d · flags 0x%4$08X · entry 0x%5$08X · code 0x%6$08X · %7$s</string>
+  <string name="hex_dex_class_data_method_kind_direct">direct</string>
+  <string name="hex_dex_class_data_method_kind_virtual">virtual</string>
+  <string name="hex_dex_class_data_method_execution_code">code</string>
+  <string name="hex_dex_class_data_method_execution_native">native/JNI</string>
+  <string name="hex_dex_class_data_method_execution_abstract">abstract</string>
+  <string name="hex_dex_class_data_method_execution_no_code">no code</string>
+  <string name="hex_dex_code_items_show_all">DEX code item %1$d</string>
+  <string name="hex_dex_code_items_dialog_title">DEX code item</string>
+  <string name="hex_dex_code_items_filter_label">过滤 DEX code item</string>
+  <string name="hex_dex_code_items_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_code_items_empty">没有匹配的 DEX code item</string>
+  <string name="hex_dex_code_item_display">%1$s.%2$s %3$s</string>
+  <string name="hex_dex_code_item_meta">#%1$d · method #%2$d · regs %3$d · ins %4$d · outs %5$d · tries %6$d · debug 0x%7$08X · insns %8$d · first %9$s (0x%10$02X)</string>
+  <string name="hex_dex_code_item_preview">units %1$s</string>
+  <string name="hex_dex_code_item_preview_empty">无指令</string>
+  <string name="hex_dex_call_references_show_all">DEX invoke 引用 %1$d</string>
+  <string name="hex_dex_call_references_dialog_title">DEX invoke 引用</string>
+  <string name="hex_dex_call_references_filter_label">过滤 DEX invoke 引用</string>
+  <string name="hex_dex_call_references_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_call_references_empty">没有匹配的 DEX invoke 引用</string>
+  <string name="hex_dex_call_reference_display">%1$s.%2$s -> %3$s.%4$s</string>
+  <string name="hex_dex_call_reference_meta">#%1$d · %2$s 0x%3$02X · caller %4$d · target %5$d · insn 0x%6$08X · code 0x%7$08X · method_id 0x%8$08X</string>
+  <string name="hex_dex_call_reference_signature">%1$s -> %2$s</string>
+  <string name="hex_dex_string_references_show_all">DEX 字符串引用 %1$d</string>
+  <string name="hex_dex_string_references_dialog_title">DEX 字符串引用</string>
+  <string name="hex_dex_string_references_filter_label">过滤 DEX 字符串引用</string>
+  <string name="hex_dex_string_references_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_string_references_empty">没有匹配的 DEX 字符串引用</string>
+  <string name="hex_dex_string_reference_display">%1$s.%2$s -> \"%3$s\"</string>
+  <string name="hex_dex_string_reference_meta">#%1$d · %2$s 0x%3$02X · caller %4$d · string %5$d · insn 0x%6$08X · code 0x%7$08X · string_id 0x%8$08X · data 0x%9$08X</string>
+  <string name="hex_dex_field_references_show_all">DEX 字段引用 %1$d</string>
+  <string name="hex_dex_field_references_dialog_title">DEX 字段引用</string>
+  <string name="hex_dex_field_references_filter_label">过滤 DEX 字段引用</string>
+  <string name="hex_dex_field_references_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_field_references_empty">没有匹配的 DEX 字段引用</string>
+  <string name="hex_dex_field_reference_display">%1$s.%2$s -> %3$s.%4$s:%5$s</string>
+  <string name="hex_dex_field_reference_meta">#%1$d · %2$s 0x%3$02X · caller %4$d · field %5$d · insn 0x%6$08X · code 0x%7$08X · field_id 0x%8$08X</string>
+  <string name="hex_dex_index_none">-</string>
+  <string name="hex_dex_map_show_all">DEX map %1$d</string>
+  <string name="hex_dex_map_dialog_title">DEX map list</string>
+  <string name="hex_dex_map_filter_label">过滤 DEX map</string>
+  <string name="hex_dex_map_filter_count">%1$d / %2$d</string>
+  <string name="hex_dex_map_empty">没有匹配的 DEX map 条目</string>
+  <string name="hex_dex_map_filter_all">全部</string>
+  <string name="hex_dex_map_filter_ids">ID</string>
+  <string name="hex_dex_map_filter_class_data">类数据</string>
+  <string name="hex_dex_map_filter_code">代码</string>
+  <string name="hex_dex_map_filter_data">数据</string>
+  <string name="hex_dex_map_meta">#%1$d · type 0x%2$04X · size %3$d · offset 0x%4$08X · entry 0x%5$08X</string>
+  <string name="hex_archive_entries_show_all">压缩包条目 %1$d</string>
+  <string name="hex_analysis_archive_counts">DEX %1$d · Native %2$d · 资源 %3$d · 签名 %4$d</string>
+  <string name="hex_archive_zip_structure_show">ZIP 结构</string>
+  <string name="hex_analysis_archive_zip_structure_preview">条目 %1$d · central 0x%2$08X · EOCD 0x%3$08X</string>
+  <string name="hex_archive_dex_show_all">内嵌 DEX %1$d</string>
+  <string name="hex_analysis_archive_dex_preview">原型 %1$d · 字段 %2$d · 方法 %3$d · 类 %4$d</string>
+  <string name="hex_analysis_archive_manifest">AndroidManifest.xml</string>
+  <string name="hex_archive_manifest_show">Manifest 摘要</string>
+  <string name="hex_analysis_archive_manifest_preview">包 %1$s · 权限 %2$d</string>
+  <string name="hex_analysis_archive_native_preview">Native：%1$s</string>
+  <string name="hex_archive_native_show_all">Native 库 %1$d</string>
+  <string name="hex_analysis_archive_native_summary_preview">ABI %1$s · 混淆标记 %2$d</string>
+  <string name="hex_archive_native_dialog_title">Native 库摘要</string>
+  <string name="hex_archive_native_dialog_meta">库 %1$d · ABI %2$s · 混淆标记 %3$d</string>
+  <string name="hex_archive_native_filter_label">过滤 Native 库</string>
+  <string name="hex_archive_native_filter_count">%1$d / %2$d</string>
+  <string name="hex_archive_native_empty">没有匹配的 Native 库</string>
+  <string name="hex_archive_native_load_filter_all">全部</string>
+  <string name="hex_archive_native_load_filter_direct_mmap">mmap</string>
+  <string name="hex_archive_native_load_filter_stored_unaligned">未页对齐</string>
+  <string name="hex_archive_native_load_filter_needs_decompression">需解压</string>
+  <string name="hex_archive_native_load_filter_unknown">未知</string>
+  <string name="hex_archive_native_entry_display">%1$s · %2$s</string>
+  <string name="hex_archive_native_entry_meta">%1$s · %2$s · method %3$d · %4$d/%5$d B · analyzed %6$d B · %7$s · crc 0x%8$08X · local 0x%9$08X</string>
+  <string name="hex_archive_native_load_mode">装载 %1$s · 4096 对齐 %2$s</string>
+  <string name="hex_archive_native_load_direct_mmap">可直接 mmap</string>
+  <string name="hex_archive_native_load_stored_unaligned">stored 未页对齐</string>
+  <string name="hex_archive_native_load_needs_decompression">需解压/抽取</string>
+  <string name="hex_archive_native_load_unknown">未知</string>
+  <string name="hex_archive_native_page_aligned">已对齐</string>
+  <string name="hex_archive_native_page_remainder">余数 0x%1$03X</string>
+  <string name="hex_archive_native_obfuscation_marker">%1$s · %2$s · +0x%3$08X</string>
+  <string name="hex_archive_native_unknown">-</string>
+  <string name="hex_archive_native_not_elf">非 ELF</string>
+  <string name="hex_archive_native_elf64">ELF64 %1$s</string>
+  <string name="hex_archive_native_elf32">ELF32 %1$s</string>
+  <string name="hex_analysis_archive_entry_item">%1$s</string>
+  <string name="hex_archive_entries_dialog_title">压缩包条目</string>
+  <string name="hex_archive_entries_filter_label">过滤压缩包条目</string>
+  <string name="hex_archive_entries_filter_count">%1$d / %2$d</string>
+  <string name="hex_archive_entries_empty">没有匹配的压缩包条目</string>
+  <string name="hex_archive_entry_filter_all">全部</string>
+  <string name="hex_archive_entry_filter_dex">DEX</string>
+  <string name="hex_archive_entry_filter_native_libraries">Native</string>
+  <string name="hex_archive_entry_filter_manifest">Manifest</string>
+  <string name="hex_archive_entry_filter_resources">资源</string>
+  <string name="hex_archive_entry_filter_signature">签名</string>
+  <string name="hex_archive_entry_meta">#%1$d · method %2$d · %3$s · crc 0x%4$08X · %5$d/%6$d B · local 0x%7$08X · %8$s · central 0x%9$08X</string>
+  <string name="hex_archive_entry_flags">flags 0x%1$04X</string>
+  <string name="hex_archive_entry_flags_data_descriptor">flags 0x%1$04X · data descriptor</string>
+  <string name="hex_archive_entry_data_offset">data 0x%1$08X</string>
+  <string name="hex_archive_entry_data_offset_unknown">data -</string>
+  <string name="hex_archive_entry_data_range">%1$s · %2$s</string>
+  <string name="hex_archive_entry_data_range_value">data 0x%1$08X .. &lt;0x%2$08X</string>
+  <string name="hex_archive_entry_data_range_unknown">data range -</string>
+  <string name="hex_archive_entry_data_range_status_ok">范围正常</string>
+  <string name="hex_archive_entry_data_range_status_unknown">范围未知</string>
+  <string name="hex_archive_entry_data_range_status_out_of_file">超出文件</string>
+  <string name="hex_archive_entry_data_range_status_overlaps_central">重叠 central directory</string>
+  <string name="hex_archive_entry_local_header">%1$s · %2$s</string>
+  <string name="hex_archive_entry_local_header_value">local %1$s · method %2$d · flags 0x%3$04X</string>
+  <string name="hex_archive_entry_local_header_unknown">local header -</string>
+  <string name="hex_archive_entry_local_header_status_ok">local header 一致</string>
+  <string name="hex_archive_entry_local_header_status_unknown">local header 未知</string>
+  <string name="hex_archive_entry_local_header_status_name_mismatch">local 名称不一致</string>
+  <string name="hex_archive_entry_local_header_status_metadata_mismatch">local method/flags 不一致</string>
+  <string name="hex_archive_entry_local_header_status_multiple_mismatches">local header 多处不一致</string>
+  <string name="hex_archive_entry_name_risk">name risk · %1$s</string>
+  <string name="hex_archive_entry_name_risk_ok">name OK</string>
+  <string name="hex_archive_entry_name_risk_empty">空名称</string>
+  <string name="hex_archive_entry_name_risk_duplicate">重复名称</string>
+  <string name="hex_archive_entry_name_risk_absolute_path">绝对路径</string>
+  <string name="hex_archive_entry_name_risk_windows_drive">Windows 盘符路径</string>
+  <string name="hex_archive_entry_name_risk_path_traversal">路径穿越</string>
+  <string name="hex_archive_entry_name_risk_backslash">反斜杠分隔符</string>
+  <string name="hex_archive_entry_jump_local">Local</string>
+  <string name="hex_archive_entry_jump_data">Data</string>
+  <string name="hex_archive_manifest_dialog_title">Manifest 摘要</string>
+  <string name="hex_archive_manifest_meta">root %1$s · package %2$s · strings %3$d · elements %4$d · analyzed %5$d B · %6$s · local 0x%7$08X</string>
+  <string name="hex_archive_manifest_root_unknown">-</string>
+  <string name="hex_archive_manifest_package_unknown">-</string>
+  <string name="hex_archive_manifest_jump_local">跳转 Manifest</string>
+  <string name="hex_archive_manifest_permissions_title">权限 %1$d</string>
+  <string name="hex_archive_manifest_permissions_empty">没有解析到权限声明</string>
+  <string name="hex_archive_resources_show">Resources 摘要</string>
+  <string name="hex_analysis_archive_resources_preview">packages %1$d · type specs %2$d · type chunks %3$d</string>
+  <string name="hex_archive_resources_dialog_title">Resources 摘要</string>
+  <string name="hex_archive_resources_meta">packages %1$d/%2$d · global strings %3$d · type specs %4$d · type chunks %5$d · analyzed %6$d B · %7$s · local 0x%8$08X</string>
+  <string name="hex_archive_resources_jump_local">跳转 resources.arsc</string>
+  <string name="hex_archive_resources_packages_title">Package %1$d</string>
+  <string name="hex_archive_resources_packages_empty">没有解析到资源包</string>
+  <string name="hex_archive_resources_package_display">0x%1$02X · %2$s</string>
+  <string name="hex_archive_resources_package_unknown">-</string>
+  <string name="hex_archive_resources_package_meta">type strings %1$d · key strings %2$d · specs %3$d · chunks %4$d</string>
+  <string name="hex_archive_zip_structure_dialog_title">ZIP 结构</string>
+  <string name="hex_archive_zip_structure_central_directory">Central directory</string>
+  <string name="hex_archive_zip_structure_eocd">End of central directory</string>
+  <string name="hex_archive_zip_structure_zip64_locator">ZIP64 locator</string>
+  <string name="hex_archive_zip_structure_central_meta">offset 0x%1$08X · size %2$d B · entries %3$d</string>
+  <string name="hex_archive_zip_structure_eocd_meta">offset 0x%1$08X · comment %2$d B</string>
+  <string name="hex_archive_zip_structure_zip64_meta">offset 0x%1$08X</string>
+  <string name="hex_archive_dex_dialog_title">内嵌 DEX 摘要</string>
+  <string name="hex_archive_dex_filter_label">过滤内嵌 DEX</string>
+  <string name="hex_archive_dex_filter_count">%1$d / %2$d</string>
+  <string name="hex_archive_dex_empty">没有匹配的内嵌 DEX 摘要</string>
+  <string name="hex_archive_dex_meta">DEX %1$s · 字符串 %2$d · 原型 %3$d · 字段 %4$d · 方法 %5$d · 类 %6$d · 已分析 %7$d B · %8$s · local 0x%9$08X</string>
+  <string name="hex_archive_dex_strings_preview">字符串: %1$s</string>
+  <string name="hex_archive_dex_native_methods">native 方法 %1$d</string>
+  <string name="hex_archive_dex_truncated">已截断</string>
+  <string name="hex_archive_dex_complete">完整</string>
+  <string name="hex_archive_signing_block_show_all">APK 签名块 %1$d</string>
+  <string name="hex_analysis_archive_signing_block_preview">签名块: %1$s</string>
+  <string name="hex_archive_signing_block_dialog_title">APK 签名块</string>
+  <string name="hex_archive_signing_block_filter_label">过滤 APK 签名块</string>
+  <string name="hex_archive_signing_block_filter_count">%1$d / %2$d</string>
+  <string name="hex_archive_signing_block_empty">没有匹配的 APK 签名块条目</string>
+  <string name="hex_archive_signing_block_display">%1$s · id 0x%2$08X</string>
+  <string name="hex_archive_signing_block_meta">#%1$d · value %2$d B · block 0x%3$08X/%4$d B · pair 0x%5$08X · value 0x%6$08X</string>
+  <string name="hex_analysis_elf_summary">ELF%1$d · %2$s · %3$s</string>
+  <string name="hex_analysis_elf_entry">入口 0x%1$08X</string>
+  <string name="hex_analysis_elf_entry_mapped">入口 0x%1$08X → offset 0x%2$08X</string>
+  <string name="hex_analysis_elf_sections">Section %1$d · Program %2$d</string>
+  <string name="hex_analysis_elf_symbol_counts">导入 %1$d · 导出 %2$d · JNI %3$d</string>
+  <string name="hex_analysis_elf_dynamic_counts">依赖 %1$d · SONAME %2$s · 路径 %3$d</string>
+  <string name="hex_analysis_needed_preview">依赖: %1$s</string>
+  <string name="hex_analysis_search_path_preview">路径: %1$s</string>
+  <string name="hex_elf_dynamic_soname_empty">-</string>
+  <string name="hex_elf_dynamic_show_all">Dynamic %1$d</string>
+  <string name="hex_elf_dynamic_dialog_title">ELF Dynamic</string>
+  <string name="hex_elf_dynamic_filter_label">过滤 Dynamic</string>
+  <string name="hex_elf_dynamic_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_dynamic_empty">没有匹配的 Dynamic 条目</string>
+  <string name="hex_elf_dynamic_filter_all">全部</string>
+  <string name="hex_elf_dynamic_filter_needed">依赖</string>
+  <string name="hex_elf_dynamic_filter_soname">SONAME</string>
+  <string name="hex_elf_dynamic_filter_rpath">RPATH</string>
+  <string name="hex_elf_dynamic_filter_runpath">RUNPATH</string>
+  <string name="hex_elf_dynamic_type_needed">NEEDED</string>
+  <string name="hex_elf_dynamic_type_soname">SONAME</string>
+  <string name="hex_elf_dynamic_type_rpath">RPATH</string>
+  <string name="hex_elf_dynamic_type_runpath">RUNPATH</string>
+  <string name="hex_elf_dynamic_meta">%1$s · entry 0x%2$08X</string>
+  <string name="hex_elf_dynamic_semantic">语义：%1$s</string>
+  <string name="hex_elf_dynamic_semantic_needed_load">按声明顺序加载依赖库</string>
+  <string name="hex_elf_dynamic_semantic_soname_identity">共享库运行时身份名</string>
+  <string name="hex_elf_dynamic_semantic_legacy_rpath">旧式 RPATH 搜索路径</string>
+  <string name="hex_elf_dynamic_semantic_runpath">RUNPATH 依赖搜索路径</string>
+  <string name="hex_elf_dynamic_semantic_unknown">未知 Dynamic 字符串语义</string>
+  <string name="hex_elf_dynamic_load_order">加载顺序 #%1$d</string>
+  <string name="hex_elf_dynamic_flags_show_all">Flags %1$d</string>
+  <string name="hex_elf_dynamic_flags_dialog_title">ELF Dynamic Flags</string>
+  <string name="hex_elf_dynamic_flags_filter_label">过滤 Dynamic flags</string>
+  <string name="hex_elf_dynamic_flags_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_dynamic_flags_empty">没有匹配的 Dynamic flags</string>
+  <string name="hex_elf_dynamic_flag_filter_all">全部</string>
+  <string name="hex_elf_dynamic_flag_filter_bind_now">BIND_NOW</string>
+  <string name="hex_elf_dynamic_flag_filter_flags">FLAGS</string>
+  <string name="hex_elf_dynamic_flag_filter_flags_1">FLAGS_1</string>
+  <string name="hex_elf_dynamic_flag_type_bind_now">DT_BIND_NOW</string>
+  <string name="hex_elf_dynamic_flag_type_flags">DT_FLAGS</string>
+  <string name="hex_elf_dynamic_flag_type_flags_1">DT_FLAGS_1</string>
+  <string name="hex_elf_dynamic_flag_meta">value 0x%1$X · entry 0x%2$08X · %3$s</string>
+  <string name="hex_elf_dynamic_flag_bind_now_enabled">BIND_NOW</string>
+  <string name="hex_elf_dynamic_flag_bind_now_missing">no BIND_NOW</string>
+  <string name="hex_elf_init_array_show_all">init_array %1$d</string>
+  <string name="hex_elf_init_array_dialog_title">ELF init_array</string>
+  <string name="hex_elf_init_array_empty">没有 init_array 条目</string>
+  <string name="hex_elf_init_array_meta_mapped">#%1$d · 指针 0x%2$08X · 目标 0x%3$08X → offset 0x%4$08X</string>
+  <string name="hex_elf_init_array_meta_unmapped">#%1$d · 指针 0x%2$08X · 目标 0x%3$08X</string>
+  <string name="hex_elf_relocations_show_all">重定位 %1$d</string>
+  <string name="hex_elf_relocations_dialog_title">ELF 重定位</string>
+  <string name="hex_elf_relocations_filter_label">过滤重定位</string>
+  <string name="hex_elf_relocations_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_relocations_empty">没有匹配的重定位</string>
+  <string name="hex_elf_relocation_filter_all">全部</string>
+  <string name="hex_elf_relocation_filter_plt">PLT</string>
+  <string name="hex_elf_relocation_filter_dynamic">Dynamic</string>
+  <string name="hex_elf_relocation_symbol_index">符号 #%1$d</string>
+  <string name="hex_elf_relocation_addend">加数 %1$d</string>
+  <string name="hex_elf_relocation_no_addend">无加数</string>
+  <string name="hex_elf_relocation_type_named">%1$s (%2$d)</string>
+  <string name="hex_elf_relocation_type_unknown">type %1$d</string>
+  <string name="hex_elf_relocation_symbol_meta">%1$s · %2$s · %3$s</string>
+  <string name="hex_elf_relocation_symbol_meta_unknown">symbol -</string>
+  <string name="hex_elf_relocation_target_section">slot %1$s</string>
+  <string name="hex_elf_relocation_target_section_unknown">slot -</string>
+  <string name="hex_elf_relocation_semantic">语义：%1$s</string>
+  <string name="hex_elf_relocation_semantic_jump_slot_binding">PLT 调用 slot 绑定</string>
+  <string name="hex_elf_relocation_semantic_glob_dat_address">加载期写入 GOT 符号地址</string>
+  <string name="hex_elf_relocation_semantic_relative_rebase">按 load bias 重定位本地地址</string>
+  <string name="hex_elf_relocation_semantic_copy_relocation">从共享库复制数据对象</string>
+  <string name="hex_elf_relocation_semantic_absolute_address">写入绝对符号地址</string>
+  <string name="hex_elf_relocation_semantic_pc_relative_address">写入 PC-relative 地址修正</string>
+  <string name="hex_elf_relocation_semantic_other">其他重定位</string>
+  <string name="hex_elf_relocation_meta_mapped">#%1$d · %2$s · %3$s · %4$s · %5$s · entry 0x%6$08X · address 0x%7$08X → offset 0x%8$08X · %9$s</string>
+  <string name="hex_elf_relocation_meta_unmapped">#%1$d · %2$s · %3$s · %4$s · %5$s · entry 0x%6$08X · address 0x%7$08X · %8$s</string>
+  <string name="hex_elf_sections_show_all">全部 Section %1$d</string>
+  <string name="hex_elf_sections_dialog_title">ELF Section</string>
+  <string name="hex_elf_sections_filter_label">过滤 Section</string>
+  <string name="hex_elf_sections_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_sections_empty">没有匹配的 Section</string>
+  <string name="hex_elf_section_filter_all">全部</string>
+  <string name="hex_elf_section_filter_allocated">已加载</string>
+  <string name="hex_elf_section_filter_executable">可执行</string>
+  <string name="hex_elf_section_filter_writable">可写</string>
+  <string name="hex_elf_section_filter_string_table">字符串表</string>
+  <string name="hex_elf_section_filter_symbol_table">符号表</string>
+  <string name="hex_elf_section_name_empty">&lt;unnamed&gt;</string>
+  <string name="hex_elf_section_type_null">NULL</string>
+  <string name="hex_elf_section_type_progbits">PROGBITS</string>
+  <string name="hex_elf_section_type_symtab">SYMTAB</string>
+  <string name="hex_elf_section_type_strtab">STRTAB</string>
+  <string name="hex_elf_section_type_rela">RELA</string>
+  <string name="hex_elf_section_type_hash">HASH</string>
+  <string name="hex_elf_section_type_dynamic">DYNAMIC</string>
+  <string name="hex_elf_section_type_note">NOTE</string>
+  <string name="hex_elf_section_type_nobits">NOBITS</string>
+  <string name="hex_elf_section_type_rel">REL</string>
+  <string name="hex_elf_section_type_dynsym">DYNSYM</string>
+  <string name="hex_elf_section_type_init_array">INIT_ARRAY</string>
+  <string name="hex_elf_section_type_fini_array">FINI_ARRAY</string>
+  <string name="hex_elf_section_type_preinit_array">PREINIT_ARRAY</string>
+  <string name="hex_elf_section_type_other">OTHER</string>
+  <string name="hex_elf_section_flags_none">-</string>
+  <string name="hex_elf_section_flags_raw">0x%1$X</string>
+  <string name="hex_elf_section_flag_alloc">A</string>
+  <string name="hex_elf_section_flag_write">W</string>
+  <string name="hex_elf_section_flag_exec">X</string>
+  <string name="hex_elf_section_meta">#%1$d · %2$s · %3$s · VA 0x%4$08X · offset 0x%5$08X · size 0x%6$X</string>
+  <string name="hex_elf_program_headers_show_all">Program %1$d</string>
+  <string name="hex_elf_program_headers_dialog_title">ELF Program Header</string>
+  <string name="hex_elf_program_headers_filter_label">过滤 Program Header</string>
+  <string name="hex_elf_program_headers_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_program_headers_empty">没有匹配的 Program Header</string>
+  <string name="hex_elf_program_header_filter_all">全部</string>
+  <string name="hex_elf_program_header_filter_load">LOAD</string>
+  <string name="hex_elf_program_header_filter_executable">可执行</string>
+  <string name="hex_elf_program_header_filter_writable">可写</string>
+  <string name="hex_elf_program_header_filter_dynamic">DYNAMIC</string>
+  <string name="hex_elf_program_header_filter_hardening">加固相关</string>
+  <string name="hex_elf_program_header_flags_none">-</string>
+  <string name="hex_elf_program_header_flags_raw">0x%1$X</string>
+  <string name="hex_elf_program_header_flag_read">R</string>
+  <string name="hex_elf_program_header_flag_write">W</string>
+  <string name="hex_elf_program_header_flag_execute">X</string>
+  <string name="hex_elf_program_header_meta">#%1$d · %2$s · VA 0x%3$08X · offset 0x%4$08X · file 0x%5$X · mem 0x%6$X · align 0x%7$X</string>
+  <string name="hex_elf_section_segments_show_all">Section 映射 %1$d</string>
+  <string name="hex_elf_section_segments_dialog_title">ELF Section 映射</string>
+  <string name="hex_elf_section_segments_filter_label">过滤 Section 映射</string>
+  <string name="hex_elf_section_segments_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_section_segments_empty">没有匹配的 Section 映射</string>
+  <string name="hex_elf_section_segment_filter_all">全部</string>
+  <string name="hex_elf_section_segment_filter_executable">可执行段</string>
+  <string name="hex_elf_section_segment_filter_writable">可写段</string>
+  <string name="hex_elf_section_segment_filter_readable">可读段</string>
+  <string name="hex_elf_section_segment_display">%1$s -&gt; segment #%2$d %3$s %4$s</string>
+  <string name="hex_elf_section_segment_meta">section #%1$d · VA 0x%2$08X · offset 0x%3$08X · size 0x%4$X · segment VA 0x%5$08X · segment offset 0x%6$08X · file 0x%7$X · mem 0x%8$X</string>
+  <string name="hex_elf_section_entropy_show_all">Section 熵 %1$d</string>
+  <string name="hex_elf_section_entropy_dialog_title">ELF Section 熵</string>
+  <string name="hex_elf_section_entropy_filter_label">过滤 Section 熵</string>
+  <string name="hex_elf_section_entropy_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_section_entropy_empty">没有匹配的 Section 熵</string>
+  <string name="hex_elf_section_entropy_display">%1$s · %2$s · H %3$.2f</string>
+  <string name="hex_elf_section_entropy_meta">section #%1$d · VA 0x%2$08X · offset 0x%3$08X · size 0x%4$X · sample 0x%5$X</string>
+  <string name="hex_elf_hardening_summary">加固 %1$d / %2$d</string>
+  <string name="hex_elf_hardening_item">%1$s %2$s</string>
+  <string name="hex_elf_hardening_pie">PIE</string>
+  <string name="hex_elf_hardening_nx">NX</string>
+  <string name="hex_elf_hardening_relro">RELRO</string>
+  <string name="hex_elf_hardening_bind_now">BIND_NOW</string>
+  <string name="hex_elf_hardening_ibt">IBT</string>
+  <string name="hex_elf_hardening_shstk">SHSTK</string>
+  <string name="hex_elf_hardening_bti">BTI</string>
+  <string name="hex_elf_hardening_pac">PAC</string>
+  <string name="hex_elf_hardening_enabled">已启用</string>
+  <string name="hex_elf_hardening_missing">缺失</string>
+  <string name="hex_elf_symbols_show_all">全部符号 %1$d</string>
+  <string name="hex_elf_symbols_dialog_title">ELF 符号</string>
+  <string name="hex_elf_symbols_filter_label">过滤符号</string>
+  <string name="hex_elf_symbols_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_symbols_empty">没有匹配的符号</string>
+  <string name="hex_elf_symbol_filter_all">全部</string>
+  <string name="hex_elf_symbol_filter_imported">导入</string>
+  <string name="hex_elf_symbol_filter_exported">导出</string>
+  <string name="hex_elf_symbol_filter_jni">JNI</string>
+  <string name="hex_elf_symbol_role_imported">导入</string>
+  <string name="hex_elf_symbol_role_exported">导出</string>
+  <string name="hex_elf_symbol_role_jni">JNI</string>
+  <string name="hex_elf_symbol_role_local">本地</string>
+  <string name="hex_elf_symbol_section_unknown">section -</string>
+  <string name="hex_elf_symbol_binding_local">LOCAL</string>
+  <string name="hex_elf_symbol_binding_global">GLOBAL</string>
+  <string name="hex_elf_symbol_binding_weak">WEAK</string>
+  <string name="hex_elf_symbol_binding_other">OTHER</string>
+  <string name="hex_elf_symbol_type_notype">无类型</string>
+  <string name="hex_elf_symbol_type_object">对象</string>
+  <string name="hex_elf_symbol_type_func">函数</string>
+  <string name="hex_elf_symbol_type_section">Section</string>
+  <string name="hex_elf_symbol_type_file">文件</string>
+  <string name="hex_elf_symbol_type_tls">TLS</string>
+  <string name="hex_elf_symbol_type_other">其他</string>
+  <string name="hex_elf_symbol_meta_mapped">%1$s · %2$s · %3$s · value 0x%4$08X · offset 0x%5$08X</string>
+  <string name="hex_elf_symbol_meta_unmapped">%1$s · %2$s · %3$s · value 0x%4$08X</string>
+  <string name="hex_analysis_symbol_with_offset">%1$s @ 0x%2$08X</string>
+  <string name="hex_analysis_imports_preview">导入: %1$s</string>
+  <string name="hex_analysis_exports_preview">导出: %1$s</string>
+  <string name="hex_analysis_jni_preview">JNI: %1$s</string>
+  <string name="hex_obfuscation_title">混淆提示</string>
+  <string name="hex_obfuscation_item">%1$s · %2$s · %3$s</string>
+  <string name="hex_obfuscation_ollvm_marker">OLLVM 标记</string>
+  <string name="hex_obfuscation_control_flow_flattening">控制流平坦化标记</string>
+  <string name="hex_obfuscation_bogus_control_flow">虚假控制流标记</string>
+  <string name="hex_obfuscation_instruction_substitution">指令替换标记</string>
+  <string name="hex_obfuscation_anti_debug">疑似反调试</string>
+  <string name="hex_obfuscation_anti_instrumentation">疑似反注入</string>
+  <string name="hex_obfuscation_protector_packer">加壳/保护器标记</string>
+  <string name="hex_obfuscation_string_heuristic">疑似字符串混淆</string>
+  <string name="hex_obfuscation_stripped_symbols">疑似符号剥离</string>
+  <string name="hex_obfuscation_confidence_low">低</string>
+  <string name="hex_obfuscation_confidence_medium">中</string>
+  <string name="hex_obfuscation_confidence_high">高</string>
+  <string name="hex_analysis_signals_title">信号</string>
+  <string name="hex_analysis_strings_title">字符串</string>
+  <string name="hex_analysis_strings_show_all">全部 %1$d</string>
+  <string name="hex_strings_dialog_title">字符串</string>
+  <string name="hex_strings_filter_label">过滤字符串</string>
+  <string name="hex_strings_filter_count">%1$d / %2$d</string>
+  <string name="hex_strings_empty">没有匹配的字符串</string>
+  <string name="hex_strings_dialog_meta">0x%1$08X · %2$s</string>
+  <string name="hex_strings_copy_filtered">复制结果</string>
+  <string name="hex_analysis_signal_with_offset">%1$s @ 0x%2$08X</string>
+  <string name="hex_analysis_string_item">0x%1$08X %2$s %3$s</string>
+  <string name="hex_string_encoding_all">全部</string>
+  <string name="hex_string_encoding_ascii">ASCII</string>
+  <string name="hex_string_encoding_utf8">UTF-8</string>
+  <string name="hex_string_encoding_utf16le">UTF-16LE</string>
+  <string name="hex_string_encoding_utf16be">UTF-16BE</string>
+  <string name="hex_file_kind_elf">ELF/SO</string>
+  <string name="hex_file_kind_dex">DEX</string>
+  <string name="hex_file_kind_apk">APK</string>
+  <string name="hex_file_kind_zip">ZIP</string>
+  <string name="hex_file_kind_png">PNG</string>
+  <string name="hex_file_kind_jpeg">JPEG</string>
+  <string name="hex_file_kind_unknown">未知</string>
+  <string name="hex_endian_little">Little endian</string>
+  <string name="hex_endian_big">Big endian</string>
+  <string name="hex_signal_high_entropy">高熵区域</string>
+  <string name="hex_signal_elf_program_headers">Program Header</string>
+  <string name="hex_signal_elf_section_segments">Section 映射</string>
+  <string name="hex_signal_elf_section_entropy">Section 熵</string>
+  <string name="hex_signal_elf_hardening_warning">加固缺失</string>
+  <string name="hex_signal_elf_init_array">init_array</string>
+  <string name="hex_signal_elf_dynamic_symbols">动态符号</string>
+  <string name="hex_signal_elf_dynamic_dependencies">动态依赖</string>
+  <string name="hex_signal_elf_relocations">重定位</string>
+  <string name="hex_signal_elf_jni_symbols">JNI 符号</string>
+  <string name="hex_signal_elf_rodata">只读数据</string>
+  <string name="hex_signal_obfuscation_risk">混淆风险</string>
+  <string name="hex_signal_dex_file">DEX 文件</string>
+  <string name="hex_signal_dex_header">DEX 头部</string>
+  <string name="hex_signal_dex_type_ids">DEX type IDs</string>
+  <string name="hex_signal_dex_proto_ids">DEX proto IDs</string>
+  <string name="hex_signal_dex_field_ids">DEX field IDs</string>
+  <string name="hex_signal_dex_method_ids">DEX method IDs</string>
+  <string name="hex_signal_dex_class_defs">DEX class defs</string>
+  <string name="hex_signal_dex_class_data">DEX class data</string>
+  <string name="hex_signal_dex_native_methods">DEX native 方法</string>
+  <string name="hex_signal_dex_code_items">DEX code item</string>
+  <string name="hex_signal_dex_call_references">DEX invoke 引用</string>
+  <string name="hex_signal_dex_string_references">DEX 字符串引用</string>
+  <string name="hex_signal_dex_field_references">DEX 字段引用</string>
+  <string name="hex_signal_dex_map_list">DEX map list</string>
+  <string name="hex_signal_apk_file">APK 压缩包</string>
+  <string name="hex_signal_apk_manifest">APK Manifest</string>
+  <string name="hex_signal_apk_dex_files">APK DEX 文件</string>
+  <string name="hex_signal_apk_embedded_dex_summaries">APK 内嵌 DEX 摘要</string>
+  <string name="hex_signal_apk_native_libraries">APK Native 库</string>
+  <string name="hex_signal_apk_zip_structure">APK ZIP 结构</string>
+  <string name="hex_signal_apk_signing_block">APK 签名块</string>
 
   <!-- SettingsScreen -->
 
@@ -1564,6 +2225,7 @@
   <string name="sdl_runtime_invalid_shared_library">SDL 图形运行需要共享库（.so），当前目标不是可加载的共享库：%1$s</string>
   <string name="sdl_runtime_no_shared_library_target">SDL 图形运行需要 CMake 共享库目标（.so）。请将 CMake 目标改为 add_library(... SHARED ...)，或切换到终端模式运行可执行文件。</string>
   <string name="sdl_runtime_auto_selected_shared_library_target">SDL 图形模式已自动切换到共享库目标：%1$s</string>
+  <string name="cmake_run_target_auto_repaired">当前 CMake 构建目标不可用，已切换到项目默认目标：%1$s（原目标：%2$s）</string>
   <string name="terminal_runtime_invalid_executable_artifact">终端运行只能启动可执行文件，当前产物不是可执行文件：%1$s（类型：%2$s）。如果这是 NDK 共享库项目，请使用构建/导出产物，或新增可执行测试目标后再运行。</string>
   <string name="sdl_runtime_error_non_sdl_library">当前共享库未检测到 SDL 依赖，无法用 SDL 图形运行时启动：%1$s</string>
   <string name="sdl_runtime_stage_failed">准备 SDL 图形运行时失败：%1$s</string>
@@ -1654,6 +2316,7 @@
   <!-- FileTreeItem / FileTreeDialogs / FileTreeContextMenu -->
   <string name="content_desc_collapse">折叠</string>
   <string name="content_desc_expand">展开</string>
+  <string name="content_desc_hide_keyboard">收起键盘</string>
   <string name="action_new_file">新建文件</string>
   <string name="action_new_folder">新建文件夹</string>
   <string name="action_copy_path">复制路径</string>
@@ -1869,259 +2532,21 @@
   <!-- DrawerTab -->
   <string name="drawer_tab_files_title">文件</string>
   <string name="drawer_tab_git_title">Git</string>
-  <string name="drawer_tab_ai_title">AI</string>
-  <string name="drawer_title_ai">AI 助手</string>
+  <string name="drawer_tab_rikkahub_title">AI</string>
 
-  <!-- AI 功能 -->
-  <string name="ai_new_conversation">新对话</string>
-  <string name="ai_stop_generation">停止生成</string>
-  <string name="ai_input_placeholder">输入消息...</string>
-  <string name="ai_attach_file">附加当前文件</string>
-  <string name="ai_attach_selection">附加选中代码</string>
-  <string name="ai_attach_image">附加图片</string>
-  <string name="ai_attached_images_count">已附加 %1$d 张图片</string>
-  <string name="ai_clear_attachments">清除已附加图片</string>
-  <string name="ai_remove_image">移除图片</string>
-  <string name="ai_attached_file">附加的文件</string>
-  <string name="ai_attached_code">附加的代码</string>
-  <string name="ai_remove_attachment">移除附加</string>
-  <string name="ai_image_pick_failed">图片处理失败（请换一张或缩小图片）</string>
-  <string name="ai_image_load_failed">图片加载失败</string>
-  <string name="ai_image_content_description">图片</string>
-  <string name="ai_copy_code">复制代码</string>
-  <string name="ai_insert_code">插入到编辑器</string>
-  <string name="ai_code_lines">行</string>
-  <string name="ai_code_expand">展开剩余 %1$d 行</string>
-  <string name="ai_code_collapse">收起代码</string>
-  <string name="ai_code_save">保存代码</string>
-  <string name="ai_code_view">查看代码</string>
-  <string name="ai_code_hide">收起高亮</string>
-  <string name="ai_thinking">AI 正在思考...</string>
-  <string name="ai_error_no_config">请先配置 AI 设置</string>
-  <string name="ai_code_copied">代码已复制</string>
-  <string name="ai_code_inserted">代码已插入</string>
-  <string name="ai_close">关闭</string>
-  <string name="ai_send">发送</string>
-  <string name="ai_assistant">AI 助手</string>
-  <string name="ai_token_usage_title">📊 Token 使用</string>
-  <string name="ai_token_usage_detail">%1$d (输入: %2$d + 输出: %3$d)</string>
-  <string name="ai_tool_mode_auto">自动</string>
-  <string name="ai_tool_mode_manual">手动</string>
-  <string name="ai_time_just_now">刚刚</string>
-  <string name="ai_time_minutes_ago">%1$d 分钟前</string>
-  <string name="ai_time_hours_ago">%1$d 小时前</string>
-  <string name="ai_time_days_ago">%1$d 天前</string>
-  <string name="ai_dangerous_tool_title">⚠️ 危险操作确认</string>
-  <string name="ai_dangerous_tool_message">工具 “%1$s” 可能执行危险操作，是否继续？</string>
-  <string name="ai_dangerous_tool_critical_tip">此操作极度危险，请仔细确认！</string>
-  <string name="ai_summary_context_message">以下是之前对话的总结：\n\n%1$s\n\n请基于这个总结继续回答我的问题。</string>
-  <string name="ai_summary_error_empty">总结失败：返回内容为空</string>
-  <string name="ai_summary_error">总结失败: %1$s</string>
-  <string name="ai_summary_network_error">网络错误: %1$s</string>
-  <string name="ai_tool_delete_recursive_warning">此操作将递归删除目录及其所有内容，此操作不可恢复！</string>
-  <string name="ai_tool_delete_file_warning">此操作将删除文件，此操作不可恢复！</string>
-  <string name="ai_tool_delete_path_detail">要删除的路径：%1$s</string>
-  <string name="ai_tool_delete_mode_recursive">模式：递归删除</string>
-  <string name="ai_tool_delete_confirm">确认删除</string>
-  <string name="ai_tool_delete_lines_title">⚠️ 删除代码行确认</string>
-  <string name="ai_tool_delete_lines_message">此操作将删除文件中的代码行，此操作不可恢复！</string>
-  <string name="ai_tool_delete_lines_detail">文件：%1$s\n删除范围：%2$s</string>
-  <string name="ai_search_results_bing_title">必应搜索结果</string>
-  <string name="ai_search_results_baidu_title">百度搜索结果</string>
-  <string name="ai_search_results_google_title">Google 搜索结果</string>
-  <string name="ai_search_results_query">查询: %1$s</string>
-  <string name="ai_search_results_count">找到 %1$d 条结果</string>
-  <string name="ai_search_results_empty_title">未找到相关结果，请尝试:</string>
-  <string name="ai_search_results_tip_diff_keyword">- 使用不同的关键词</string>
-  <string name="ai_search_results_tip_specific_keyword">- 更具体的搜索词</string>
-  <string name="ai_search_results_tip_site">- 使用 \'site\' 参数搜索特定网站</string>
-  <string name="ai_search_results_duckduckgo_title">DuckDuckGo 搜索结果</string>
-  <string name="ai_search_results_summary_title">摘要：</string>
-  <string name="ai_search_results_related_title">相关主题：</string>
-  <string name="ai_search_results_related_empty">未找到相关主题。</string>
-  <string name="ai_search_results_none_for_query">未找到相关结果：%1$s</string>
-  <string name="ai_search_results_tip_title">你可以尝试：</string>
-  <string name="ai_search_github_results_title">GitHub 搜索结果（%1$s）</string>
-  <string name="ai_search_github_results_count">共找到 %1$d 条，显示 %2$d 条</string>
-  <string name="ai_search_github_rate_limit">GitHub API 速率限制已触发，请稍后重试或使用 GitHub Token。</string>
-  <string name="ai_search_github_auth_failed">GitHub API 认证失败。</string>
-  <string name="ai_search_github_invalid_query">无效的搜索查询，请检查语法。</string>
-  <string name="ai_search_github_request_failed">GitHub API 请求失败：%1$d %2$s</string>
-  <string name="ai_search_error_query_required">必须提供搜索关键词。</string>
-  <string name="ai_search_error_unknown_type">未知搜索类型：%1$s</string>
-  <string name="ai_search_error_network_unreachable">网络错误：无法连接到搜索服务，请检查网络。</string>
-  <string name="ai_search_error_timeout">网络超时：搜索请求超时，请稍后再试。</string>
-  <string name="ai_search_error_failed_with_detail">%1$s 搜索失败：%2$s</string>
-  <string name="ai_search_engine_request_failed">%1$s 搜索失败：%2$d %3$s</string>
-  <string name="ai_search_engine_google">Google</string>
-  <string name="ai_search_engine_duckduckgo">DuckDuckGo</string>
-  <string name="ai_search_engine_baidu">百度</string>
-  <string name="ai_search_engine_bing">必应</string>
-  <string name="ai_search_web_label">网络</string>
-  <string name="ai_search_unknown_placeholder">未知</string>
-  <string name="ai_search_no_description">暂无描述</string>
-  <string name="ai_search_default_user_type">用户</string>
-  <string name="ai_search_label_language">   语言：%1$s</string>
-  <string name="ai_search_label_description">   描述：%1$s</string>
-  <string name="ai_search_label_url">   URL: %1$s</string>
-  <string name="ai_search_label_last_updated">   最后更新：%1$s</string>
-  <string name="ai_search_label_repository">   仓库：%1$s</string>
-  <string name="ai_search_label_path">   路径：%1$s</string>
-  <string name="ai_search_label_author">   作者：%1$s</string>
-  <string name="ai_search_label_created">   创建时间：%1$s</string>
-  <string name="ai_search_label_source">   来源：%1$s</string>
-  <string name="ai_search_github_repo_required">必须提供仓库（格式：owner/repo）。</string>
-  <string name="ai_search_github_path_required">必须提供文件路径。</string>
-  <string name="ai_search_github_repo_invalid_format">仓库格式无效，请使用 owner/repo（例如：torvalds/linux）。</string>
-  <string name="ai_search_github_file_read_failed">读取 GitHub 文件失败。文件可能不存在，或触发了 GitHub API 速率限制。请稍后重试并检查仓库与路径。</string>
-  <string name="ai_search_github_path_not_file">路径“%1$s”不是文件（类型：%2$s）</string>
-  <string name="ai_search_github_file_title">GitHub 文件内容</string>
-  <string name="ai_search_label_branch">   分支：%1$s</string>
-  <string name="ai_search_branch_commit_label">   分支/提交：%1$s</string>
-  <string name="ai_search_label_size">   大小：%1$s</string>
-  <string name="ai_search_label_lines">   行数：%1$s</string>
-  <string name="ai_search_lines_total">%1$d 行</string>
-  <string name="ai_search_lines_truncated">%1$d 行（仅显示前 %2$d 行）</string>
-  <string name="ai_search_label_content">内容：</string>
-  <string name="ai_search_content_truncated_note">内容已截断，文件共 %1$d 行。</string>
-  <string name="ai_search_content_truncated_hint">可提高 max_lines 查看更多内容，或访问：</string>
-  <string name="ai_diag_error">错误</string>
-  <string name="ai_diag_warning">警告</string>
-  <string name="ai_diag_info">信息</string>
-  <string name="ai_diag_hint">提示</string>
-  <string name="ai_error_unable_connect_server">无法连接到服务器</string>
-  <string name="ai_error_request_timeout">请求超时</string>
-  <string name="ai_error_connect_failed">连接失败</string>
-  <string name="ai_error_ssl_failed">SSL 连接失败</string>
-  <string name="ai_error_parse_failed">数据解析失败</string>
-  <string name="ai_error_unknown">发生未知错误</string>
-  <string name="ai_error_auth_failed">认证失败</string>
-  <string name="ai_error_access_denied">访问被拒绝</string>
-  <string name="ai_error_service_not_found">服务未找到</string>
-  <string name="ai_error_rate_limit">请求过于频繁</string>
-  <string name="ai_error_server_internal">服务器内部错误</string>
-  <string name="ai_error_gateway">网关错误</string>
-  <string name="ai_error_service_unavailable">服务暂时不可用</string>
-  <string name="ai_error_api_failed">API 请求失败 (%1$d)</string>
-  <string name="ai_error_http_status">HTTP %1$d</string>
-  <string name="ai_error_empty_response">AI 服务返回了空响应</string>
-  <string name="ai_error_empty_stream_response">AI 服务返回了空的流式响应</string>
-  <string name="ai_error_stream_unparseable">AI 流式响应结束，但未解析到有效内容</string>
-  <string name="ai_error_retry_no_messages">没有可重试的消息</string>
-  <string name="ai_error_retry_no_user_or_ai_message">没有可重试的用户或 AI 消息</string>
-  <string name="ai_tool_execution_cancelled">工具执行已取消</string>
-  <string name="ai_tool_cancelled_previous_incomplete">已取消：上一个工具未成功完成</string>
-  <string name="ai_error_suggest_check_network_server">请检查网络连接和服务器地址配置</string>
-  <string name="ai_error_suggest_check_network_retry">请检查网络连接或稍后重试</string>
-  <string name="ai_error_suggest_check_server_address">请检查服务器地址和端口配置</string>
-  <string name="ai_error_suggest_check_certificate">请检查服务器证书或使用 HTTP 连接</string>
-  <string name="ai_error_suggest_invalid_server_data">服务器返回的数据格式不正确</string>
-  <string name="ai_error_suggest_check_logs">请查看日志获取详细信息</string>
-  <string name="ai_error_suggest_check_api_key">请检查 API 密钥配置</string>
-  <string name="ai_error_suggest_check_permission">请检查账户权限</string>
-  <string name="ai_error_suggest_check_server_model">请检查服务器地址和模型配置</string>
-  <string name="ai_error_suggest_retry_or_upgrade">请稍后重试或升级账户配额</string>
-  <string name="ai_error_suggest_server_retry">服务器出现问题，请稍后重试</string>
-  <string name="ai_error_suggestion_prefix">💡 </string>
-  <string name="ai_error_detail_title">❌ %1$s</string>
-  <string name="ai_error_detail_info_title">📋 详细信息:</string>
-  <string name="ai_error_detail_code">🔢 错误代码: %1$d</string>
-  <string name="ai_error_detail_suggestion_title">💡 建议:</string>
-  <string name="ai_not_configured">未配置</string>
-  <string name="ai_settings">设置</string>
-  <string name="ai_welcome_title">👋 你好！</string>
-  <string name="ai_welcome_subtitle">我是你的 AI 编程助手</string>
-  <string name="ai_welcome_features">我可以帮你：\n• 解释代码\n• 生成代码片段\n• 修复错误\n• 重构建议</string>
-  <string name="ai_generation_stopped">[生成已停止]</string>
-  <string name="ai_conversation_history">对话历史</string>
-  <string name="ai_no_conversations">暂无对话</string>
-  <string name="ai_untitled_conversation">未命名对话</string>
-  <string name="ai_delete_conversation">删除对话</string>
-  <string name="ai_delete_conversation_confirm">确定要删除这个对话吗？</string>
-  <string name="ai_delete">删除</string>
-  <string name="ai_cancel">取消</string>
-  <string name="ai_retry">重试</string>
-  <string name="ai_auto_retrying">自动重试中... (%1$d/%2$d)</string>
-  <string name="ai_retry_error_title">重试错误</string>
-  <string name="ai_confirm">确认</string>
-  <string name="ai_summarize_confirm_title">总结并继续</string>
-  <string name="ai_summarize_confirm_message">这将总结当前对话并创建新对话，是否继续？</string>
-  <string name="ai_rename">重命名</string>
-  <string name="ai_rename_conversation">重命名对话</string>
-  <string name="ai_conversation_title">对话标题</string>
-  <string name="ai_copy">复制</string>
+  <string name="rikkahub_title">RikkaHub</string>
+  <string name="rikkahub_desc">TinaIDE 已内嵌 RikkaHub，聊天、模型和渠道配置由 RikkaHub 提供。</string>
+  <string name="rikkahub_open">打开 RikkaHub</string>
+  <string name="code_block_copy">复制代码</string>
+  <string name="code_block_insert">插入到编辑器</string>
+  <string name="code_block_lines">行</string>
+  <string name="code_block_expand">显示剩余 %1$d 行</string>
+  <string name="code_block_collapse">收起代码</string>
+  <string name="code_block_save">保存代码</string>
+  <string name="code_block_view">查看代码</string>
+  <string name="code_block_hide">隐藏高亮</string>
 
-  <!-- AI 设置 -->
-  <string name="settings_cat_ai">AI 助手</string>
-  <string name="settings_ai_provider">服务商</string>
-  <string name="settings_ai_model">模型</string>
-  <string name="settings_ai_model_custom">自定义模型...</string>
-  <string name="settings_ai_api_key">API Key</string>
-  <string name="settings_ai_image_detail">图片细节</string>
-  <string name="settings_ai_image_detail_auto">自动</string>
-  <string name="settings_ai_image_detail_low">低（更省 Token）</string>
-  <string name="settings_ai_image_detail_high">高（更清晰）</string>
-  <string name="settings_ai_not_configured">未配置</string>
-  <string name="settings_ai_channel_management">渠道管理</string>
-  <string name="settings_ai_channel_list_empty">暂无自定义渠道，点击下方添加</string>
-  <string name="settings_ai_channel_add">添加渠道</string>
-  <string name="settings_ai_channel_edit">编辑渠道</string>
-  <string name="settings_ai_channel_delete">删除</string>
-  <string name="settings_ai_channel_delete_confirm">确定删除 \"%1$s\" 吗？删除后需要重新添加。</string>
-  <string name="settings_ai_channel_name">渠道名称</string>
-  <string name="settings_ai_channel_name_hint">例如：我的 OpenAI</string>
-  <string name="settings_ai_channel_active">当前使用</string>
-  <string name="settings_ai_channel_apikey_loading">正在读取已保存 Key...</string>
-  <string name="settings_ai_channel_apikey_empty">未保存 Key，可直接填写</string>
-  <string name="settings_ai_channel_apikey_copy">复制 API Key</string>
-  <string name="settings_ai_channel_apikey_load_failed">读取已保存 Key 失败：%1$s</string>
-  <string name="settings_ai_channel_apikey_load_required">请等待 API Key 读取完成，或重新输入 Key</string>
-  <string name="settings_ai_channel_apikey_required">必填</string>
-  <string name="settings_ai_channel_provider_base_url">%1$s · %2$s</string>
-  <string name="settings_ai_channel_error_name_blank">渠道名称不能为空</string>
-  <string name="settings_ai_channel_error_url_blank">API 地址不能为空</string>
-  <string name="settings_ai_channel_error_url_invalid">API 地址必须以 http:// 或 https:// 开头</string>
-  <string name="settings_ai_channel_error_apikey_blank">API Key 不能为空</string>
-  <string name="ai_error_no_active_channel">请在设置 → 渠道管理中选择或添加渠道。</string>
-  <string name="settings_ai_advanced">高级设置</string>
-  <string name="settings_ai_base_url">API 地址</string>
-  <string name="settings_ai_max_tokens">最大输出 Token</string>
-  <string name="settings_ai_temperature">温度</string>
-    <string name="settings_ai_system_prompt">系统提示词</string>
-  <string name="settings_ai_prompt_templates">模板</string>
-  <string name="settings_ai_prompt_custom">自定义</string>
-  <string name="settings_ai_prompt_default">默认助手</string>
-  <string name="settings_ai_prompt_code_assistant">代码助手</string>
-  <string name="settings_ai_prompt_code_reviewer">代码审查</string>
-  <string name="settings_ai_prompt_bug_analyzer">Bug 分析</string>
-  <string name="settings_ai_prompt_refactoring">重构专家</string>
-  <string name="settings_ai_prompt_documentation">文档编写</string>
-    <string name="settings_ai_tools">启用工具调用</string>
-    <string name="settings_ai_tools_subtitle">允许模型调用 TinaIDE 内置工具（需要上游模型支持 tools/tool_calls）</string>
-    <string name="settings_ai_allow_dangerous_tools_auto">允许高危工具自动调用</string>
-    <string name="settings_ai_allow_dangerous_tools_auto_subtitle">自动执行模式下，允许自动调用高危工具（如文件删除、系统命令等）</string>
-    <string name="settings_ai_deep_thinking">启用深度思考</string>
-    <string name="settings_ai_deep_thinking_subtitle">启用后，AI 将进行更深入的思考和分析（可能增加响应时间）</string>
-    <string name="settings_ai_budget_tokens">深度思考预算（tokens）</string>
-  <string name="settings_ai_timeout">请求超时（秒）</string>
-  <string name="settings_ai_retry_count">自动重试次数</string>
-  <string name="settings_ai_retry_delay">重试间隔（秒）</string>
-  <string name="settings_ai_summary_prompt">总结提示词</string>
-  <string name="settings_ai_manage_tools">管理工具</string>
-  <string name="settings_ai_manage_tools_subtitle">查看和管理 AI 工具启用状态</string>
-  <string name="settings_ai_tools_dialog_title">AI 工具管理</string>
-  <string name="settings_ai_save">保存</string>
-  <string name="settings_ai_loading_models">正在加载模型列表...</string>
-  <string name="settings_ai_provider_openai">OpenAI</string>
-  <string name="settings_ai_provider_deepseek">DeepSeek</string>
-  <string name="settings_ai_provider_qwen">通义千问</string>
-  <string name="settings_ai_provider_zhipu">智谱 AI</string>
-  <string name="settings_ai_provider_ollama">Ollama (本地)</string>
-  <string name="settings_ai_provider_custom">自定义</string>
-  <string name="settings_ai_select_provider">选择服务商</string>
-  <string name="settings_ai_select_model">选择模型</string>
-
-  <!-- Terminal Tab List Dialog -->
+<!-- Terminal Tab List Dialog -->
   <string name="terminal_tab_list_title">终端标签 (%1$d)</string>
   <string name="terminal_status_starting">启动中...</string>
   <string name="terminal_status_running">运行中</string>
@@ -2281,10 +2706,7 @@
   <string name="compile_diag_phase_chain_failed">%1$s 结论: 分阶段命令可通过，问题在原始整合调用链</string>
   <string name="compile_exec_exception">异常：%1$s</string>
 
-  <!-- AI -->
-  <string name="ai_default_summary_prompt">请简要总结以上对话的核心内容和关键要点，保持简洁明了。</string>
-
-  <!-- PRoot Logs -->
+<!-- PRoot Logs -->
   <string name="proot_log_share_failed">分享失败：%1$s</string>
   <string name="proot_log_read_failed">读取失败</string>
   <string name="proot_log_tail_header">=== 文件已截断（仅展示尾部） ===
@@ -2424,11 +2846,7 @@ kept=%3$d bytes
 
   <!-- Project Sync -->
 
-
-
-
-
-  <!-- Rsync Sync -->
+<!-- Rsync Sync -->
   <string name="settings_remote_lsp_sync_method">同步方案</string>
   <string name="settings_remote_lsp_sync_method_builtin">内置同步（WebSocket）</string>
   <string name="settings_remote_lsp_sync_method_rsync">rsync 增量同步</string>
@@ -2445,8 +2863,7 @@ kept=%3$d bytes
 
   <string name="rsync_error_exit_code">rsync 执行失败，退出码：%1$d</string>
 
-
-  <!-- ==================== Help Center ==================== -->
+<!-- ==================== Help Center ==================== -->
 
   <!-- Help Settings -->
   <string name="settings_title_help">帮助与文档</string>
@@ -2518,8 +2935,6 @@ kept=%3$d bytes
   <string name="help_doc_debug_guide_summary">使用 LLDB 调试 C/C++ 程序</string>
   <string name="help_doc_keyboard_shortcuts_title">快捷键</string>
   <string name="help_doc_keyboard_shortcuts_summary">自定义和使用键盘快捷键</string>
-  <string name="help_doc_ai_settings_title">AI 设置说明</string>
-  <string name="help_doc_ai_settings_summary">了解渠道管理、模型与工具相关选项</string>
   <string name="help_doc_appearance_settings_title">外观设置说明</string>
   <string name="help_doc_appearance_settings_summary">了解应用主题和调试工具栏位置设置</string>
   <string name="help_doc_keyboard_settings_title">快捷键设置说明</string>
@@ -2535,7 +2950,7 @@ kept=%3$d bytes
 
   <string name="help_placeholder_tip_label">提示</string>
   <string name="help_placeholder_tip_body">此文档正在编写中，敬请期待。</string>
-  <string name="help_placeholder_tip_contact">如果您有任何问题，欢迎通过反馈入口或 GitHub Issue 与我们交流。</string>
+  <string name="help_placeholder_tip_contact">如果您有任何问题，欢迎通过 GitHub Issue 与我们交流。</string>
   <string name="help_placeholder_related_topics_title">相关主题</string>
 
   <!-- Help Keywords -->
@@ -2717,14 +3132,6 @@ kept=%3$d bytes
     <item>keyboard</item>
     <item>shortcut</item>
   </string-array>
-  <string-array name="help_keywords_ai_settings">
-    <item>AI</item>
-    <item>模型</item>
-    <item>渠道</item>
-    <item>byok</item>
-    <item>prompt</item>
-    <item>tools</item>
-  </string-array>
   <string-array name="help_keywords_appearance_settings">
     <item>外观</item>
     <item>主题</item>
@@ -2766,7 +3173,6 @@ kept=%3$d bytes
     <item>崩溃上传</item>
     <item>开发者选项</item>
     <item>诊断日志</item>
-    <item>反馈</item>
     <item>下载历史</item>
     <item>本地数据</item>
     <item>测试工具</item>
@@ -2782,7 +3188,6 @@ kept=%3$d bytes
     <item>bug</item>
     <item>faq</item>
     <item>帮助</item>
-    <item>反馈</item>
     <item>开源版</item>
     <item>插件市场</item>
     <item>AI</item>
@@ -2813,7 +3218,7 @@ kept=%3$d bytes
   <string name="fileutils_delete_failed">删除失败: %1$s</string>
   <string name="fileutils_new_name_empty">新名称不能为空</string>
   <string name="fileutils_target_exists">目标文件已存在: %1$s</string>
-  <string name="fileutils_rename_failed">重命名失败: %1$s -> %2$s</string>
+  <string name="fileutils_rename_failed">重命名失败: %1$s -&gt; %2$s</string>
   <string name="fileutils_source_not_file">源文件不存在或不是文件</string>
   <string name="fileutils_target_file_exists">目标文件已存在</string>
   <string name="fileutils_source_not_dir">源目录不存在或不是目录</string>
@@ -2837,7 +3242,7 @@ kept=%3$d bytes
   <string name="settings_view_proot_logs">查看 PRoot 日志</string>
   <string name="settings_view_proot_logs_desc">查看 PRoot 会话/错误日志（用于排查安装与运行问题）</string>
   <string name="settings_crash_auto_upload">崩溃日志自动上传</string>
-  <string name="settings_crash_auto_upload_desc">下次启动自动上传崩溃日志（可在此关闭）</string>
+  <string name="settings_crash_auto_upload_desc">自动上传 TinaIDE 主进程崩溃日志；用户程序崩溃仍只保存在本地。</string>
   <string name="settings_crash_upload_status">最近崩溃上传状态</string>
   <string name="settings_crash_upload_status_no_record">暂未记录崩溃上传状态。</string>
   <string name="settings_crash_upload_status_disabled">自动上传已关闭，新的 TinaIDE 崩溃日志不会自动上传。</string>
@@ -2861,7 +3266,7 @@ kept=%3$d bytes
   <string name="toast_logs_cleared">日志缓存已清空</string>
   <string name="toast_clear_logs_failed">清空日志失败: %1$s</string>
   <string name="dialog_title_upload_logs">上传日志</string>
-  <string name="dialog_message_upload_logs">将生成 TinaIDE 问题诊断上传包并发送到服务器。请确认你愿意分享以下信息。\n\n会上传：\n• TinaIDE 结构化日志（Timber）\n• 当前 App 进程 logcat（不含全局 logcat）\n• 应用/设备信息、TinaIDE 主进程崩溃与安装诊断\n• 项目构建日志（可能包含项目路径、编译输出或依赖名）\n• PRoot/rootfs/Linux 环境日志（可能包含软件源、已安装包或命令输出）\n• export_manifest.txt（记录收集策略）\n\n不会上传：\n• 源码文件或完整项目文件\n• 全局 logcat\n• 用户 SDL/Native/NDK 程序崩溃 tombstone\n\n如不想分享这些运行环境日志，请取消并改用“导出日志”本地分享。</string>
+  <string name="dialog_message_upload_logs">将生成 TinaIDE 问题诊断上传包并发送到服务器。请确认你愿意分享以下信息。\n\n会上传：\n• TinaIDE 结构化日志（Timber）\n• 最近 TinaIDE 相关进程 logcat（按 PID 收集，不含全局 logcat；可包含 SDL/native 运行时 stdout/stderr）\n• 应用/设备信息、TinaIDE 主进程崩溃与安装诊断\n• 项目构建日志（可能包含项目路径、编译输出或依赖名）\n• PRoot/rootfs/Linux 环境日志（可能包含软件源、已安装包或命令输出）\n• export_manifest.txt（记录收集策略）\n\n不会上传：\n• 源码文件或完整项目文件\n• 全局 logcat\n• 用户 SDL/Native/NDK 程序崩溃 tombstone\n\n如不想分享这些运行环境日志，请取消并改用“导出日志”本地分享。</string>
   <string name="dialog_title_clear_logs">清空日志缓存</string>
   <string name="dialog_message_clear_logs">确定要清空所有日志缓存吗？此操作不可撤销。</string>
   <string name="log_export_filename">TinaIDE_logs_%1$s.zip</string>
@@ -2876,11 +3281,9 @@ kept=%3$d bytes
   <string name="log_export_version_code">版本代码: %1$d</string>
   <string name="log_export_export_time">导出时间: %1$s</string>
 
+<!-- License Status -->
 
-  <!-- License Status -->
-
-
-  <!-- License Validation -->
+<!-- License Validation -->
 
   <!-- License Status Card -->
 
@@ -2893,7 +3296,6 @@ kept=%3$d bytes
   <!-- License Debug -->
 
   <!-- Toolchain Configuration -->
-  <string name="and_word">与</string>
 
   <!-- 插件命令字符串（HostCommands） -->
   <!-- 文件操作扩展 -->
@@ -2967,8 +3369,7 @@ kept=%3$d bytes
 
   <!-- Auth Errors -->
 
-
-  <!-- WeChat Auth Provider Errors -->
+<!-- WeChat Auth Provider Errors -->
 
   <!-- TinaIDEException Messages -->
   <string name="exception_compile_failed_at">编译失败: %1$s:%2$d - %3$s</string>
@@ -3004,8 +3405,7 @@ kept=%3$d bytes
   <string name="exception_timeout_suggestion">请检查网络连接，或稍后重试</string>
   <string name="exception_process_failed">进程执行失败: %1$s</string>
 
-
-  <!-- Command Executor -->
+<!-- Command Executor -->
   <string name="error_no_directory_selected">无法新建：未选择目录</string>
 
   <!-- Git Panel -->
@@ -3082,8 +3482,12 @@ kept=%3$d bytes
   <string name="run_config_workdir_placeholder">$PROJECT_DIR$/build</string>
   <string name="run_config_sysroot_api_level_label">NDK API Level（可选）</string>
   <string name="run_config_sysroot_api_level_placeholder">留空优先使用项目 API（无则默认 28）</string>
-  <string name="run_config_sysroot_api_level_desc">仅用于原生构建（CMake/Make/单文件），范围 21-35。留空时优先读取项目 metadata 的 nativeApiLevel，无值时默认 28。</string>
+  <string name="run_config_sysroot_api_level_desc">仅用于原生构建（CMake/Make/单文件），以选择的 NDK Runtime 实际支持 API 为准。留空时优先读取项目 metadata 的 nativeApiLevel，无值时默认 28。</string>
   <string name="run_config_sysroot_api_level_error_range">API Level 必须在 %1$d-%2$d 之间</string>
+  <string name="run_config_sysroot_api_level_error_supported_values">当前 NDK Runtime 支持的 API Level：%1$s</string>
+  <string name="run_config_sysroot_profile_label">NDK Runtime</string>
+  <string name="run_config_sysroot_profile_desc">留空时跟随全局当前 NDK Runtime；选择后此运行配置固定使用对应 sysroot/libc++_shared.so。</string>
+  <string name="run_config_sysroot_profile_global">跟随全局当前 NDK Runtime</string>
   <string name="run_config_variable_hint">支持变量，输入 $ 查看可用变量</string>
   <string name="run_config_variable_help">变量帮助</string>
   <string name="run_config_run_method">运行方式</string>
@@ -3131,9 +3535,9 @@ kept=%3$d bytes
   <string name="about_export_logs_failed">导出日志失败</string>
   <string name="about_user_report_log">用户上报日志</string>
   <string name="about_clear_logs_failed">清理失败</string>
+  <string name="about_qq_group_not_configured">QQ 群加群链接未配置</string>
 
-
-  <!-- Editor Settings Section - LSP Connection -->
+<!-- Editor Settings Section - LSP Connection -->
   <string name="editor_lsp_connection_success">连接成功！延迟：%1$d ms</string>
   <string name="editor_lsp_connection_timeout">连接超时</string>
   <string name="editor_lsp_connection_failed">连接失败：%1$s</string>
@@ -3433,24 +3837,15 @@ kept=%3$d bytes
   <string name="debug_toolbar_bottom">底部</string>
   <string name="debug_toolbar_both">顶部和底部</string>
 
-
-
-
-
-
-
-  <!-- Diagnostic Severity -->
+<!-- Diagnostic Severity -->
   <string name="diagnostic_error">错误</string>
   <string name="diagnostic_warning">警告</string>
   <string name="diagnostic_information">信息</string>
   <string name="diagnostic_hint">提示</string>
 
+<string name="lsp_template_rename">重命名符号</string>
 
-  <string name="lsp_template_rename">重命名符号</string>
-
-
-
-  <!-- PRoot Bootstrap -->
+<!-- PRoot Bootstrap -->
   <string name="proot_restarting">正在重启安装…</string>
   <string name="proot_install_already_running">安装已在进行中，跳过重复请求</string>
   <string name="proot_environment_ready">Linux 环境已安装</string>
@@ -3597,32 +3992,9 @@ kept=%3$d bytes
   <string name="lsp_error_navigation_failed">导航失败</string>
   <string name="lsp_error_call_hierarchy_failed">调用层次查询失败</string>
 
-  <!-- Feedback -->
-  <string name="feedback_title">反馈</string>
-  <string name="feedback_category_label">反馈类型</string>
-  <string name="feedback_category_bug">问题反馈</string>
-  <string name="feedback_category_feature">功能需求</string>
-  <string name="feedback_category_improvement">改进建议</string>
-  <string name="feedback_category_question">疑问咨询</string>
-  <string name="feedback_category_other">其他</string>
-  <string name="feedback_title_label">标题</string>
-  <string name="feedback_title_hint">简要描述您的反馈</string>
-  <string name="feedback_content_label">详细内容</string>
-  <string name="feedback_content_hint">请详细描述您的问题或建议</string>
-  <string name="feedback_submit">提交反馈</string>
-  <string name="feedback_submit_success">提交成功！</string>
-  <string name="feedback_hint">我们会认真阅读每一条反馈,感谢您的支持!</string>
-  <string name="feedback_min_chars_hint">还需 %1$d 个字符</string>
-  <string name="feedback_error_too_frequent">提交过于频繁,请 %1$d 秒后再试</string>
-  <string name="feedback_error_title_too_short">标题至少需要 %1$d 个字符</string>
-  <string name="feedback_error_title_too_long">标题不能超过 %1$d 个字符</string>
-  <string name="feedback_error_content_too_short">内容至少需要 %1$d 个字符</string>
-  <string name="feedback_error_content_too_long">内容不能超过 %1$d 个字符</string>
-  <string name="feedback_error_network">网络连接失败,请检查网络后重试</string>
   <string name="dismiss">关闭</string>
 
-
-  <!-- Plugin Marketplace -->
+<!-- Plugin Marketplace -->
   <string name="error_download_failed">下载失败</string>
   <string name="error_file_hash_mismatch">文件校验失败</string>
   <string name="plugin_marketplace_title">插件市场</string>
@@ -3944,7 +4316,7 @@ kept=%3$d bytes
   <string name="tutorial_step_tutorial_tab_title">教程中心</string>
   <string name="tutorial_step_tutorial_tab_desc">这里有丰富的教程帮助你学习使用 TinaIDE</string>
   <string name="tutorial_step_profile_tab_title">个人中心</string>
-  <string name="tutorial_step_profile_tab_desc">管理反馈、设置、关于和下载历史</string>
+  <string name="tutorial_step_profile_tab_desc">管理设置、关于和下载历史</string>
 
   <!-- Onboarding Dialog -->
   <string name="onboarding_dialog_title">欢迎使用 TinaIDE</string>
@@ -3961,10 +4333,9 @@ kept=%3$d bytes
 
   <!-- Profile Screen -->
   <string name="profile_open_source_title">TinaIDE 开源版</string>
-  <string name="profile_open_source_desc">私有身份与商业功能已迁出；反馈、日志、插件、包下载、收藏和下载历史保留。</string>
+  <string name="profile_open_source_desc">私有身份与商业功能已迁出；日志、插件、包下载、收藏和下载历史保留。</string>
   <string name="profile_version_format">版本 %1$s</string>
   <string name="profile_settings">设置</string>
-  <string name="profile_feedback">反馈</string>
   <string name="profile_about">关于</string>
   <string name="profile_my_plugins">我的插件</string>
   <string name="profile_my_packages">我的包</string>
@@ -3977,7 +4348,6 @@ kept=%3$d bytes
   <string name="profile_download_history_desc">下载记录</string>
   <string name="profile_favorites_desc">收藏的内容</string>
   <string name="profile_settings_desc">应用设置、主题、快捷键等</string>
-  <string name="profile_feedback_desc">意见反馈、功能建议</string>
   <string name="profile_about_desc">版本信息、开源许可</string>
   <string name="app_slogan">让移动开发更简单</string>
 
@@ -3985,8 +4355,7 @@ kept=%3$d bytes
   <string name="ndk_api_level_label">API Level</string>
   <string name="ndk_api_level_display_name">API %1$d（%2$s）</string>
 
-
-  <!-- Text Action Menu Groups -->
+<!-- Text Action Menu Groups -->
   <string name="text_action_group_navigation">导航</string>
 
   <!-- Developer Options: Server Config Dialog -->
@@ -3998,7 +4367,6 @@ kept=%3$d bytes
   <string name="dev_options_config_refresh_interval">刷新间隔: %1$d秒</string>
   <string name="dev_options_config_unknown">未知</string>
   <string name="dev_options_config_features">功能开关:</string>
-  <string name="dev_options_config_feedback">• 反馈功能: %1$s</string>
   <string name="dev_options_config_plugin_market">• 插件市场: %1$s</string>
   <string name="dev_options_config_package_manager">• 包管理器: %1$s</string>
   <string name="dev_options_config_developer_options">• 开发者选项: %1$s</string>
@@ -4020,317 +4388,7 @@ kept=%3$d bytes
   <string name="tutorial_interactive">交互式</string>
   <string name="tutorial_relearn">重新学习</string>
 
-  <!-- AI Chat -->
-  <string name="ai_error_configure_settings">请先配置 AI 设置</string>
-  <string name="ai_error_tool_call_id_empty">tool_call_id 为空，无法回传工具结果</string>
-  <string name="ai_error_not_ready">AI 未就绪（请检查服务器连接）</string>
-  <string name="ai_error_configure_api_key">请先配置 API Key</string>
-  <string name="ai_error_image_empty">图片数据为空</string>
-  <string name="ai_image_count">（图片 %1$d 张）</string>
-  <string name="ai_context_current_file">当前文件: %1$s</string>
-  <string name="ai_context_selected_code">选中代码 (%1$s:%2$d-%3$d):</string>
-  <string name="ai_context_error_info">错误信息:</string>
-  <string name="ai_toggle_tool_calls_show">展开剩余 %1$d 个工具</string>
-  <string name="ai_toggle_tool_calls_hide">收起工具调用</string>
-  <string name="ai_execute">执行</string>
-  <string name="ai_waiting">等待中</string>
-  <string name="ai_tool_status_executing">执行中</string>
-  <string name="ai_tool_status_success">成功</string>
-  <string name="ai_tool_status_failed">失败</string>
-  <string name="ai_tool_status_cancelled">已取消</string>
-  <string name="ai_tool_show_details">查看详情</string>
-  <string name="ai_tool_id">工具ID</string>
-  <string name="ai_tool_params">参数</string>
-  <string name="ai_tool_result_label">执行结果</string>
-  <string name="ai_tool_error_label">执行错误</string>
-  <string name="ai_tool_cancelled_label">取消原因</string>
-  <string name="ai_expand">展开</string>
-  <string name="ai_collapse">收起</string>
-  <string name="ai_toggle_reasoning_show">显示思考过程</string>
-  <string name="ai_toggle_reasoning_hide">隐藏思考过程</string>
-  <string name="ai_tool_call_missing_name">工具调用缺少 name，无法执行</string>
-  <string name="ai_tool_not_found">未找到工具：%1$s</string>
-  <string name="ai_tool_execution_failed">工具执行失败：%1$s</string>
-  <string name="ai_tool_error_context_not_initialized">工具执行上下文未初始化，请先打开项目并等待初始化完成</string>
-  <string name="ai_tool_cancelled_previous_failed">已取消：上一个工具执行失败</string>
-  <string name="ai_tool_cancelled_previous_cancelled">已取消：上一个工具已被取消</string>
-  <string name="ai_tool_error_execution_callbacks_unavailable">执行回调不可用，请先初始化项目上下文</string>
-  <string name="ai_tool_error_editor_callbacks_unavailable">编辑器回调不可用</string>
-  <string name="ai_tool_error_project_root_missing">项目根目录未设置，请先初始化项目上下文</string>
-  <string name="ai_tool_error_execution_id_required">执行 ID 不能为空</string>
-  <string name="ai_tool_error_default_run_callback_unavailable">当前项目未注册运行回调，无法通过 AI 工具运行项目。</string>
-  <string name="ai_tool_error_default_test_callback_unavailable">当前项目未注册测试回调，无法通过 AI 工具运行测试。</string>
-  <string name="ai_tool_error_default_build_callback_unavailable">当前项目未注册构建回调，无法通过 AI 工具构建项目。</string>
-  <string name="ai_tool_error_failed_run_project">运行项目失败：%1$s</string>
-  <string name="ai_tool_error_failed_build_project">构建项目失败：%1$s</string>
-  <string name="ai_tool_error_failed_run_tests">运行测试失败：%1$s</string>
-  <string name="ai_tool_error_failed_stop_execution_by_id">停止执行失败：%1$s（执行可能不存在或已完成）</string>
-  <string name="ai_tool_error_failed_stop_execution">停止执行失败：%1$s</string>
-  <string name="ai_tool_error_execution_not_found">未找到执行：%1$s（可能已清理或从未存在）</string>
-  <string name="ai_tool_error_failed_get_execution_status">获取执行状态失败：%1$s</string>
-  <string name="ai_tool_error_execution_output_not_found">未找到执行输出：%1$s（执行可能不存在或输出暂不可用）</string>
-  <string name="ai_tool_error_failed_get_execution_output">获取执行输出失败：%1$s</string>
-  <string name="ai_tool_error_failed_get_build_errors">获取构建错误失败：%1$s</string>
-  <string name="ai_tool_error_failed_navigate_run_output">跳转到运行输出失败：%1$s</string>
-  <string name="ai_tool_error_failed_navigate_build_log">跳转到构建日志失败：%1$s</string>
-  <string name="ai_tool_error_no_current_file_open">当前没有打开的文件</string>
-  <string name="ai_tool_error_no_code_selected">当前没有选中代码</string>
-  <string name="ai_tool_error_code_parameter_required">code 参数不能为空</string>
-  <string name="ai_tool_error_failed_insert_code">插入代码失败：%1$s</string>
-  <string name="ai_tool_error_failed_replace_code">替换代码失败：%1$s</string>
-  <string name="ai_tool_error_directory_not_found">目录未找到：%1$s</string>
-  <string name="ai_tool_error_path_not_directory">路径不是目录：%1$s</string>
-  <string name="ai_tool_error_failed_get_project_structure">获取项目结构失败：%1$s</string>
-  <string name="ai_tool_error_file_name_pattern_required">文件名模式不能为空</string>
-  <string name="ai_tool_error_failed_find_files">查找文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_count_code_lines">统计代码行失败：%1$s</string>
-
-  <string name="ai_tool_error_code_analysis_callbacks_unavailable">代码分析回调不可用</string>
-  <string name="ai_tool_error_search_query_required">搜索关键词不能为空</string>
-  <string name="ai_tool_error_failed_search_code">搜索代码失败：%1$s</string>
-  <string name="ai_tool_error_symbol_name_required">符号名称不能为空</string>
-  <string name="ai_tool_error_failed_find_symbol">查找符号失败：%1$s</string>
-  <string name="ai_tool_error_failed_find_references">查找引用失败：%1$s</string>
-  <string name="ai_tool_error_file_path_required">文件路径不能为空</string>
-  <string name="ai_tool_error_failed_get_code_outline">获取代码大纲失败：%1$s</string>
-  <string name="ai_tool_error_diagnostics_callbacks_unavailable">诊断回调不可用</string>
-  <string name="ai_tool_error_failed_get_diagnostics">获取诊断失败：%1$s</string>
-  <string name="ai_tool_error_failed_get_all_diagnostics">获取全部诊断失败：%1$s</string>
-  <string name="ai_tool_error_failed_clear_diagnostics_for_file">清理诊断失败：%1$s</string>
-  <string name="ai_tool_error_failed_clear_diagnostics">清理诊断失败：%1$s</string>
-  <string name="ai_tool_error_file_system_callbacks_unavailable">文件系统回调不可用</string>
-  <string name="ai_tool_error_failed_read_file">读取文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_write_file">写入文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_list_files">列出文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_delete">删除失败：%1$s</string>
-  <string name="ai_tool_error_directory_path_required">目录路径不能为空</string>
-  <string name="ai_tool_error_failed_create_directory">创建目录失败：%1$s</string>
-  <string name="ai_tool_error_source_destination_required">源路径和目标路径不能为空</string>
-  <string name="ai_tool_error_failed_move_file">移动文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_copy_file">复制文件失败：%1$s</string>
-  <string name="ai_tool_error_failed_get_file_info">获取文件信息失败：%1$s</string>
-  <string name="ai_tool_error_old_text_required">old_text 不能为空</string>
-  <string name="ai_tool_error_failed_replace_text">替换文本失败：%1$s</string>
-  <string name="ai_tool_error_line_number_min_one">行号必须大于等于 1</string>
-  <string name="ai_tool_error_failed_replace_line">替换行失败：%1$s</string>
-  <string name="ai_tool_error_failed_insert_line">插入行失败：%1$s</string>
-  <string name="ai_tool_error_start_line_min_one">起始行必须大于等于 1</string>
-  <string name="ai_tool_error_end_line_before_start">结束行必须大于等于起始行</string>
-  <string name="ai_tool_error_failed_delete_lines">删除行失败：%1$s</string>
-  <string name="ai_tool_error_editor_callbacks_context_unavailable">编辑器回调不可用，请确认编辑器上下文已初始化</string>
-  <string name="ai_tool_error_start_line_after_end_line">起始行（%1$d）必须小于或等于结束行（%2$d）</string>
-  <string name="ai_tool_error_failed_format_code_unsupported">格式化代码失败，当前文件可能不支持格式化，或 clang-format 不可用。</string>
-  <string name="ai_tool_error_failed_format_code">格式化代码失败：%1$s</string>
-  <string name="ai_tool_error_method_name_code_required">方法名和代码不能为空</string>
-  <string name="ai_tool_error_failed_extract_method">提取方法失败：%1$s</string>
-  <string name="ai_tool_error_code_description_required">代码和描述不能为空</string>
-  <string name="ai_tool_error_unsupported_element_type">不支持的元素类型：%1$s</string>
-  <string name="ai_tool_error_failed_add_documentation">添加文档失败：%1$s</string>
-
-  <string name="ai_tool_param_desc_branch_or_commit_sha_default_repository_s_default">分支或提交 SHA（默认使用仓库默认分支）</string>
-  <string name="ai_tool_param_desc_brief_description_of_what_the_code_does">简要说明代码的作用</string>
-  <string name="ai_tool_param_desc_clean_build_artifacts_before_building_default_false">构建前是否清理构建产物（默认 false）</string>
-  <string name="ai_tool_param_desc_code_to_document">需要添加文档的代码</string>
-  <string name="ai_tool_param_desc_code_to_extract_into_the_method">需要提取到方法中的代码</string>
-  <string name="ai_tool_param_desc_directory_to_analyze_relative_to_project_root_default">相对项目根目录的分析目录（默认 \'.\' 表示整个项目）</string>
-  <string name="ai_tool_param_desc_directory_to_search_in_relative_to_project_root">相对项目根目录的搜索目录（默认 \'.\' 表示整个项目）</string>
-  <string name="ai_tool_param_desc_end_line_for_range_formatting_optional_1_based">范围格式化的结束行（可选，从 1 开始）</string>
-  <string name="ai_tool_param_desc_file_name_or_pattern_to_search_for_supports">要搜索的文件名或模式（支持 * 和 ? 通配符，例如 \'*.cpp\'、\'main.*\'、\'test_*.h\'）</string>
-  <string name="ai_tool_param_desc_file_name_pattern_to_filter_e_g_kt">用于过滤的文件名模式（例如 \'*.kt\'、\'*.java\'）</string>
-  <string name="ai_tool_param_desc_file_path_in_the_repository_e_g_src">仓库中的文件路径（例如 \'src/main.cpp\'、\'README.md\'）</string>
-  <string name="ai_tool_param_desc_filter_by_programming_language_e_g_cpp_c">按编程语言过滤（例如 \'C++\'、\'C\'、\'Python\'、\'Java\'）</string>
-  <string name="ai_tool_param_desc_filter_by_severity_level">按严重级别过滤</string>
-  <string name="ai_tool_param_desc_include_info_and_hints_in_results">结果中包含信息和提示</string>
-  <string name="ai_tool_param_desc_include_warnings_in_results">结果中包含警告</string>
-  <string name="ai_tool_param_desc_insert_position_before_or_after_the_line_default">插入位置：在该行 \'before\' 之前或 \'after\' 之后（默认 \'after\'）</string>
-  <string name="ai_tool_param_desc_limit_search_to_specific_site_e_g_stackoverflow">将搜索限制到特定站点（例如 \'stackoverflow.com\'、\'cppreference.com\'）</string>
-  <string name="ai_tool_param_desc_maximum_depth_to_traverse_default_3_max_10">最大遍历深度（默认 3，最大 10）</string>
-  <string name="ai_tool_param_desc_maximum_number_of_lines_to_return_default_500">返回的最大行数（默认 500，最大 2000）</string>
-  <string name="ai_tool_param_desc_maximum_number_of_results_to_return">返回的最大结果数</string>
-  <string name="ai_tool_param_desc_maximum_number_of_results_to_return_default_10">返回的最大结果数（默认 10，最大 20）</string>
-  <string name="ai_tool_param_desc_maximum_number_of_results_to_return_default_10_2">返回的最大结果数（默认 10，最大 30）</string>
-  <string name="ai_tool_param_desc_maximum_number_of_results_to_return_default_50">返回的最大结果数（默认 50）</string>
-  <string name="ai_tool_param_desc_method_visibility_private_public_protected">方法可见性（private、public、protected）</string>
-  <string name="ai_tool_param_desc_name_for_the_new_method">新方法名称</string>
-  <string name="ai_tool_param_desc_optional_arguments_passed_to_executable_test_targets">传递给可执行测试目标的可选参数。</string>
-  <string name="ai_tool_param_desc_optional_command_line_arguments_passed_to_the_executable">传递给可执行文件的可选命令行参数</string>
-  <string name="ai_tool_param_desc_optional_execution_id_to_get_errors_from_a">可选执行 ID，用于获取指定构建的错误（来自 build_project）。不提供时返回当前全部构建错误。</string>
-  <string name="ai_tool_param_desc_optional_test_class_or_target_name_for_c">可选测试类或目标名称。对于 C/C++ 项目会按目标名称处理。</string>
-  <string name="ai_tool_param_desc_optional_test_method_or_filter_argument_passed_to">可选测试方法或过滤参数，会传递给可执行测试目标。</string>
-  <string name="ai_tool_param_desc_optional_test_package_or_target_group_for_c">可选测试包或目标组。对于 C/C++ 项目可按目标名称处理。</string>
-  <string name="ai_tool_param_desc_optional_test_target_name_for_cmake_make_this">可选测试目标名称。对于 CMake/Make 可以是 \'test\' 或指定的可执行测试目标。</string>
-  <string name="ai_tool_param_desc_optional_working_directory_used_when_launching_the_executable">启动可执行文件时使用的可选工作目录</string>
-  <string name="ai_tool_param_desc_path_to_the_file_to_format_relative_to">要格式化的文件路径（相对项目根目录）</string>
-  <string name="ai_tool_param_desc_repository_in_format_owner_repo_e_g_torvalds">仓库格式为 \'owner/repo\'（例如 \'torvalds/linux\'、\'llvm/llvm-project\'）</string>
-  <string name="ai_tool_param_desc_search_engine_to_use_baidu_bing_google_or">使用的搜索引擎：\'baidu\'、\'bing\'、\'google\' 或 \'duckduckgo\'（默认 \'duckduckgo\'）</string>
-  <string name="ai_tool_param_desc_search_query_e_g_cmake_tutorial_clang_format">搜索关键词（例如 \'cmake tutorial\'、\'clang-format configuration\'、\'C++ best practices\'）</string>
-  <string name="ai_tool_param_desc_search_query_e_g_language_cpp_cmake_user">搜索关键词（例如 \'language:cpp cmake\'、\'user:torvalds linux\'、\'repo:llvm/llvm-project\'）</string>
-  <string name="ai_tool_param_desc_sort_results_by_stars_forks_updated_or_best">结果排序方式：\'stars\'、\'forks\'、\'updated\' 或 \'best-match\'（默认 \'best-match\'）</string>
-  <string name="ai_tool_param_desc_specific_build_target_name_optional_uses_current_selected">指定构建目标名称（可选；未指定时使用当前选中的配置）</string>
-  <string name="ai_tool_param_desc_start_line_for_range_formatting_optional_1_based">范围格式化的起始行（可选，从 1 开始）</string>
-  <string name="ai_tool_param_desc_the_code_to_insert">要插入的代码</string>
-  <string name="ai_tool_param_desc_the_content_to_insert">要插入的内容</string>
-  <string name="ai_tool_param_desc_the_content_to_write_to_the_file">要写入文件的内容</string>
-  <string name="ai_tool_param_desc_the_destination_file_or_directory_path">目标文件或目录路径</string>
-  <string name="ai_tool_param_desc_the_directory_path_to_analyze_relative_to_project">相对项目根目录的分析目录路径（默认 \'.\' 表示根目录）</string>
-  <string name="ai_tool_param_desc_the_directory_path_to_create">要创建的目录路径</string>
-  <string name="ai_tool_param_desc_the_directory_path_to_list_relative_to_project">要列出的目录路径（相对项目根目录或绝对路径）</string>
-  <string name="ai_tool_param_desc_the_directory_path_to_search_in_default_project">要搜索的目录路径（默认项目根目录）</string>
-  <string name="ai_tool_param_desc_the_ending_line_number_to_delete_default_same">要删除的结束行号（默认与 start_line 相同）</string>
-  <string name="ai_tool_param_desc_the_execution_id_to_check_obtained_from_run">要检查的执行 ID（来自 run_project 或 build_project）</string>
-  <string name="ai_tool_param_desc_the_execution_id_to_get_output_from_obtained">要获取输出的执行 ID（来自 run_project 或 build_project）</string>
-  <string name="ai_tool_param_desc_the_execution_id_to_stop_obtained_from_run">要停止的执行 ID（来自 run_project 或 build_project）</string>
-  <string name="ai_tool_param_desc_the_file_containing_the_symbol_optional">包含该符号的文件（可选）</string>
-  <string name="ai_tool_param_desc_the_file_or_directory_path">文件或目录路径</string>
-  <string name="ai_tool_param_desc_the_file_or_directory_path_to_delete">要删除的文件或目录路径</string>
-  <string name="ai_tool_param_desc_the_file_path_relative_to_project_root_or">文件路径（相对项目根目录或绝对路径）</string>
-  <string name="ai_tool_param_desc_the_file_path_to_clear_diagnostics_for">要清理诊断的文件路径</string>
-  <string name="ai_tool_param_desc_the_file_path_to_get_diagnostics_for_omit">要获取诊断的文件路径（省略表示所有文件）</string>
-  <string name="ai_tool_param_desc_the_file_path_to_get_outline_for">要获取大纲的文件路径</string>
-  <string name="ai_tool_param_desc_the_file_path_to_read_relative_to_project">要读取的文件路径（相对项目根目录或绝对路径）</string>
-  <string name="ai_tool_param_desc_the_file_path_to_write_relative_to_project">要写入的文件路径（相对项目根目录或绝对路径）</string>
-  <string name="ai_tool_param_desc_the_line_number_of_the_symbol_optional">符号所在行号（可选）</string>
-  <string name="ai_tool_param_desc_the_line_number_to_replace_starts_from_1">要替换的行号（从 1 开始）</string>
-  <string name="ai_tool_param_desc_the_new_code_to_replace_the_selection">用于替换选区的新代码</string>
-  <string name="ai_tool_param_desc_the_new_content_for_the_line">该行的新内容</string>
-  <string name="ai_tool_param_desc_the_reference_line_number_starts_from_1">参考行号（从 1 开始）</string>
-  <string name="ai_tool_param_desc_the_replacement_text">替换文本</string>
-  <string name="ai_tool_param_desc_the_run_configuration_name_to_use_optional_uses">要使用的运行配置名称（可选；未指定时使用当前选中的配置）</string>
-  <string name="ai_tool_param_desc_the_search_query_text_or_regex_pattern">搜索关键词（文本或正则模式）</string>
-  <string name="ai_tool_param_desc_the_source_file_or_directory_path">源文件或目录路径</string>
-  <string name="ai_tool_param_desc_the_starting_line_number_to_delete_starts_from">要删除的起始行号（从 1 开始）</string>
-  <string name="ai_tool_param_desc_the_symbol_name_to_find">要查找的符号名称</string>
-  <string name="ai_tool_param_desc_the_symbol_name_to_find_references_for">要查找引用的符号名称</string>
-  <string name="ai_tool_param_desc_the_symbol_type_class_function_variable_etc">符号类型（类、函数、变量等）</string>
-  <string name="ai_tool_param_desc_the_text_to_find_and_replace">要查找并替换的文本</string>
-  <string name="ai_tool_param_desc_type_of_code_element_class_function_property">代码元素类型（class、function、property）</string>
-  <string name="ai_tool_param_desc_type_of_search_code_repositories_issues_or_users">搜索类型：\'code\'、\'repositories\'、\'issues\' 或 \'users\'（默认 \'repositories\'）</string>
-  <string name="ai_tool_param_desc_whether_the_search_is_case_sensitive">搜索是否区分大小写</string>
-  <string name="ai_tool_param_desc_whether_the_search_is_case_sensitive_default_false">搜索是否区分大小写（默认 false）</string>
-  <string name="ai_tool_param_desc_whether_to_create_parent_directories_if_they_don">父目录不存在时是否创建</string>
-  <string name="ai_tool_param_desc_whether_to_delete_directories_recursively">是否递归删除目录</string>
-  <string name="ai_tool_param_desc_whether_to_include_hidden_files">是否包含隐藏文件</string>
-  <string name="ai_tool_param_desc_whether_to_list_files_recursively">是否递归列出文件</string>
-  <string name="ai_tool_param_desc_whether_to_overwrite_if_destination_exists">目标已存在时是否覆盖</string>
-  <string name="ai_tool_param_desc_whether_to_replace_all_occurrences_default_false_replaces">是否替换所有匹配项（默认 false，仅替换首个）</string>
-  <string name="ai_tool_param_desc_whether_to_show_files_or_only_directories_default">是否显示文件；否则只显示目录（默认 true）</string>
-  <string name="ai_tool_param_desc_whether_to_treat_query_as_regex_pattern">是否将关键词作为正则模式处理</string>
-  <string name="ai_tool_desc_search_code">在项目中搜索代码模式。支持正则、文件过滤（*.kt、*.java）、大小写敏感和结果数量限制。用于查找特定代码片段、函数调用或代码库中的模式。</string>
-  <string name="ai_tool_desc_find_symbol">定位代码符号（类、函数、变量、接口、枚举、常量）的定义。返回文件路径、行号、签名和文档，便于理解符号定义位置和结构。</string>
-  <string name="ai_tool_desc_find_references">查找项目中某个符号被引用或使用的所有位置。区分定义和引用，适合影响分析、重构和理解代码依赖。</string>
-  <string name="ai_tool_desc_get_code_outline">提取文件的结构化大纲，展示类、方法、属性及其层级关系。无需读取完整内容即可快速了解文件组织。</string>
-  <string name="ai_tool_desc_get_diagnostics">获取某个文件或整个项目的代码诊断（错误、警告、提示）。返回语法错误、类型错误、Lint 问题和代码质量问题的详细位置与消息。</string>
-  <string name="ai_tool_desc_get_all_diagnostics">获取整个项目的全部诊断信息。返回所有文件中的错误、警告和问题，用于快速了解项目健康状态。</string>
-  <string name="ai_tool_desc_clear_diagnostics">清理指定文件的缓存诊断信息。适合在修改代码后刷新诊断结果。</string>
-  <string name="ai_tool_desc_get_current_file">读取编辑器中当前打开文件的完整内容，包括文件名、语言类型和全文。用于理解当前工作文件上下文。</string>
-  <string name="ai_tool_desc_get_selected_code">获取用户当前在编辑器中选中的代码片段，包括文件名、语言、行范围和选中文本。适合分析或修改特定代码区域。</string>
-  <string name="ai_tool_desc_insert_code">在编辑器当前光标位置插入代码，不替换已有内容。用于添加代码片段、导入语句或函数。</string>
-  <string name="ai_tool_desc_replace_selected_code">用新代码替换编辑器中当前选中的代码。适合重构、修复 bug 或更新用户高亮的代码区域。</string>
-  <string name="ai_tool_desc_run_project">使用当前运行配置运行 C/C++ 项目。必要时先编译并执行二进制文件，返回执行状态、输出和错误。用于测试应用或验证修改是否生效。</string>
-  <string name="ai_tool_desc_build_project">使用 CMake 或 Makefile 构建/编译 C/C++ 项目。编译源码并生成可执行文件，返回构建输出、成功状态和编译错误。运行前可用它确认代码可编译。</string>
-  <string name="ai_tool_desc_stop_execution">按执行 ID 停止正在运行的任务（项目运行或构建）。终止进程并取消操作，用于中断耗时或卡住的任务。</string>
-  <string name="ai_tool_desc_get_execution_status">按执行 ID 获取运行中或已完成任务的当前状态。返回 pending、running、success、failed、cancelled、timeout 等状态，用于跟踪耗时任务。</string>
-  <string name="ai_tool_desc_get_execution_output">按执行 ID 获取已完成或运行中任务的标准输出和错误输出。返回 stdout、stderr、退出码和当前状态，用于查看详细执行结果并诊断问题。</string>
-  <string name="ai_tool_desc_get_build_errors">获取当前项目或指定构建执行中的全部构建错误和警告。返回错误数、警告数以及带文件位置和行号的详细消息，用于诊断编译问题并修复代码。</string>
-  <string name="ai_tool_desc_navigate_to_run_output">打开并聚焦 IDE 的运行输出面板。适合在运行项目后引导用户查看执行结果和程序输出。</string>
-  <string name="ai_tool_desc_navigate_to_build_log">打开并聚焦 IDE 的构建日志面板。适合在构建后引导用户查看编译输出、错误和警告。</string>
-  <string name="ai_tool_desc_run_tests">运行当前 C/C++ 项目的测试。优先使用 CMake/Ninja 的 test 等测试构建目标，也可在可用时运行测试可执行目标。适合在代码修改后验证行为。</string>
-  <string name="ai_tool_desc_read_file">从文件系统读取文件完整内容。支持相对项目根目录路径和绝对路径，返回文件内容、大小、行数和编码；大文件会自动截断。</string>
-  <string name="ai_tool_desc_write_file">向文件写入内容；文件不存在时创建，存在时覆盖。必要时自动创建父目录，适合生成新文件或更新已有文件。</string>
-  <string name="ai_tool_desc_list_files">列出指定路径下的文件和目录。支持递归遍历、文件模式过滤（*.kt、*.java）和包含隐藏文件，返回路径、类型和大小。</string>
-  <string name="ai_tool_desc_delete_file">从文件系统删除文件或目录。</string>
-  <string name="ai_tool_desc_create_directory">在文件系统中创建新目录。</string>
-  <string name="ai_tool_desc_move_file">移动或重命名文件或目录。</string>
-  <string name="ai_tool_desc_copy_file">将文件或目录复制到新位置。</string>
-  <string name="ai_tool_desc_get_file_info">获取文件或目录信息（大小、修改时间、权限等）。</string>
-  <string name="ai_tool_desc_replace_text">在文件中查找并替换文本。支持替换首个匹配或全部匹配，并会自动同步已打开的编辑器标签页。</string>
-  <string name="ai_tool_desc_replace_line">替换文件中指定行的内容。行号从 1 开始，并会自动同步已打开的编辑器标签页。</string>
-  <string name="ai_tool_desc_insert_line">在文件指定行号之前或之后插入新行。行号从 1 开始，并会自动同步已打开的编辑器标签页。</string>
-  <string name="ai_tool_desc_delete_lines">删除文件中的一行或多行。可删除单行或行范围；行号从 1 开始，并会自动同步已打开的编辑器标签页。</string>
-  <string name="ai_tool_desc_get_project_structure">获取项目目录结构。以树形展示文件夹和文件，支持配置深度。适合理解项目组织、定位源码、头文件和构建配置，并自动排除构建产物和常见临时目录。</string>
-  <string name="ai_tool_desc_find_file">按名称或模式在项目中查找文件。支持通配符（* 和 ?）以及大小写不敏感搜索，返回相对项目根目录的路径。适合快速定位源码、头文件或配置文件。</string>
-  <string name="ai_tool_desc_count_code_lines">统计项目或指定目录的代码行数。按文件类型（C、C++、H、CMake 等）分组，展示总行数、代码行、注释行和空行，用于项目度量和理解代码规模。</string>
-  <string name="ai_tool_desc_format_code">使用 clang-format 格式化 C/C++ 代码。自动应用一致的缩进、空格、括号和换行风格；支持格式化整个文件或指定范围。</string>
-  <string name="ai_tool_desc_extract_method">将选中代码提取为新的方法/函数。自动检测参数和返回类型，适合重构过长方法并提升代码复用性。需要提供方法名和待提取代码。</string>
-  <string name="ai_tool_desc_add_documentation">为代码元素（类、函数、属性）生成文档注释。创建包含参数说明、返回值和使用示例的 KDoc/JavaDoc 格式注释，提升可维护性。</string>
-  <string name="ai_tool_desc_github_search">在 GitHub 搜索代码、仓库、Issue 或用户。适合查找代码示例、库、问题解决方案，或确认是否存在类似项目。返回仓库名、描述、星标数和相关代码片段。</string>
-  <string name="ai_tool_desc_web_search">使用多个搜索引擎（百度、必应、Google、DuckDuckGo）在网络上搜索信息、文档、教程或问题解决方案。适合查找最新信息、API 文档、错误解决方案和学习资源。</string>
-  <string name="ai_tool_desc_read_github_file">读取 GitHub 仓库中的文件内容。适合查看代码示例、阅读文档或研究开源实现，支持指定分支或提交。</string>
-  <string name="ai_tool_success_no_symbols_found">未找到符号：%1$s</string>
-  <string name="ai_tool_success_no_references_found">未找到引用：%1$s</string>
-  <string name="ai_tool_success_code_inserted">代码已成功插入</string>
-  <string name="ai_tool_success_code_replaced">代码已成功替换</string>
-  <string name="ai_tool_success_no_diagnostics_found">未找到诊断信息</string>
-  <string name="ai_tool_success_project_clean">✅ 未找到诊断信息，项目状态正常！</string>
-  <string name="ai_tool_success_diagnostics_cleared_for_file">已清理诊断信息：%1$s</string>
-  <string name="ai_tool_success_execution_stopped">执行已成功停止：%1$s</string>
-  <string name="ai_tool_success_navigated_run_output">已跳转到运行输出面板，运行输出标签页现在已显示并获得焦点。</string>
-  <string name="ai_tool_success_navigated_build_log">已跳转到构建日志面板，构建日志标签页现在已显示并获得焦点。</string>
-  <string name="ai_new_conversation_count">新对话 %1$d</string>
-  <string name="ai_summarize_and_continue">总结并继续</string>
-  <string name="ai_summary_prompt">请总结以上对话的关键内容，包括：\n1. 讨论的主要问题\n2. 已经完成的工作\n3. 遇到的问题和解决方案\n4. 待完成的任务\n\n请用简洁的语言总结，保留技术细节。</string>
-
-  <!-- AI Tool Categories -->
-  <string name="ai_tool_category_editor">编辑器</string>
-  <string name="ai_tool_category_file_system">文件系统</string>
-  <string name="ai_tool_category_code_analysis">代码分析</string>
-  <string name="ai_tool_category_diagnostics">诊断</string>
-  <string name="ai_tool_category_build">构建</string>
-  <string name="ai_tool_category_execution">执行</string>
-  <string name="ai_tool_category_git">版本控制</string>
-  <string name="ai_tool_category_terminal">终端</string>
-  <string name="ai_tool_category_refactor">重构</string>
-  <string name="ai_tool_category_web">网络</string>
-  <string name="ai_tool_category_custom">自定义</string>
-
-  <!-- AI Tool Names - Editor -->
-  <string name="ai_tool_get_current_file">获取当前文件</string>
-  <string name="ai_tool_get_selected_code">获取选中代码</string>
-  <string name="ai_tool_insert_code">插入代码</string>
-  <string name="ai_tool_replace_selected_code">替换选中代码</string>
-
-  <!-- AI Tool Names - File System -->
-  <string name="ai_tool_read_file">读取文件</string>
-  <string name="ai_tool_write_file">写入文件</string>
-  <string name="ai_tool_list_files">列出文件</string>
-  <string name="ai_tool_delete_file">删除文件</string>
-  <string name="ai_tool_create_directory">创建目录</string>
-  <string name="ai_tool_move_file">移动/重命名文件</string>
-  <string name="ai_tool_copy_file">复制文件</string>
-  <string name="ai_tool_get_file_info">获取文件信息</string>
-
-  <!-- AI Tool Names - Code Analysis -->
-  <string name="ai_tool_search_code">搜索代码</string>
-  <string name="ai_tool_find_definition">查找符号定义</string>
-  <string name="ai_tool_find_references">查找符号引用</string>
-  <string name="ai_tool_get_outline">获取代码大纲</string>
-
-  <!-- AI Tool Names - Diagnostics -->
-  <string name="ai_tool_get_diagnostics">获取诊断信息</string>
-  <string name="ai_tool_get_all_diagnostics">获取所有诊断信息</string>
-  <string name="ai_tool_clear_diagnostics">清除诊断信息</string>
-
-  <!-- AI Tool Names - Execution -->
-  <string name="ai_tool_run_project">运行项目</string>
-  <string name="ai_tool_run_tests">运行测试</string>
-  <string name="ai_tool_build_project">构建项目</string>
-  <string name="ai_tool_stop_execution">停止执行</string>
-  <string name="ai_tool_get_execution_status">获取执行状态</string>
-
-  <!-- AI Tool Names - Project -->
-  <string name="ai_tool_get_project_structure">获取项目结构</string>
-  <string name="ai_tool_find_files">查找文件</string>
-  <string name="ai_tool_count_lines">统计代码行数</string>
-
-  <!-- AI Tool Names - Refactor -->
-  <string name="ai_tool_format_code">格式化代码</string>
-  <string name="ai_tool_extract_method">提取方法</string>
-  <string name="ai_tool_add_doc_comment">添加文档注释</string>
-
-  <!-- AI Provider -->
-
-
-  <!-- Diff -->
+<!-- Diff -->
   <string name="diff_error_left_not_found">左侧文件不存在: %1$s</string>
   <string name="diff_error_right_not_found">右侧文件不存在: %1$s</string>
   <string name="diff_error_file_too_large">文件过大，最大支持 5MB</string>
@@ -4357,8 +4415,7 @@ kept=%3$d bytes
   <string name="plugin_log_message_line">消息: %1$s</string>
   <string name="plugin_log_stacktrace">堆栈跟踪:</string>
 
-
-  <!-- Linux PRoot -->
+<!-- Linux PRoot -->
   <string name="proot_profile_missing_shell">Linux 系统“%1$s”缺少关键 shell：%2$s</string>
 
   <!-- Favorites & Download History -->
@@ -4554,112 +4611,8 @@ kept=%3$d bytes
   <string name="editor_perf_text_scan_cache">文本扫描缓存条目</string>
   <string name="editor_perf_line_layout_entries">行布局缓存条目</string>
   <string name="editor_perf_line_layout_floats">行布局缓存浮点数</string>
-  <!-- AI Tool Output Templates -->
-  <string name="ai_tool_output_project_execution_started">项目执行已启动</string>
-  <string name="ai_tool_output_configuration">配置：%1$s</string>
-  <string name="ai_tool_output_execution_id">执行 ID：%1$s</string>
-  <string name="ai_tool_output_project_compiling_then_run">项目正在编译，稍后将运行。</string>
-  <string name="ai_tool_output_use_get_execution_status">使用 get_execution_status 检查进度。</string>
-  <string name="ai_tool_output_execution_completed">执行已成功完成</string>
-  <string name="ai_tool_output_exit_code">退出码：%1$s</string>
-  <string name="ai_tool_output_duration_ms">耗时：%1$sms</string>
-  <string name="ai_tool_output_output_label">输出：</string>
-  <string name="ai_tool_output_truncated">...（输出已截断）</string>
-  <string name="ai_tool_output_execution_failed">执行失败</string>
-  <string name="ai_tool_output_error_label">错误：</string>
-  <string name="ai_tool_output_execution_status">执行状态：%1$s</string>
-  <string name="ai_tool_output_build_started">构建已启动</string>
-  <string name="ai_tool_output_mode_clean_build">模式：清理构建</string>
-  <string name="ai_tool_output_target">目标：%1$s</string>
-  <string name="ai_tool_output_project_compiling">项目正在编译。</string>
-  <string name="ai_tool_output_build_completed">构建已成功完成</string>
-  <string name="ai_tool_output_build_output_label">构建输出：</string>
-  <string name="ai_tool_output_build_failed">构建失败</string>
-  <string name="ai_tool_output_build_errors_label">构建错误：</string>
-  <string name="ai_tool_output_build_status">构建状态：%1$s</string>
-  <string name="ai_tool_output_execution_status_with_icon">%1$s 执行状态：%2$s</string>
-  <string name="ai_tool_output_execution_queued">执行已排队，正在等待启动。</string>
-  <string name="ai_tool_output_execution_in_progress">执行正在进行中。</string>
-  <string name="ai_tool_output_execution_completed_status">执行已成功完成。</string>
-  <string name="ai_tool_output_execution_failed_status">执行失败。请检查执行结果了解详情。</string>
-  <string name="ai_tool_output_execution_cancelled_status">执行已被用户取消。</string>
-  <string name="ai_tool_output_execution_timeout_status">执行已超时。</string>
-  <string name="ai_tool_output_execution_output_title">执行输出</string>
-  <string name="ai_tool_output_status">状态：%1$s</string>
-  <string name="ai_tool_output_standard_output_label">标准输出：</string>
-  <string name="ai_tool_output_error_output_label">错误输出：</string>
-  <string name="ai_tool_output_truncated_first_chars">...（输出已截断，仅显示前 %1$s 个字符）</string>
-  <string name="ai_tool_output_error_truncated_first_chars">...（错误输出已截断，仅显示前 %1$s 个字符）</string>
-  <string name="ai_tool_output_build_errors_found">❌ 发现构建错误</string>
-  <string name="ai_tool_output_build_warnings_found">⚠️ 发现构建警告</string>
-  <string name="ai_tool_output_no_build_errors_or_warnings">✅ 未发现构建错误或警告</string>
-  <string name="ai_tool_output_summary_label">摘要：</string>
-  <string name="ai_tool_output_errors_count">错误：%1$s</string>
-  <string name="ai_tool_output_warnings_count">警告：%1$s</string>
-  <string name="ai_tool_output_info_count">信息：%1$s</string>
-  <string name="ai_tool_output_hints_count">提示：%1$s</string>
-  <string name="ai_tool_output_details_label">详情：</string>
-  <string name="ai_tool_output_more_errors_warnings">... 还有 %1$s 条错误/警告</string>
-  <string name="ai_tool_output_test_execution_started">测试执行已启动</string>
-  <string name="ai_tool_output_test_target_preparing">测试目标正在准备，稍后将运行。</string>
-  <string name="ai_tool_output_tests_completed">测试已成功完成</string>
-  <string name="ai_tool_output_tests_failed">测试失败</string>
-  <string name="ai_tool_output_test_status">测试状态：%1$s</string>
-  <string name="ai_tool_output_found_matches">找到 %1$s 个匹配%2$s：</string>
-  <string name="ai_tool_output_showing_first_suffix">（显示前 %1$s 个）</string>
-  <string name="ai_tool_output_line_content">第 %1$s 行：%2$s</string>
-  <string name="ai_tool_output_found_symbols">找到 %1$s 个符号：</string>
-  <string name="ai_tool_output_location">位置：%1$s</string>
-  <string name="ai_tool_output_signature">签名：%1$s</string>
-  <string name="ai_tool_output_documentation">文档：%1$s</string>
-  <string name="ai_tool_output_found_references">找到 %1$s 个引用：</string>
-  <string name="ai_tool_output_reference_line_content">%1$s 第 %2$s:%3$s 行：%4$s</string>
-  <string name="ai_tool_output_code_outline_for">%1$s 的代码大纲（%2$s）：</string>
-  <string name="ai_tool_output_found_diagnostics">找到 %1$s 条诊断：</string>
-  <string name="ai_tool_output_diagnostic_line">%1$s 第 %2$s:%3$s 行 - %4$s</string>
-  <string name="ai_tool_output_code_label">代码：%1$s</string>
-  <string name="ai_tool_output_project_diagnostics_summary">项目诊断摘要：</string>
-  <string name="ai_tool_output_total_issues">问题总数：%1$s</string>
-  <string name="ai_tool_output_affected_files">受影响文件：%1$s</string>
-  <string name="ai_tool_output_files_with_issues">包含问题的文件：</string>
-  <string name="ai_tool_output_file_issue_counts">%1$s：%2$s 个错误，%3$s 个警告</string>
-  <string name="ai_tool_output_more_files">... 还有 %1$s 个文件</string>
-  <string name="ai_tool_output_project_structure">项目结构：%1$s</string>
-  <string name="ai_tool_output_found_files_matching">找到 %1$s 个匹配 \'%2$s\' 的文件：</string>
-  <string name="ai_tool_output_results_limited">（结果限制为 %1$s 个文件）</string>
-  <string name="ai_tool_output_no_files_matching">未找到匹配该模式的文件。</string>
-  <string name="ai_tool_output_code_statistics_for">代码统计：%1$s</string>
-  <string name="ai_tool_output_total_summary">总览：</string>
-  <string name="ai_tool_output_files_count">文件：%1$s</string>
-  <string name="ai_tool_output_total_lines_count">总行数：%1$s</string>
-  <string name="ai_tool_output_code_lines_count">代码行：%1$s</string>
-  <string name="ai_tool_output_comment_lines_count">注释行：%1$s</string>
-  <string name="ai_tool_output_blank_lines_count">空行：%1$s</string>
-  <string name="ai_tool_output_breakdown_by_file_type">按文件类型拆分：</string>
-  <string name="ai_tool_output_no_code_files_found">未找到代码文件。</string>
-  <string name="ai_tool_output_file_type_percentage">.%1$s（%2$s%%）</string>
-  <string name="ai_tool_output_lines_count">行数：%1$s</string>
-  <string name="ai_tool_output_code_count">代码：%1$s</string>
-  <string name="ai_tool_output_comments_count">注释：%1$s</string>
-  <string name="ai_tool_output_blank_count">空行：%1$s</string>
-  <string name="ai_tool_output_files_in">%1$s 中的文件：</string>
-  <string name="ai_tool_output_total_files">总计：%1$s 个文件</string>
-  <string name="ai_tool_output_directory_marker">[目录]</string>
-  <string name="ai_tool_output_file_marker">[文件]</string>
-  <string name="ai_tool_output_file_size_bytes">%1$s 字节</string>
-  <string name="ai_tool_output_lines_range">（第 %1$s-%2$s 行）</string>
-  <string name="ai_tool_output_code_formatted_success">代码格式化成功</string>
-  <string name="ai_tool_output_file">文件：%1$s%2$s</string>
-  <string name="ai_tool_output_code_formatted_clang">代码已使用 clang-format 格式化。</string>
-  <string name="ai_tool_output_changes_applied_editor">更改已应用到编辑器。</string>
-  <string name="ai_tool_output_extracted_method">已提取方法：</string>
-  <string name="ai_tool_output_replace_original_code">将原始代码替换为：</string>
-  <string name="ai_tool_output_generated_documentation">已生成文档：</string>
-  <string name="ai_tool_output_original_code">原始代码：</string>
-  <string name="ai_tool_doc_property_description">%1$s 参数</string>
-  <string name="ai_tool_doc_param_description">%1$s 的说明</string>
-  <string name="ai_tool_doc_return_description">返回值说明</string>
-  <string name="pkg_manager_detail_artifact_type">产物类型：%1$s</string>
+
+<string name="pkg_manager_detail_artifact_type">产物类型：%1$s</string>
   <string name="pkg_detail_artifact_type">产物类型</string>
   <string name="pkg_artifact_type_source">源码</string>
   <string name="pkg_artifact_type_header">头文件</string>
@@ -4667,4 +4620,172 @@ kept=%3$d bytes
   <string name="pkg_artifact_type_shared">动态库</string>
   <string name="pkg_artifact_type_executable">可执行文件</string>
   <string name="pkg_artifact_type_mixed">混合内容</string>
+  <string name="hex_analysis_build_id_preview">Build ID: %1$s</string>
+  <string name="hex_elf_notes_show_all">Notes %1$d</string>
+  <string name="hex_elf_notes_dialog_title">ELF Notes</string>
+  <string name="hex_elf_notes_filter_label">过滤 Notes</string>
+  <string name="hex_elf_notes_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_notes_empty">没有匹配的 Notes</string>
+  <string name="hex_elf_note_filter_all">全部</string>
+  <string name="hex_elf_note_filter_build_id">Build ID</string>
+  <string name="hex_elf_note_filter_gnu">GNU</string>
+  <string name="hex_elf_note_filter_android">Android</string>
+  <string name="hex_elf_note_name_empty">未命名</string>
+  <string name="hex_elf_note_title">%1$s · type %2$d</string>
+  <string name="hex_elf_note_meta">%1$s · note 0x%2$08X · desc 0x%3$08X · size %4$d</string>
+  <string name="hex_elf_note_description_text">text: %1$s</string>
+  <string name="hex_elf_note_description_hex">hex: %1$s</string>
+  <string name="hex_elf_note_property">property %1$s · value 0x%2$s</string>
+  <string name="hex_elf_note_property_features">features: %1$s</string>
+  <string name="hex_elf_note_property_feature_ibt">IBT</string>
+  <string name="hex_elf_note_property_feature_shstk">SHSTK</string>
+  <string name="hex_elf_note_property_feature_bti">BTI</string>
+  <string name="hex_elf_note_property_feature_pac">PAC</string>
+  <string name="hex_signal_elf_notes">ELF Notes</string>
+  <string name="hex_signal_elf_gnu_property">GNU 属性</string>
+  <string name="hex_signal_elf_build_id">Build ID</string>
+  <string name="hex_analysis_linkage_preview">PLT %1$d · GOT %2$d · Lazy %3$d</string>
+  <string name="hex_elf_linkage_show_all">Linkage %1$d</string>
+  <string name="hex_elf_linkage_dialog_title">ELF PLT/GOT Linkage</string>
+  <string name="hex_elf_linkage_filter_label">过滤 Linkage</string>
+  <string name="hex_elf_linkage_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_linkage_empty">没有匹配的 Linkage 条目</string>
+  <string name="hex_elf_linkage_filter_all">全部</string>
+  <string name="hex_elf_linkage_filter_imports">导入</string>
+  <string name="hex_elf_linkage_filter_plt">PLT</string>
+  <string name="hex_elf_linkage_filter_got">GOT</string>
+  <string name="hex_elf_linkage_filter_jni">JNI</string>
+  <string name="hex_elf_linkage_filter_now">Now</string>
+  <string name="hex_elf_linkage_filter_lazy">Lazy</string>
+  <string name="hex_elf_linkage_kind_plt">PLT</string>
+  <string name="hex_elf_linkage_kind_got">GOT</string>
+  <string name="hex_elf_linkage_kind_relative">Relative</string>
+  <string name="hex_elf_linkage_kind_other">Other</string>
+  <string name="hex_elf_linkage_mode_now">BIND_NOW</string>
+  <string name="hex_elf_linkage_mode_lazy">Lazy</string>
+  <string name="hex_elf_linkage_mode_load_time">Load-time</string>
+  <string name="hex_elf_linkage_mode_local">Local</string>
+  <string name="hex_elf_linkage_type_named">%1$s</string>
+  <string name="hex_elf_linkage_type_unknown">type -</string>
+  <string name="hex_elf_linkage_meta_mapped">#%1$d · %2$s · %3$s · %4$s · %5$s · %6$s entry 0x%7$08X · slot 0x%8$08X → offset 0x%9$08X · %10$s</string>
+  <string name="hex_elf_linkage_meta_unmapped">#%1$d · %2$s · %3$s · %4$s · %5$s · %6$s entry 0x%7$08X · slot 0x%8$08X · %9$s</string>
+  <string name="hex_elf_linkage_resolution_semantic">语义：%1$s</string>
+  <string name="hex_elf_linkage_semantic_eager_plt_binding">启动时解析导入并回写 PLT/GOT slot</string>
+  <string name="hex_elf_linkage_semantic_lazy_plt_call">首次调用经 PLT 解析，再回写 GOT slot</string>
+  <string name="hex_elf_linkage_semantic_load_time_got_write">加载时解析导入并写入 GOT slot</string>
+  <string name="hex_elf_linkage_semantic_relative_rebase">按 load bias 重定位本地地址</string>
+  <string name="hex_elf_linkage_semantic_local_relocation">本地重定位修正</string>
+  <string name="hex_elf_linkage_plt_stub_meta_mapped">PLT stub 0x%1$08X · %2$s · %3$s · %4$d B · slot offset 0x%5$08X</string>
+  <string name="hex_elf_linkage_plt_stub_meta_unmapped">PLT stub 0x%1$08X · %2$s · %3$s · %4$d B</string>
+  <string name="hex_elf_linkage_plt_stub_bytes">bytes: %1$s</string>
+  <string name="hex_elf_linkage_plt_stub_jump">Stub</string>
+  <string name="hex_elf_linkage_slot_jump">Slot</string>
+  <string name="hex_elf_plt_arch_aarch64">AArch64</string>
+  <string name="hex_elf_plt_arch_x86_64">x86_64</string>
+  <string name="hex_elf_plt_semantic_load_got_slot_branch">加载 GOT slot 并跳转</string>
+  <string name="hex_elf_plt_semantic_unknown">未知 stub 语义</string>
+  <string name="hex_signal_elf_linkage">PLT/GOT Linkage</string>
+  <string name="hex_analysis_loader_steps_preview">加载 %1$d · 绑定 %2$d · 入口 %3$d</string>
+  <string name="hex_elf_loader_steps_show_all">Loader Steps %1$d</string>
+  <string name="hex_elf_loader_steps_dialog_title">动态链接器步骤</string>
+  <string name="hex_elf_loader_steps_filter_label">过滤 Loader Steps</string>
+  <string name="hex_elf_loader_steps_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_loader_steps_empty">没有匹配的 Loader Steps</string>
+  <string name="hex_elf_loader_step_filter_all">全部</string>
+  <string name="hex_elf_loader_step_filter_loading">加载</string>
+  <string name="hex_elf_loader_step_filter_relocations">重定位</string>
+  <string name="hex_elf_loader_step_filter_binding">绑定</string>
+  <string name="hex_elf_loader_step_filter_hardening">加固</string>
+  <string name="hex_elf_loader_step_filter_entrypoints">入口</string>
+  <string name="hex_elf_loader_step_map_load_segments">映射 PT_LOAD 段</string>
+  <string name="hex_elf_loader_step_load_needed">加载 DT_NEEDED 依赖</string>
+  <string name="hex_elf_loader_step_apply_relocations">应用重定位</string>
+  <string name="hex_elf_loader_step_resolve_now">解析 BIND_NOW 导入</string>
+  <string name="hex_elf_loader_step_enable_lazy">启用 Lazy PLT 绑定</string>
+  <string name="hex_elf_loader_step_protect_relro">保护 GNU_RELRO</string>
+  <string name="hex_elf_loader_step_call_init_array">调用 init_array</string>
+  <string name="hex_elf_loader_step_expose_jni">暴露 JNI 入口</string>
+  <string name="hex_elf_loader_step_meta_mapped">#%1$d · items %2$d · evidence 0x%3$08X</string>
+  <string name="hex_elf_loader_step_meta_unmapped">#%1$d · items %2$d</string>
+  <string name="hex_elf_loader_step_detail">detail: %1$s</string>
+  <string name="hex_signal_elf_dynamic_linker_steps">动态链接器步骤</string>
+  <string name="hex_analysis_risk_preview">高危 %1$d · 警告 %2$d · 信息 %3$d</string>
+  <string name="hex_elf_risks_show_all">风险 %1$d</string>
+  <string name="hex_elf_risks_dialog_title">ELF 风险提示</string>
+  <string name="hex_elf_risks_filter_label">过滤风险</string>
+  <string name="hex_elf_risks_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_risks_empty">没有匹配的风险提示</string>
+  <string name="hex_elf_risk_filter_all">全部</string>
+  <string name="hex_elf_risk_filter_high">高危</string>
+  <string name="hex_elf_risk_filter_warning">警告</string>
+  <string name="hex_elf_risk_filter_hardening">加固</string>
+  <string name="hex_elf_risk_filter_segments">段与节</string>
+  <string name="hex_elf_risk_filter_paths">路径</string>
+  <string name="hex_elf_risk_filter_metadata">元数据</string>
+  <string name="hex_elf_risk_severity_high">高危</string>
+  <string name="hex_elf_risk_severity_warning">警告</string>
+  <string name="hex_elf_risk_severity_info">信息</string>
+  <string name="hex_elf_risk_type_rwx_load_segment">RWX PT_LOAD 段</string>
+  <string name="hex_elf_risk_type_writable_executable_section">可写可执行 section</string>
+  <string name="hex_elf_risk_type_executable_stack">可执行栈</string>
+  <string name="hex_elf_risk_type_missing_relro">缺少 RELRO</string>
+  <string name="hex_elf_risk_type_missing_bind_now">缺少 BIND_NOW</string>
+  <string name="hex_elf_risk_type_legacy_rpath">旧 RPATH</string>
+  <string name="hex_elf_risk_type_runpath_present">RUNPATH 存在</string>
+  <string name="hex_elf_risk_type_missing_soname">缺少 SONAME</string>
+  <string name="hex_elf_risk_row_title">%1$s · %2$s</string>
+  <string name="hex_elf_risk_meta_mapped">#%1$d · 证据 0x%2$08X</string>
+  <string name="hex_elf_risk_meta_unmapped">#%1$d · 无直接证据 offset</string>
+  <string name="hex_elf_risk_detail">详情：%1$s</string>
+  <string name="hex_signal_elf_risk_findings">ELF 风险提示</string>
+  <string name="hex_analysis_native_api_preview">加载 %1$d · 内存 %2$d · 进程 %3$d · 网络 %4$d</string>
+  <string name="hex_elf_native_api_hints_show_all">Native API %1$d</string>
+  <string name="hex_elf_native_api_hints_dialog_title">Native API 导入</string>
+  <string name="hex_elf_native_api_hints_filter_label">过滤 Native API</string>
+  <string name="hex_elf_native_api_hints_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_native_api_hints_empty">没有匹配的 Native API 导入</string>
+  <string name="hex_elf_native_api_filter_all">全部</string>
+  <string name="hex_elf_native_api_filter_dynamic_loading">加载</string>
+  <string name="hex_elf_native_api_filter_memory">内存</string>
+  <string name="hex_elf_native_api_filter_process">进程</string>
+  <string name="hex_elf_native_api_filter_file">文件</string>
+  <string name="hex_elf_native_api_filter_network">网络</string>
+  <string name="hex_elf_native_api_filter_crypto">加密</string>
+  <string name="hex_elf_native_api_filter_threading">线程</string>
+  <string name="hex_elf_native_api_filter_logging">日志</string>
+  <string name="hex_elf_native_api_category_dynamic_loading">动态加载</string>
+  <string name="hex_elf_native_api_category_memory">内存保护</string>
+  <string name="hex_elf_native_api_category_process">进程控制</string>
+  <string name="hex_elf_native_api_category_file">文件 IO</string>
+  <string name="hex_elf_native_api_category_network">网络</string>
+  <string name="hex_elf_native_api_category_crypto">加密</string>
+  <string name="hex_elf_native_api_category_threading">线程</string>
+  <string name="hex_elf_native_api_category_logging">日志</string>
+  <string name="hex_elf_native_api_hint_title">%1$s · %2$s</string>
+  <string name="hex_elf_native_api_hint_meta_mapped">#%1$d · 证据 0x%2$08X</string>
+  <string name="hex_elf_native_api_hint_meta_unmapped">#%1$d · 导入符号</string>
+  <string name="hex_signal_elf_native_api_hints">Native API 导入</string>
+  <string name="hex_analysis_jni_hints_preview">RegisterNatives %1$d · 入口 %2$d · 静态 %3$d · 描述符 %4$d</string>
+  <string name="hex_elf_jni_hints_show_all">JNI 线索 %1$d</string>
+  <string name="hex_elf_jni_hints_dialog_title">JNI 注册线索</string>
+  <string name="hex_elf_jni_hints_filter_label">过滤 JNI 线索</string>
+  <string name="hex_elf_jni_hints_filter_count">%1$d / %2$d</string>
+  <string name="hex_elf_jni_hints_empty">没有匹配的 JNI 线索</string>
+  <string name="hex_elf_jni_hint_filter_all">全部</string>
+  <string name="hex_elf_jni_hint_filter_register_natives">RegisterNatives</string>
+  <string name="hex_elf_jni_hint_filter_entrypoints">入口</string>
+  <string name="hex_elf_jni_hint_filter_static_exports">静态导出</string>
+  <string name="hex_elf_jni_hint_filter_descriptors">描述符</string>
+  <string name="hex_elf_jni_hint_type_register_natives_symbol">RegisterNatives 符号</string>
+  <string name="hex_elf_jni_hint_type_register_natives_string">RegisterNatives 字符串</string>
+  <string name="hex_elf_jni_hint_type_jni_onload">JNI_OnLoad 入口</string>
+  <string name="hex_elf_jni_hint_type_jni_onunload">JNI_OnUnload 入口</string>
+  <string name="hex_elf_jni_hint_type_static_export">静态 JNI 导出</string>
+  <string name="hex_elf_jni_hint_type_java_class_descriptor">Java 类描述符</string>
+  <string name="hex_elf_jni_hint_type_jni_method_signature">JNI 方法签名</string>
+  <string name="hex_elf_jni_hint_meta_mapped">#%1$d · 证据 0x%2$08X</string>
+  <string name="hex_elf_jni_hint_meta_unmapped">#%1$d · 无直接证据 offset</string>
+  <string name="hex_elf_jni_hint_symbol">符号：%1$s</string>
+  <string name="hex_elf_jni_hint_string">字符串：%1$s</string>
+  <string name="hex_signal_elf_jni_registration_hints">JNI 注册线索</string>
 </resources>

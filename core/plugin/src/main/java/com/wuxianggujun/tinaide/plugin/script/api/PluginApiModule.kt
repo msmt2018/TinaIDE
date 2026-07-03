@@ -33,10 +33,12 @@ class PluginApiRegistry(private val context: Context) {
     private val moduleFactories = linkedMapOf<String, () -> PluginApiModule>()
     private val runtimeModules = mutableMapOf<String, List<PluginApiModule>>()
 
+    @Synchronized
     fun registerModule(namespace: String, factory: () -> PluginApiModule) {
         moduleFactories[namespace] = factory
     }
 
+    @Synchronized
     fun unregisterModule(namespace: String) {
         moduleFactories.remove(namespace)
         runtimeModules.values.forEach { modules ->
@@ -55,36 +57,40 @@ class PluginApiRegistry(private val context: Context) {
      *
      * After the call the stack is clean and `tina` is available globally.
      */
+    @Synchronized
     fun initializeForRuntime(runtime: ScriptPluginRuntime) {
-        val lua = runtime.getLuaState() ?: return
-        cleanupRuntime(runtime.pluginId)
-        val modules = moduleFactories.values.map { createModule -> createModule() }
-        runtimeModules[runtime.pluginId] = modules
+        runtime.withLuaState { lua ->
+            cleanupRuntime(runtime.pluginId)
+            val modules = moduleFactories.values.map { createModule -> createModule() }
+            runtimeModules[runtime.pluginId] = modules
 
-        // tina = {}
-        lua.createTable(0, modules.size + 1)
+            // tina = {}
+            lua.createTable(0, modules.size + 1)
 
-        modules.forEach { module ->
-            lua.createTable(0, 12)
-            module.register(runtime, lua)
-            lua.setField(-2, module.namespace)
+            modules.forEach { module ->
+                lua.createTable(0, 12)
+                module.register(runtime, lua)
+                lua.setField(-2, module.namespace)
+            }
+
+            // tina.pluginId = "<id>"
+            lua.push(runtime.pluginId)
+            lua.setField(-2, "pluginId")
+
+            // tina.apiVersion = 1
+            lua.push(runtime.apiVersion)
+            lua.setField(-2, "apiVersion")
+
+            lua.setGlobal("tina")
         }
-
-        // tina.pluginId = "<id>"
-        lua.push(runtime.pluginId)
-        lua.setField(-2, "pluginId")
-
-        // tina.apiVersion = 1
-        lua.push(runtime.apiVersion)
-        lua.setField(-2, "apiVersion")
-
-        lua.setGlobal("tina")
     }
 
+    @Synchronized
     fun cleanupRuntime(pluginId: String) {
         runtimeModules.remove(pluginId)?.forEach { module -> module.unregister() }
     }
 
+    @Synchronized
     fun cleanup() {
         runtimeModules.values
             .flatten()

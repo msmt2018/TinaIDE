@@ -50,10 +50,19 @@ enum class SaveReason {
 }
 
 sealed class SaveResult {
-    data class Success(val timestamp: Long, val reason: SaveReason) : SaveResult()
+    data class Success(
+        val timestamp: Long,
+        val reason: SaveReason,
+        val target: SaveTarget? = null
+    ) : SaveResult()
     data class Failure(val message: String) : SaveResult()
     data object NoOp : SaveResult()
 }
+
+data class SaveTarget(
+    val tabId: String,
+    val file: File
+)
 
 data class EditorViewState(
     val cursorLine: Int = 0,
@@ -115,6 +124,12 @@ class DocumentSession(
         val modifiedAt: Long,
         val fileSize: Long,
         val observedAt: Long
+    )
+
+    private data class EditorBindingState(
+        val isDirty: Boolean,
+        val canUndo: Boolean,
+        val canRedo: Boolean
     )
 
     private enum class BaselineState {
@@ -189,7 +204,7 @@ class DocumentSession(
             val text = binding.readText()
             cleanFingerprint = buildTextFingerprint(text)
         }
-        refreshState(binding.canUndo(), binding.canRedo())
+        syncStateFromBinding(binding, changeCausedByUndoManager = false, forceCompare = true)
     }
 
     fun detachEditor(binding: EditorBinding) {
@@ -296,16 +311,30 @@ class DocumentSession(
         }
         detachedEditorSnapshot = null
 
-        val dirty = computeDirty(binding, changeCausedByUndoManager = changeCausedByUndoManager, forceCompare = false)
-        _state.update {
-            it.copy(
-                isDirty = dirty,
-                canUndo = canUndo,
-                canRedo = canRedo,
-                lastEditAt = lastEditTimestamp,
-                lastError = null
+        syncStateFromBinding(
+            binding = binding,
+            changeCausedByUndoManager = changeCausedByUndoManager,
+            forceCompare = false,
+            lastEditAt = lastEditTimestamp
+        )
+    }
+
+    internal fun refreshDirtyStateForSave(): Boolean {
+        val binding = editorBinding.get()
+        if (binding != null) {
+            return syncStateFromBinding(
+                binding = binding,
+                changeCausedByUndoManager = false,
+                forceCompare = true
             )
         }
+
+        val dirty = detachedEditorSnapshot?.isDirty ?: _state.value.isDirty
+
+        _state.update { current ->
+            if (current.isDirty == dirty) current else current.copy(isDirty = dirty)
+        }
+        return dirty
     }
 
     fun updateCursorPosition(line: Int, column: Int) {
@@ -383,30 +412,52 @@ class DocumentSession(
         )
     }
 
-    private fun refreshState(canUndo: Boolean, canRedo: Boolean) {
-        val binding = editorBinding.get()
-        val dirty = binding?.let { computeDirty(it, changeCausedByUndoManager = false, forceCompare = true) }
-            ?: _state.value.isDirty
-        _state.update {
-            it.copy(
-                canUndo = canUndo,
-                canRedo = canRedo,
-                isDirty = dirty,
+    private fun readBindingState(
+        binding: EditorBinding,
+        changeCausedByUndoManager: Boolean,
+        forceCompare: Boolean
+    ): EditorBindingState = EditorBindingState(
+        isDirty = computeDirty(binding, changeCausedByUndoManager, forceCompare),
+        canUndo = binding.canUndo(),
+        canRedo = binding.canRedo()
+    )
+
+    private fun syncStateFromBinding(
+        binding: EditorBinding,
+        changeCausedByUndoManager: Boolean,
+        forceCompare: Boolean,
+        lastEditAt: Long? = null
+    ): Boolean {
+        val bindingState = readBindingState(binding, changeCausedByUndoManager, forceCompare)
+        _state.update { current ->
+            current.copy(
+                isDirty = bindingState.isDirty,
+                canUndo = bindingState.canUndo,
+                canRedo = bindingState.canRedo,
+                lastEditAt = lastEditAt ?: current.lastEditAt,
                 lastError = null
             )
+        }
+        return bindingState.isDirty
+    }
+
+    private fun refreshState() {
+        val binding = editorBinding.get()
+        if (binding != null) {
+            syncStateFromBinding(binding, changeCausedByUndoManager = false, forceCompare = true)
         }
     }
     fun requestUndo() {
         editorBinding.get()?.let {
             it.undo()
-            refreshState(it.canUndo(), it.canRedo())
+            refreshState()
         }
     }
 
     fun requestRedo() {
         editorBinding.get()?.let {
             it.redo()
-            refreshState(it.canUndo(), it.canRedo())
+            refreshState()
         }
     }
     suspend fun save(reason: SaveReason): SaveResult {
@@ -422,19 +473,20 @@ class DocumentSession(
                         return@withLock SaveResult.Failure(Strings.editor_error_not_initialized.strOr(context))
                     }
 
+                    val targetFile = file
                     val snapshot = withContext(Dispatchers.IO) {
                         val text = binding?.readText() ?: detachedSnapshot!!.text
                         val snapshotVersion = binding?.currentDocumentVersion() ?: detachedSnapshot!!.documentVersion
                         val fingerprint = buildTextFingerprint(text)
-                        writeFileSafely(text)
+                        writeFileSafely(targetFile, text)
                         val versionAfterWrite = binding?.currentDocumentVersion() ?: snapshotVersion
                         SaveSnapshot(
                             text = text,
                             timestamp = System.currentTimeMillis(),
                             documentVersion = snapshotVersion,
                             fingerprint = fingerprint,
-                            fileModifiedAt = file.lastModified(),
-                            fileSize = file.length(),
+                            fileModifiedAt = targetFile.lastModified(),
+                            fileSize = targetFile.length(),
                             isUpToDate = versionAfterWrite == snapshotVersion,
                         )
                     }
@@ -473,8 +525,12 @@ class DocumentSession(
                             charsetName = fileCharset.name()
                         )
                     }
-                    projectSymbolIndexServiceProvider()?.onFileSaved(file, snapshot.text)
-                    SaveResult.Success(snapshot.timestamp, reason)
+                    projectSymbolIndexServiceProvider()?.onFileSaved(targetFile, snapshot.text)
+                    SaveResult.Success(
+                        timestamp = snapshot.timestamp,
+                        reason = reason,
+                        target = SaveTarget(tabId = tabId, file = targetFile)
+                    )
                 } finally {
                     isSavingInternally = false
                 }
@@ -485,25 +541,25 @@ class DocumentSession(
             SaveResult.Failure(e.message ?: Strings.editor_error_save_failed.strOr(context))
         }
     }
-    private fun writeFileSafely(content: String) {
-        val parent = file.parentFile ?: throw IOException(Strings.editor_error_cannot_resolve_dir.strOr(context))
+    private fun writeFileSafely(targetFile: File, content: String) {
+        val parent = targetFile.parentFile ?: throw IOException(Strings.editor_error_cannot_resolve_dir.strOr(context))
         if (!parent.exists() && !parent.mkdirs()) {
             throw IOException(Strings.editor_error_cannot_create_dir.strOr(context, parent.absolutePath))
         }
-        val tmpFile = File(parent, "${file.name}.autosave.tmp")
+        val tmpFile = File(parent, "${targetFile.name}.autosave.tmp")
         tmpFile.writeText(content, fileCharset)
         try {
             try {
                 Files.move(
                     tmpFile.toPath(),
-                    file.toPath(),
+                    targetFile.toPath(),
                     StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE
                 )
             } catch (ignored: AtomicMoveNotSupportedException) {
                 Files.move(
                     tmpFile.toPath(),
-                    file.toPath(),
+                    targetFile.toPath(),
                     StandardCopyOption.REPLACE_EXISTING
                 )
             }

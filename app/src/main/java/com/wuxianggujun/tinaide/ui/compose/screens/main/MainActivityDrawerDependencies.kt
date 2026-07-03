@@ -3,7 +3,6 @@ package com.wuxianggujun.tinaide.ui.compose.screens.main
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
-import com.wuxianggujun.tinaide.ai.viewmodel.AiChatViewModel
 import com.wuxianggujun.tinaide.core.commands.HostCommandExecutor
 import com.wuxianggujun.tinaide.editor.IEditorManager
 import com.wuxianggujun.tinaide.editor.symbol.ProjectSymbolIndexService
@@ -29,7 +28,6 @@ internal class MainActivityDrawerDependencies(
     val editorContainerState: EditorContainerState,
     val dialogState: DialogState,
     val gitDialogState: GitDialogState,
-    val currentAiChatViewModel: AiChatViewModel,
     val drawerState: SwipeableDrawerState,
     val buildUiState: MainActivityBuildUiState,
     val hostCommandExecutor: HostCommandExecutor?,
@@ -53,7 +51,6 @@ internal fun rememberMainActivityDrawerDependencies(
     editorContainerState: EditorContainerState,
     dialogState: DialogState,
     gitDialogState: GitDialogState,
-    currentAiChatViewModel: AiChatViewModel,
     drawerState: SwipeableDrawerState,
     buildUiState: MainActivityBuildUiState,
     hostCommandExecutor: HostCommandExecutor?,
@@ -74,7 +71,6 @@ internal fun rememberMainActivityDrawerDependencies(
     editorContainerState,
     dialogState,
     gitDialogState,
-    currentAiChatViewModel,
     drawerState,
     buildUiState,
     hostCommandExecutor,
@@ -96,7 +92,6 @@ internal fun rememberMainActivityDrawerDependencies(
         editorContainerState = editorContainerState,
         dialogState = dialogState,
         gitDialogState = gitDialogState,
-        currentAiChatViewModel = currentAiChatViewModel,
         drawerState = drawerState,
         buildUiState = buildUiState,
         hostCommandExecutor = hostCommandExecutor,

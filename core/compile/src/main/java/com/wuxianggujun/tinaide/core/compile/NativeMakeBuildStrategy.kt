@@ -9,7 +9,7 @@ import com.wuxianggujun.tinaide.core.ndk.AndroidSysrootManager
 import com.wuxianggujun.tinaide.core.packages.InstalledPackagePathResolver
 import com.wuxianggujun.tinaide.core.util.NativeExecutableRunner
 import java.io.File
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import timber.log.Timber
 
 /**
@@ -79,8 +79,13 @@ class NativeMakeBuildStrategy(
         val startTime = System.currentTimeMillis()
         val outputBuilder = StringBuilder()
         val sysrootApiLevel = options.sysrootApiLevel
+        val sysrootProfileId = options.sysrootProfileId
 
-        val sysrootValidationError = validateSysrootForBuild(sysrootApiLevel)
+        NativeSysrootPreparer.ensureInstalled(context, sysrootProfileId)?.let { error ->
+            options.onProgress?.invoke(error)
+            return makeBuildError(error)
+        }
+        val sysrootValidationError = validateSysrootForBuild(sysrootApiLevel, sysrootProfileId)
         if (sysrootValidationError != null) {
             options.onProgress?.invoke(sysrootValidationError)
             return makeBuildError(sysrootValidationError)
@@ -95,16 +100,22 @@ class NativeMakeBuildStrategy(
         val makeBinary = File(toolchainManager.getBinDir(), "make")
         val makeCommand = mutableListOf(makeBinary.absolutePath)
         val packagePaths = InstalledPackagePathResolver.resolve(context.applicationContext, projectRoot)
+        val arch = AndroidSysrootManager.Companion.Arch.current()
         val packageEnvironment = MakeBuildEnvironment.build(
             packagePaths = packagePaths,
             nativeCFlags = options.nativeCFlags,
             nativeCppFlags = options.nativeCppFlags,
-            nativeLdFlags = options.nativeLdFlags,
+            nativeLdFlags = AndroidLinkerCompatibilityFlags.mergeWithUserLdFlags(
+                arch = arch,
+                apiLevel = sysrootApiLevel,
+                userLdFlags = options.nativeLdFlags,
+            ),
             nativeLdLibs = options.nativeLdLibs,
             extraLibraryDirs = listOfNotNull(
                 sysrootManager.getLibPath(
                     apiLevel = sysrootApiLevel,
-                    arch = AndroidSysrootManager.Companion.Arch.current()
+                    arch = arch,
+                    profileId = sysrootProfileId
                 )
             )
         )
@@ -113,7 +124,7 @@ class NativeMakeBuildStrategy(
         // Android 上 /bin/sh 不存在，GNU make 默认 SHELL=/bin/sh 会导致 Error 127，
         // 且 make 不会从环境变量继承 SHELL，所以必须通过命令行变量显式覆盖。
         makeCommand.add(buildRecipeShellAssignment())
-        appendMakeToolchainOverrides(makeCommand, sysrootApiLevel)
+        appendMakeToolchainOverrides(makeCommand, sysrootApiLevel, sysrootProfileId)
 
         // 添加并行任务数
         if (options.parallelJobs > 1) {
@@ -271,7 +282,8 @@ class NativeMakeBuildStrategy(
 
     private fun appendMakeToolchainOverrides(
         makeCommand: MutableList<String>,
-        sysrootApiLevel: Int
+        sysrootApiLevel: Int,
+        sysrootProfileId: String?
     ) {
         if (!NativeExecutableRunner.shouldPreferLinker64()) {
             Timber.tag(TAG).d("Skip make toolchain overrides because preferLinker64=false")
@@ -284,10 +296,10 @@ class NativeMakeBuildStrategy(
             return
         }
         val cFlagSplit = MakeCommandOverrides.splitCompileAndLinkFlags(
-            buildSysrootFlags(isCpp = false, apiLevel = sysrootApiLevel)
+            buildSysrootFlags(isCpp = false, apiLevel = sysrootApiLevel, profileId = sysrootProfileId)
         )
         val cxxFlagSplit = MakeCommandOverrides.splitCompileAndLinkFlags(
-            buildSysrootFlags(isCpp = true, apiLevel = sysrootApiLevel)
+            buildSysrootFlags(isCpp = true, apiLevel = sysrootApiLevel, profileId = sysrootProfileId)
         )
         val cSysrootFlags = cFlagSplit.compileFlags
         val cxxSysrootFlags = cxxFlagSplit.compileFlags
@@ -324,19 +336,20 @@ class NativeMakeBuildStrategy(
         return fullCmd
     }
 
-    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int): List<String> {
+    private fun buildSysrootFlags(isCpp: Boolean, apiLevel: Int, profileId: String?): List<String> {
         val arch = AndroidSysrootManager.Companion.Arch.current()
         return sysrootManager.getCompilerFlags(
             apiLevel = apiLevel,
             arch = arch,
-            isCpp = isCpp
+            isCpp = isCpp,
+            profileId = profileId
         )
     }
 
-    private fun validateSysrootForBuild(apiLevel: Int): String? {
+    private fun validateSysrootForBuild(apiLevel: Int, profileId: String?): String? {
         val arch = AndroidSysrootManager.Companion.Arch.current()
-        val sysrootDir = sysrootManager.getSysrootDir(arch)
-        if (!sysrootManager.isInstalled(arch)) {
+        val sysrootDir = sysrootManager.getSysrootDir(arch, profileId)
+        if (!sysrootManager.isInstalled(arch, profileId)) {
             return Strings.compile_sysroot_missing.strOr(context, sysrootDir.absolutePath)
         }
 
@@ -374,7 +387,9 @@ class NativeMakeBuildStrategy(
         timeout: Long,
         extraEnvironment: Map<String, String> = emptyMap(),
         onOutput: ((String) -> Unit)? = null
-    ): CommandResult = try {
+    ): CommandResult {
+        val commandTempDir = BuildResourceCleaner.createCommandTempDir(context.cacheDir, "native-make")
+        return try {
         // 使用 NativeExecutableRunner 构建命令，自动处理 linker64 启动逻辑
         val executable = command[0]
         val args = command.drop(1)
@@ -389,7 +404,7 @@ class NativeMakeBuildStrategy(
                 this,
                 nativeLibDir,
                 toolchainManager.getBinDir().absolutePath,
-                tmpDir = context.cacheDir.absolutePath,
+                tmpDir = commandTempDir.absolutePath,
                 homeDir = context.filesDir.absolutePath
             )
             NativeExecutableRunner.applyRecommendedTinaExec(
@@ -410,42 +425,36 @@ class NativeMakeBuildStrategy(
             toolchainBinDir = toolchainManager.getBinDir().absolutePath
         )
 
-        val process = processBuilder.start()
-        val output = StringBuilder()
-
-        // 读取输出
-        process.inputStream.bufferedReader().use { reader ->
-            reader.lineSequence().forEach { line ->
-                output.appendLine(line)
+        val result = BuildProcessRunner.run(
+            processBuilder = processBuilder,
+            commandLabel = "native-make:${File(executable).name}",
+            timeoutMs = timeout,
+            onOutputLine = { line ->
                 onOutput?.invoke(line)
                 Timber.tag(TAG).v(line)
-            }
-        }
+            },
+        )
 
+        // 读取输出
         // 等待进程结束
-        val finished = process.waitFor(timeout, TimeUnit.MILLISECONDS)
-        val exitCode = if (finished) {
-            process.exitValue()
-        } else {
-            process.destroy()
-            -1
-        }
-        if (!finished) {
+        if (result.timedOut) {
             Timber.tag(TAG).w("Native make command timed out after %d ms", timeout)
         }
-        if (exitCode != 0) {
+        if (result.exitCode != 0) {
             NativeExecutableRunner.logFailureDiagnostics(
                 tag = TAG,
                 executable = executable,
-                output = output.toString(),
+                output = result.output,
                 toolchainBinDir = toolchainManager.getBinDir().absolutePath
             )
         }
 
         CommandResult(
-            exitCode = exitCode,
-            output = output.toString()
+            exitCode = result.exitCode,
+            output = result.output
         )
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         Timber.tag(TAG).e(e, "Failed to execute native command")
         NativeExecutableRunner.logFailureDiagnostics(
@@ -458,6 +467,9 @@ class NativeMakeBuildStrategy(
             exitCode = -1,
             output = "Exception: ${e.message}"
         )
+    } finally {
+        BuildResourceCleaner.cleanupCommandTempDir(commandTempDir)
+    }
     }
 
     private fun applyExtraEnvironment(
