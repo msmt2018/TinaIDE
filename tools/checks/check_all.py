@@ -53,6 +53,11 @@ def main() -> int:
             root / "tools/checks/check_direct_file_operations.py",
             [],
         ),
+        (
+            "embedded resource collisions",
+            root / "tools/checks/check_embedded_resource_collisions.py",
+            [],
+        ),
     ]
 
     if args.include_i18n:

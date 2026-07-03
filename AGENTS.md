@@ -108,7 +108,7 @@ TinaIDE 是 Android 上的 C/C++ IDE。当前默认运行链路是 **native tina
 ./gradlew -Ptina.devAbi=x86_64 :app:assembleX86_64Debug --console=plain
 ./gradlew :app:assembleDebugAllAbi --console=plain
 ./gradlew ktlintCheck --console=plain
-./gradlew :feature:ai:testDebugUnitTest --console=plain
+./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain
 ./gradlew :core:editor-view:testDebugUnitTest --tests "com.wuxianggujun.tinaide.core.editorview.EditorPopupComposeSmokeTest" --tests "com.wuxianggujun.tinaide.core.editorview.PopupOverlaySharedAnchorIntegrationTest" --tests "com.wuxianggujun.tinaide.core.editorview.EditorOverlaysIntegrationTest" --console=plain
 ```
 
@@ -120,7 +120,7 @@ TinaIDE 是 Android 上的 C/C++ IDE。当前默认运行链路是 **native tina
 - Gradle/ABI/CI/Release/R8/签名：`.agents/skills/tina-build-release/SKILL.md`
 - 测试选择/排障/回归验证：`.agents/skills/tina-testing-debugging/SKILL.md`
 - Compose UI/主题/设置页/用户文案：`.agents/skills/tina-compose-ui-i18n/SKILL.md`
-- AI 工具/渠道/BYOK/streaming/callbacks：`.agents/skills/tina-ai-tools/SKILL.md`
+- RikkaHub/AI 入口、模型渠道边界和 embedded 集成：`.agents/skills/tina-ai-tools/SKILL.md`
 - native toolchain/sysroot/clangd/LSP/Tree-sitter/PRoot：`.agents/skills/tina-native-lsp-runtime/SKILL.md`
 - Room/路径/权限/API key/FileProvider/日志隐私：`.agents/skills/tina-data-security-storage/SKILL.md`
 - 插件 manifest/.tinaplug/Lua/LSP 插件/marketplace/starter：`.agents/skills/tina-plugin-system/SKILL.md`
@@ -132,7 +132,7 @@ TinaIDE 是 Android 上的 C/C++ IDE。当前默认运行链路是 **native tina
 - 路径与分享：`ProjectPaths`、`ProjectLocationManager`、`PathValidator`、`TinaFileProvider`、`ExternalFileIntents`。
 - 编译运行：`CompileProjectUseCase`、`RunConfigurationManager`、`ProcessManager`、native toolchain/sysroot managers。
 - LSP：`LspEditorManager`、`LspPluginManager`、`PluginLspConnectionProvider`。
-- AI 工具：`AiTool`、`ToolRegistry`、`ToolInitializer`、`ToolParameterParser`、`ToolI18n`、`ToolExecutionCoordinator`、`AiToolsIntegrationManager`。
+- RikkaHub：`RikkaHubLauncher`、`RikkaHubEmbeddedChatPane`、`RikkaHubEmbeddedSettingsPane`、`external/rikkahub`。
 - 插件：`PluginModels`、`PluginManifestValidator`、`PluginManager`、`PluginStateSnapshot`、host command 与 permission 体系。
 - R8：各模块 `consumer-rules.pro`，不要把所有规则堆到 `app/proguard-rules.pro`。
 
@@ -143,7 +143,7 @@ TinaIDE 是 Android 上的 C/C++ IDE。当前默认运行链路是 **native tina
 - 不要恢复或复制 `docs/workflows/receive-release.yml` 到 `.github/workflows/`；旧 `repository_dispatch` 私有仓库发布链路已废弃。
 - `README_EN.md` 存在历史口径；涉及构建、DI、工具链时以中文 README、`docs/开发指南.md`、`docs/架构概览.md`、当前代码和配置为准。
 - App 内帮助不直接读取 `docs/`；面向用户的帮助内容需同步检查 `feature/help/src/main/assets/help/*.md`。
-- API Key 只能通过 `AiChannelApiKeyStore` 进入加密存储；禁止写入 Room、普通 SharedPreferences、日志、导出配置、崩溃上报。
+- RikkaHub 的模型、渠道和 API Key 由 `external/rikkahub` 自身数据层维护；TinaIDE 主仓库禁止新增旁路 API Key 存储、日志、导出配置或崩溃上报。
 - 项目、日志、缓存、配置路径优先走 `ProjectPaths`；Host/Guest 文件访问必须走白名单校验。
 - 修改 `tools/plugin-starters/**` 后必须同步检查 bundled starter zip：`app/src/main/assets/bundled_plugins/tinaide.plugin.starters/templates/*.zip`。
 
@@ -285,38 +285,29 @@ Gradle/AGP 构建产物默认应保留在**模块相对路径下的 `build/` 目
 
 ---
 
-## 9. AI 工具开发规范（feature:ai 模块）
+## 9. RikkaHub 集成规范
 
-### 9.1 工具分类与组织
+### 9.1 当前边界
 
-AI 工具按功能分类组织，当前包含以下类别：
+TinaIDE 已移除自研 `feature:ai`、聊天仓储、渠道仓储和工具调用系统。AI 聊天、模型、渠道、MCP 与相关设置由 `external/rikkahub` 提供，主 APK 通过 `rikkahub-embedded` library 打包并在编辑器侧边栏提供入口。
 
-- **ExecutionTools**：代码执行、编译、构建相关工具
-- **SearchTools**：代码搜索、符号查找、引用分析工具（v0.14.67 新增）
-- **ProjectTools**：项目管理、文件操作工具
-- **RefactorTools**：代码重构、优化工具
-- **EditorTools**：编辑器操作、代码编辑工具
+### 9.2 修改要求
 
-### 9.2 工具实现要求
+- **宿主入口**：TinaIDE 主仓库只维护入口、生命周期和嵌入容器，优先检查 `RikkaHubLauncher`、`DrawerContent`、`SettingsActivity`。
+- **RikkaHub 内部能力**：聊天、模型、渠道、MCP、API Key、流式响应、停止生成等逻辑应在 `external/rikkahub` 子模块内修改。
+- **密钥安全**：不要在 TinaIDE 主仓库新增 API Key 镜像存储、Room 字段、普通 SharedPreferences、日志、导出配置或崩溃附件。
+- **子模块提交顺序**：修改 `external/rikkahub` 后，必须先提交并推送 RikkaHub 子模块，再提交主仓库 gitlink。
 
-- **回调接口**：每类工具必须定义对应的 Callbacks 接口（如 `ExecutionCallbacks`、`EditorToolCallbacks`），实现与 UI 层解耦
-- **参数解析**：使用 `ToolParameterParser` 统一解析工具参数，支持类型转换与验证
-- **国际化**：工具名称、描述、参数说明必须通过 `ToolI18n` 实现多语言支持
-- **错误处理**：工具执行失败时返回明确的错误信息，便于 AI 理解和重试
-- **日志记录**：关键操作必须记录详细日志，便于调试和错误追踪
+### 9.3 验证
 
-### 9.3 AI 渠道管理
+RikkaHub 集成相关静态验证优先使用：
 
-- **模型映射**：不同 AI 服务提供商的模型名称需要通过 `model_mapping` 字段进行转换
-- **API 密钥处理**：密钥在使用前必须清理换行符和空白字符（`trim()`）
-- **渠道 CRUD**：支持创建、读取、更新（PATCH）、删除（DELETE）操作
-- **后台管理**：生产后台已迁入私有仓库；开源 Android 仓库只保留客户端渠道配置能力
+```bash
+./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain
+./gradlew :app:compileArm64DebugKotlin --console=plain
+```
 
-### 9.4 聊天功能规范
-
-- **停止生成**：必须支持 `stopGeneration` 控制变量，允许用户中断 AI 响应
-- **消息样式**：用户消息与 AI 消息必须有明显的视觉区分
-- **工具选择**：AI 工具按类别分组展示，便于用户选择启用的工具集
+如果只改主仓库入口或文档，至少检查 `git diff`、相关路径是否真实存在，以及帮助资产中的 RikkaHub 说明是否同步。
 
 ---
 

@@ -1,6 +1,6 @@
 # TinaIDE Toolchain 构建与同步指南
 
-> 更新日期：2026-04-06
+> 更新日期：2026-07-03
 
 ## 目标
 
@@ -88,7 +88,7 @@ docker exec tinaide-toolchain-builder bash -lc \
    ARCH=aarch64 \
    API_LEVEL=28 \
    LLVM_VERSION=22.1.0-rc3 \
-   TOOLCHAIN_VERSION=0.2.0 \
+   TOOLCHAIN_VERSION=0.2.4 \
    bash scripts/build-and-package-android-toolchain.sh"
 ```
 
@@ -97,7 +97,7 @@ docker exec tinaide-toolchain-builder bash -lc \
 - `ARCH=aarch64|x86_64`
 - `API_LEVEL=28`
 - `LLVM_VERSION=22.1.0-rc3`
-- `TOOLCHAIN_VERSION=0.2.0`
+- `TOOLCHAIN_VERSION=0.2.4`
 - `BUILD_TOOLS=0|1`
 - `PACKAGE_FULL=0|1`
 - `PACKAGE_BASE=0|1`
@@ -150,11 +150,32 @@ build/tina-toolchain/
 
 ## 同步到 App 资产目录
 
-构建完成后，不要手工复制散文件，统一走同步脚本：
+构建完成后，不要手工复制散文件，统一走同步脚本。只同步工具链时可跳过 sysroot：
 
 ```powershell
-pwsh ./tools/sync-tina-toolchain-assets.ps1 -Abi arm64 -Clean
-pwsh ./tools/sync-tina-toolchain-assets.ps1 -Abi x86_64 -Clean
+pwsh ./tools/sync-tina-toolchain-assets.ps1 -Abi arm64 -Clean -SkipSysroot
+pwsh ./tools/sync-tina-toolchain-assets.ps1 -Abi x86_64 -Clean -SkipSysroot
+```
+
+如果本次同时更新 Android sysroot，需要显式传入 profile 与资产名；旧
+`android-sysroot-<abi>-all.tar.xz` 默认包名已经移除：
+
+```powershell
+pwsh ./tools/sync-tina-toolchain-assets.ps1 `
+  -Abi arm64 `
+  -Clean `
+  -SysrootProfileId builtin-ndk-r28c-arm64 `
+  -SysrootProfileName "NDK r28c" `
+  -SysrootAssetName android-sysroot-arm64-r28c.tar.xz `
+  -SetDefaultSysrootProfile
+
+pwsh ./tools/sync-tina-toolchain-assets.ps1 `
+  -Abi x86_64 `
+  -Clean `
+  -SysrootProfileId builtin-ndk-r28c-x86_64 `
+  -SysrootProfileName "NDK r28c" `
+  -SysrootAssetName android-sysroot-x86_64-r28c.tar.xz `
+  -SetDefaultSysrootProfile
 ```
 
 同步脚本会做几件事：
@@ -162,14 +183,16 @@ pwsh ./tools/sync-tina-toolchain-assets.ps1 -Abi x86_64 -Clean
 1. 读取 `app/src/<abi>/assets/tina-toolchain/current.properties`
 2. 按 spec 检查 `release/` 目录里是否存在对应归档
 3. 复制所需 `.tar.xz` 与 `sha256`
-4. 同步 `android-sysroot-<abi>-all.tar.xz`
-5. 把旧资产归档到 `app/.local/toolchain-archive/<abi>/`
+4. 维护 `app/src/<abi>/assets/android-sysroot/profiles.json`
+5. 同步指定的 `android-sysroot-<abi>-<profile>.tar.xz`
+6. 把旧资产归档到 `app/.local/toolchain-archive/<abi>/`
 
 关键约束：
 
 - `ArchiveDir` 不能放在 `app/src` 下面，否则会被一起打包进 APK
 - `current.properties` 至少要有 `version`、`arch`，以及 `full` 或 `base`
 - `arch` 必须与 ABI 对应：`arm64 -> aarch64`，`x86_64 -> x86_64`
+- 不跳过 sysroot 时，`SysrootAssetName` 必须是 `.tar.xz` 文件名，不能包含路径分隔符
 
 ## 构建后校验
 
