@@ -32,7 +32,7 @@ description: TinaIDE 插件系统、.tinaplug、manifest、权限、Lua script/h
 - 内置插件目录支持 `app/src/main/assets/bundled_plugins/<pluginId>/manifest.json` 或 `.tinaplug`。
 - 公开插件与依赖包 Registry 固定为 `https://github.com/wuxianggujun/TinaIDE-Registry`。
 - 客户端默认读取该 Registry 的 `plugins/index.v2.json` 与 `packages/index.v2.json`；v2 不存在、请求失败或解析失败时直接报错，不再回退 `plugins/index.json` / `packages/index.json`；每个索引入口优先 GitHub Raw，失败后回退 jsDelivr CDN。
-- Registry v2 从 `0.17.11` 引入；`0.20.0` 起 Android 客户端删除 v1 fallback；Registry 默认停止生成 v1 全量索引。确实需要服务旧客户端时，Registry 仓库可显式使用 `build-registry.ps1 -IncludeLegacyV1` 与 `validate-registry.ps1 -AllowLegacyV1`。
+- Registry v2 从 `0.17.11` 引入；`0.18.0` 起 Android 客户端删除 v1 fallback；Registry 默认停止生成 v1 全量索引。确实需要服务旧客户端时，Registry 仓库可显式使用 `build-registry.ps1 -IncludeLegacyV1` 与 `validate-registry.ps1 -AllowLegacyV1`。
 - 该 Registry 承载索引、可下载包文件、官方插件源码、starter 源模板和索引构建脚本；不承载后端、数据库或管理后台。
 - 如果 v2 的 `plugins` / `packages` 索引为空，市场列表为空属于 Registry 未发布内容，不是 Android 仓库缺代码。
 - 宿主行为应消费启用态插件，例如 `enabledPluginsFlow` 或中心状态快照；不要遍历安装态插件后临时过滤。

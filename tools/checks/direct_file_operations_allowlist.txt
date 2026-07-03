@@ -19,6 +19,7 @@ core/apk-builder/src/main/java/com/wuxianggujun/tinaide/core/apkbuilder/ApkTempl
 core/apk-builder/src/main/java/com/wuxianggujun/tinaide/core/apkbuilder/DebugKeyStore.kt | deleteRecursively=1,delete=1 | Debug keystore file cleanup.
 core/common/src/main/java/com/wuxianggujun/tinaide/core/common/io/TarExtractor.kt | delete=2 | Archive extraction link collision cleanup.
 core/common/src/main/java/com/wuxianggujun/tinaide/utils/FileUtils.kt | deleteRecursively=1,renameTo=1 | Generic low-level file utility.
+core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/BuildResourceCleaner.kt | deleteRecursively=1 | Transient app-cache build resource cleanup.
 core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/NativeMakeBuildStrategy.kt | deleteRecursively=1 | Build directory cleanup.
 core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/PRootMakeBuildStrategy.kt | deleteRecursively=1 | Build directory cleanup.
 core/compile/src/main/java/com/wuxianggujun/tinaide/core/compile/artifact/JsonArtifactStore.kt | deleteRecursively=1,delete=1 | Build artifact store cleanup.
@@ -32,6 +33,7 @@ core/linux-distro/src/main/java/com/wuxianggujun/tinaide/core/linuxdistro/LinuxD
 core/linux-distro/src/main/java/com/wuxianggujun/tinaide/core/linuxdistro/LinuxDistroManager.kt | deleteRecursively=1 | Linux distro rootfs removal.
 core/logging/src/main/java/com/wuxianggujun/tinaide/core/logging/FileLoggingTree.kt | delete=1 | Log rotation cleanup.
 core/logging/src/main/java/com/wuxianggujun/tinaide/core/logging/LogExportUtils.kt | deleteRecursively=4,delete=1 | Log export directory cleanup.
+core/logging/src/main/java/com/wuxianggujun/tinaide/core/logging/LogProcessRegistry.kt | deleteRecursively=1,delete=1 | Short-lived process registry cleanup for scoped log export.
 core/ndk/src/main/java/com/wuxianggujun/tinaide/core/ndk/AndroidNativeToolchainManager.kt | deleteRecursively=6,renameTo=2 | Toolchain install staging and rollback.
 core/ndk/src/main/java/com/wuxianggujun/tinaide/core/ndk/AndroidSysrootManager.kt | deleteRecursively=7,renameTo=2 | Sysroot install staging and rollback.
 core/ndk/src/main/java/com/wuxianggujun/tinaide/core/ndk/InstalledToolchainConfig.kt | deleteRecursively=1 | Toolchain config cleanup.
@@ -64,7 +66,6 @@ core/storage/src/main/java/com/wuxianggujun/tinaide/storage/ProjectImporter.kt |
 core/storage/src/main/java/com/wuxianggujun/tinaide/storage/ProjectLocationManager.kt | deleteRecursively=4,renameTo=1 | Workspace location migration cleanup.
 core/storage/src/main/java/com/wuxianggujun/tinaide/storage/StorageCleanupSupport.kt | deleteRecursively=1 | Low-level storage cleanup helper.
 core/storage/src/main/java/com/wuxianggujun/tinaide/storage/TinaFileProvider.kt | delete=1 | FileProvider delete contract.
-feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/executor/filesystem/DefaultFileSystemCallbacks.kt | deleteRecursively=1,delete=1 | Low-level default AI filesystem callbacks; app integration delegates to IFileOperations.
 feature/editor/src/main/java/com/wuxianggujun/tinaide/editor/session/DocumentSession.kt | delete=1 | Atomic save temp file cleanup.
 feature/editor/src/main/java/com/wuxianggujun/tinaide/editor/symbol/SymbolIndexCache.kt | delete=3 | Symbol index cache cleanup.
 feature/settings/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/settings/sections/CompilerSettingsSection.kt | delete=2 | Compiler settings temp file cleanup.

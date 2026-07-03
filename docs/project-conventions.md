@@ -1,6 +1,6 @@
 # TinaIDE 项目开发规范
 
-> 本文档供所有开发者和 AI 工具参考。精简版关键约束，详细设计文档见 `docs/` 目录。
+> 本文档供所有开发者和 AI 助手参考。精简版关键约束，详细设计文档见 `docs/` 目录。
 
 ---
 
@@ -10,7 +10,7 @@
 app/                    ← 应用壳（Activity 启动、DI 装配、ProGuard 全局规则）
 build-logic/            ← Gradle Convention Plugins
 core/                   ← 基础模块（common, config, i18n, model, network, lsp, git, plugin, ...）
-feature/                ← 功能模块（editor, terminal, settings, ai, ...）
+feature/                ← 功能模块（editor, terminal, settings, viewer, workspace, ...）
 external/               ← 第三方 submodule / 本地依赖（termux-proot, tina-android-tree-sitter, ...）
 server/                 ← 公开占位说明；私有后端不随开源仓库分发
 docs/                   ← 设计文档

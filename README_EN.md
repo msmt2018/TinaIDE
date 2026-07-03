@@ -38,6 +38,8 @@ Basic C/C++ build, run, and clangd completion no longer require PRoot.
 - **Plugin System**: Themes, snippets, menu extensions, LSP plugins, and script
   / hybrid plugins
 - **File Preview**: Built-in preview for Markdown/JSON/images/Hex and more
+- **Embedded RikkaHub**: AI chat, models, providers, and MCP settings are
+  handled by RikkaHub inside TinaIDE
 
 ## UI Preview
 
@@ -243,8 +245,9 @@ Mapping files are only archived locally by the public build logic.
 | `arm64-v8a` | ✅ Primary | Physical devices |
 | `x86_64` | ✅ Supported | Emulators |
 
-**Target API Level**: 28+ (Android 9.0+)
-**Compile SDK**: 36 (Android 16)
+**Minimum API Level**: 28+ (Android 9.0+)
+**Target SDK**: 36
+**Compile SDK**: 37
 
 ## System Requirements
 

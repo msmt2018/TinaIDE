@@ -23,7 +23,8 @@ description: TinaIDE native 编译运行、Android sysroot、tina-toolchain asse
 - `AndroidSysrootManager` 与 `AndroidNativeToolchainManager` 是独立管理职责，不能合并。
 - toolchain assets 由 `app/src/<abi>/assets/tina-toolchain/current.properties`、tar.xz 和 sha256 约束。
 - arm64 当前记录为 `version=0.2.4`、`arch=aarch64`、`full=tinaide-toolchain-aarch64-v0.2.4-patched.tar.xz`。
-- x86_64 当前记录为 `version=0.2.3`、`arch=x86_64`、`full=tinaide-toolchain-x86_64-v0.2.3.tar.xz`。
+- x86_64 当前记录为 `version=0.2.4`、`arch=x86_64`、`full=tinaide-toolchain-x86_64-v0.2.4-patched.tar.xz`。
+- Android sysroot 资产通过 `app/src/<abi>/assets/android-sysroot/profiles.json` 管理；同步时必须显式传入 `SysrootAssetName`，旧 `android-sysroot-*-all.tar.xz` 默认包名已移除。
 - C/C++ LSP provider 包括 native clangd、PRoot clangd、remote LSP、plugin LSP。
 - CMake / Make 使用内建语言服务，不默认走 clangd。
 
