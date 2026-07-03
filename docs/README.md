@@ -1,6 +1,6 @@
 # TinaIDE 文档中心
 
-> 更新日期：2026-06-11
+> 更新日期：2026-07-03
 
 这里汇总 TinaIDE 当前仍然有效的项目文档，并标出应该优先回看的源码入口。
 
@@ -29,7 +29,7 @@
 - 内建 CMake / Make 语言服务：`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/BuiltinLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/CMakeLanguageServiceSession.kt`、`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/state/editor/MakeLanguageServiceSession.kt`
 - LSP 会话与连接提供者：`core/lsp/src/main/java/com/wuxianggujun/tinaide/core/lsp/LspClientSession.kt`
 - 插件 LSP：`core/plugin/src/main/java/com/wuxianggujun/tinaide/plugin/lsp/LspPluginManager.kt`
-- RikkaHub 入口：`app/src/main/java/com/wuxianggujun/tinaide/rikkahub/RikkaHubLauncher.kt`、`external/rikkahub`
+- RikkaHub 入口：`app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/DrawerContent.kt`、`app/src/main/java/com/wuxianggujun/tinaide/settings/SettingsActivity.kt`、`external/rikkahub/embedded`
 - 帮助文档入口：`feature/help/src/main/java/com/wuxianggujun/tinaide/core/help/HelpRepository.kt`
 - PRoot / Linux 环境：`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/PRootBootstrap.kt`、`core/proot/src/main/java/com/wuxianggujun/tinaide/core/proot/SelfHostedLinuxDistroRuntime.kt`、`core/linux-distro/src/main/assets/linux-distro/manifest.json`
 
@@ -65,6 +65,7 @@
 - [PC LSP 代理配置](guides/PC-LSP-Proxy-Setup-Guide.md)
 - [MT Data Files Provider](guides/MT-Data-Files-Provider.md)
 - [文件预览指南](guides/File-Viewer-Guide.md)
+- [Hex Viewer 设计说明](guides/Hex-Viewer-Design.md)
 - [分支管理指南](guides/Branch-Management-Guide.md)
 
 ### 测试与排障

@@ -1,6 +1,6 @@
 # 插件系统路线图（Roadmap）
 
-> 文档更新：2026-06-05
+> 文档更新：2026-07-03
 > 目标：以 **配置插件优先** 的方式逐步扩展 TinaIDE 插件能力（Play 合规、低风险、可维护）。
 
 ---
@@ -10,7 +10,7 @@
 当前已落地的能力：
 
 - 插件安装/卸载/启用/禁用：`core/plugin/src/main/java/.../plugin/PluginManager.kt`
-- 插件管理 UI（设置 → 插件）：`feature/settings/src/main/java/.../settings/sections/PluginsSettingsSection.kt`
+- 插件管理 UI（设置 → 插件）：`feature/settings/src/main/java/com/wuxianggujun/tinaide/ui/compose/screens/settings/sections/PluginsSettingsSection.kt`
 - 主题、代码片段、文件树菜单、编辑器 Tab 长按菜单、编辑器工具栏动作菜单
 - 插件快捷键、依赖声明提示、插件详情页配置 UI
 - 项目模板与 APK 导出模板（`contributions.projectTemplates` / `contributions.apkExports`）
@@ -144,17 +144,17 @@ interface HostCommand {
 
 - `contributions.menus["editor/context"]` 已可用（当前落点：编辑器 Tab 长按上下文菜单）
 - 扩展点：`app/src/main/java/.../ui/compose/components/TabContextMenu.kt`
+- `contributions.menus["editor/toolbar"]` 已可用（当前落点：编辑器标签栏右侧插件动作菜单）
+- 分发入口：`app/src/main/java/.../ui/compose/screens/main/MainActivityCommandProvider.kt`
 - `when` 最小支持：`isDirty`
 
 示例插件：
 
 - 直接按上文 manifest 草案声明 `editor/context` 菜单项即可。
-
-建议先做“编辑器右键菜单”再做“工具栏”，因为工具栏涉及布局与状态更复杂。
+- 工具栏动作声明 `editor/toolbar`，由宿主统一映射为标签栏右侧动作菜单。
 
 方案与文件树类似：
 
-- 宿主提供扩展点：`EditorContextMenu` / `EditorToolbar`
 - 插件只提供菜单描述，宿主负责渲染与条件判断（`when`）
 
 ### 3.4 SnippetManager（P1）

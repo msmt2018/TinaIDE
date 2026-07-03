@@ -32,6 +32,7 @@ TinaIDE 的文件打开逻辑由编辑器容器统一分发：普通文本、源
 - 用途：查看二进制文件的十六进制内容。
 - 常见扩展名：任意（通常用于 `.so` / `.bin` 等）
 - 相关实现：`feature/viewer/src/main/java/.../ui/compose/viewer/HexViewerScreen.kt`
+- 详细设计：[Hex Viewer 设计说明](Hex-Viewer-Design.md)
 
 ## 注意事项
 

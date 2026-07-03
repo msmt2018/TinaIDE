@@ -79,7 +79,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        timeout-minutes: 20
+        timeout-minutes: 45
         run: |
           ./gradlew :app:assembleArm64Debug --no-daemon -Ptina.devAbi=arm64 \
             -Ptina.buildProotFromSource=false \

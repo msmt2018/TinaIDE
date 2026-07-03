@@ -29,9 +29,9 @@
 | [Plugin-Roadmap.md](Plugin-Roadmap.md) | 插件系统路线图 |
 | [Plugin-State-Model.md](Plugin-State-Model.md) | 插件状态模型与消费规则 |
 | [Plugin-Template-Design.md](Plugin-Template-Design.md) | **插件模板插件设计方案** |
-| [Plugin-Project-Template-Wizard-Troubleshooting.md](Plugin-Project-Template-Wizard-Troubleshooting.md) | 插件项目模板向导排查记录 |
+| [Plugin-Project-Template-Wizard-Troubleshooting.md](Plugin-Project-Template-Wizard-Troubleshooting.md) | 历史参考：插件项目模板向导排查记录 |
 | [Plugin-Tutorial-Acceptance-Checklist.md](Plugin-Tutorial-Acceptance-Checklist.md) | 插件教程端到端验收清单 |
-| [Plugin-Tutorial-Maintenance-Log.md](Plugin-Tutorial-Maintenance-Log.md) | 插件教程维护记录与设计决策 |
+| [Plugin-Tutorial-Maintenance-Log.md](Plugin-Tutorial-Maintenance-Log.md) | 历史参考：插件教程维护记录与设计决策 |
 | [Plugin-Authoring-Tutorial.md](Plugin-Authoring-Tutorial.md) | **插件编写教程（基于模板）** |
 | [Plugin-API-Guide.md](Plugin-API-Guide.md) | **插件 API 指南（稳定 / Beta 边界）** |
 | [LSP-Plugin-Development-Guide.md](LSP-Plugin-Development-Guide.md) | **LSP 插件开发指南**（新） |

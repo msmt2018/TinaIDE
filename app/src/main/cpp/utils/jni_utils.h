@@ -6,6 +6,7 @@
 
 #include <jni.h>
 #include <string>
+#include <vector>
 
 namespace tinaide {
 namespace utils {
