@@ -2537,11 +2537,11 @@
   <string name="rikkahub_title">RikkaHub</string>
   <string name="rikkahub_desc">TinaIDE 已内嵌 RikkaHub，聊天、模型和渠道配置由 RikkaHub 提供。</string>
   <string name="rikkahub_open">打开 RikkaHub</string>
-  <string name="code_block_copy">复制代码</string>
+  <string name="tina_code_block_copy">复制代码</string>
   <string name="code_block_insert">插入到编辑器</string>
   <string name="code_block_lines">行</string>
-  <string name="code_block_expand">显示剩余 %1$d 行</string>
-  <string name="code_block_collapse">收起代码</string>
+  <string name="tina_code_block_expand">显示剩余 %1$d 行</string>
+  <string name="tina_code_block_collapse">收起代码</string>
   <string name="code_block_save">保存代码</string>
   <string name="code_block_view">查看代码</string>
   <string name="code_block_hide">隐藏高亮</string>

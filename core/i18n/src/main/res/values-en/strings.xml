@@ -1951,11 +1951,11 @@
   <string name="rikkahub_title">RikkaHub</string>
   <string name="rikkahub_desc">RikkaHub is embedded in TinaIDE. Chat, models, and channel settings are handled by RikkaHub.</string>
   <string name="rikkahub_open">Open RikkaHub</string>
-  <string name="code_block_copy">Copy code</string>
+  <string name="tina_code_block_copy">Copy code</string>
   <string name="code_block_insert">Insert to editor</string>
   <string name="code_block_lines">lines</string>
-  <string name="code_block_expand">Show %1$d more lines</string>
-  <string name="code_block_collapse">Collapse code</string>
+  <string name="tina_code_block_expand">Show %1$d more lines</string>
+  <string name="tina_code_block_collapse">Collapse code</string>
   <string name="code_block_save">Save code</string>
   <string name="code_block_view">View code</string>
   <string name="code_block_hide">Hide highlight</string>
