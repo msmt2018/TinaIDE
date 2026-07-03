@@ -7,7 +7,7 @@ class TextResourceAliasesTest {
 
     @Test
     fun aliases_shouldExposeCoreI18nResources() {
-        assertThat(Strings.app_name).isEqualTo(R.string.app_name)
+        assertThat(Strings.error_unknown).isEqualTo(R.string.error_unknown)
         assertThat(Arrays.editor_theme_entries).isEqualTo(R.array.editor_theme_entries)
     }
 }

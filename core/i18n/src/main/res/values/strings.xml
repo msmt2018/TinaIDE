@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">TinaIDE</string>
   <string name="menu_refresh">刷新</string>
   <string name="menu_settings">设置</string>
 <string name="permission_storage_title">需要存储权限</string>
@@ -557,7 +556,6 @@
   <string name="info_file_count_value">%1$d 个文件</string>
   <string name="info_last_modified">最后修改</string>
   <string name="btn_close">关闭</string>
-  <string name="back">返回</string>
   <string name="dialog_confirm_delete">确定要删除项目 \"%1$s\" 吗？</string>
   <string name="dialog_delete_warning">此操作将永久删除项目文件夹及其所有内容，无法恢复。</string>
   <string name="dialog_install_hint">你可以先继续浏览项目；编译功能需等待安装完成。</string>

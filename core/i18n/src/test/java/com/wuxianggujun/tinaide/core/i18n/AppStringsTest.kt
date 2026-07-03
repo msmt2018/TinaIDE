@@ -15,9 +15,9 @@ class AppStringsTest {
     fun getOr_shouldUseProvidedContextWithoutGlobalInitialization() {
         val context = fakeStringContext()
 
-        val appName = AppStrings.getOr(context, Strings.app_name)
+        val message = AppStrings.getOr(context, Strings.error_unknown)
 
-        assertThat(appName).isEqualTo("TinaIDE")
+        assertThat(message).isEqualTo("未知错误")
     }
 
     @Test
@@ -30,7 +30,7 @@ class AppStringsTest {
     }
 
     private fun fakeStringContext(): Context = mockk {
-        every { getString(Strings.app_name) } returns "TinaIDE"
+        every { getString(Strings.error_unknown) } returns "未知错误"
         every { getString(Strings.log_export_app_name) } returns "应用名称: %1\$s"
         every { getString(Strings.log_export_app_name, *anyVararg()) } answers {
             "应用名称: %1\$s".format(*args.drop(1).toTypedArray())
