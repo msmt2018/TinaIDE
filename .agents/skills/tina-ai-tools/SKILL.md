@@ -1,72 +1,52 @@
 ---
 name: tina-ai-tools
-description: TinaIDE feature:ai 工具、渠道、BYOK、流式响应和停止生成开发指南。用于新增/修改 AI 工具、工具参数、危险操作确认、工具 i18n、渠道配置、API key 存储、streaming 或 AI 与编辑器/文件系统集成。
+description: TinaIDE RikkaHub/AI 集成开发指南。用于修改内嵌 RikkaHub 入口、侧边栏聊天容器、模型/渠道边界、API key 安全边界、embedded 编译或 AI 与编辑器宿主集成。
 ---
 
-# TinaIDE AI 工具与渠道
+# TinaIDE RikkaHub / AI 集成
 
 ## 先读文件
 
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/di/AiModule.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/viewmodel/AiChatViewModel.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/AiTool.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolInitializer.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolRegistry.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolExecutionCoordinator.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolParameterParser.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/tools/ToolI18n.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/repository/ConversationRepository.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/channel/AiChannelRepository.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/channel/AiChannelApiKeyStore.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/api/AiApiClient.kt`。
-- `feature/ai/src/main/java/com/wuxianggujun/tinaide/ai/stream/ChatStreamController.kt`。
-- `app/src/main/java/com/wuxianggujun/tinaide/ai/integration/AiToolsIntegrationManager.kt`。
+- `settings.gradle.kts`：`external/rikkahub` included build 和 `rikkahub-embedded` 依赖替换。
+- `app/build.gradle.kts`：主 APK 对 `me.rerere.rikkahub:rikkahub-embedded` 的依赖。
+- `app/src/main/java/com/wuxianggujun/tinaide/ui/compose/components/DrawerContent.kt`。
+- `app/src/main/java/com/wuxianggujun/tinaide/settings/SettingsActivity.kt`。
+- `external/rikkahub/embedded/**`。
+- `external/rikkahub/app/src/main/java/me/rerere/rikkahub/RikkaHubEmbeddedChatPane.kt`：包含 `RikkaHubEmbeddedChatPane` 与 `RikkaHubEmbeddedSettingsPane`。
+- `docs/开发指南.md` 的 RikkaHub 接入落点。
+- `docs/架构概览.md` 的 RikkaHub 接入说明。
+- `feature/help/src/main/assets/help/getting-started.md` 与 `known-issues.md`。
 
-## 工具链路
+## 当前事实
 
-- Koin `aiModule` 初始化配置、渠道、会话仓库和工具注册。
-- 内置工具注册路径：`ToolInitializer -> ToolRegistry`。
-- 执行路径：`ToolExecutionCoordinator -> AiTool.execute()`。
-- `AiChatViewModel` 编排会话、流式响应、工具调用和 UI 状态，不要把工具查找分支散落到 UI。
-- 需要 app 能力时通过 callbacks 注入，参考 `AiToolsIntegrationManager`。
+- TinaIDE 已移除自研 `feature:ai`、聊天仓储、渠道仓储和工具调用系统。
+- AI 聊天、模型、渠道、MCP、API Key、流式响应和停止生成由 RikkaHub 自身维护。
+- TinaIDE 主仓库只负责 embedded library 依赖、侧边栏入口、设置入口、宿主生命周期和帮助文档。
+- RikkaHub 源码位于 `external/rikkahub` 子模块；改动子模块时必须先提交并推送子模块，再提交主仓库 gitlink。
+- 主仓库不要新增 API Key 镜像存储、日志输出、导出配置或崩溃附件。
 
-## 新增或修改工具
+## 修改流程
 
-1. 实现或修改 `AiTool`。
-2. 参数解析统一使用 `ToolParameterParser`，不要手写重复 JSON 转换。
-3. 在 `ToolInitializer.registerBuiltInTools()` 注册。
-4. 工具名、分类、状态、错误、参数说明走 `ToolI18n` 与 `core/i18n` 字符串资源。
-5. 高危工具必须设置 `isDangerous`，必要时实现 `getDangerousConfirmation()`。
-6. 补测试：registry、parser、execution、i18n、危险工具行为。
-7. 执行/构建类工具优先走 callbacks，最终复用 `CompileProjectUseCase`、`ProcessManager`、`RunConfigurationManager`，不要在工具中直接裸跑命令。
-
-## 渠道与 API key
-
-- `AiChannelConfig` 不保存 API key。
-- BYOK 密钥通过 `AiChannelApiKeyStore` / `AiChannelRepository.getApiKey()` 获取。
-- API key、baseUrl、model 等输入进入持久化前要 `trim()`。
-- `CUSTOM_BYOK` 是开源客户端实际可用路径；不要假设 `TINA_GATEWAY` 已可直接构建客户端。
-
-## 流式与停止生成
-
-- `AiApiClient` 使用 `OkHttpClientProvider.longConnection` 和 OpenAI-compatible SSE 解析链路。
-- `ChatStreamController` 管理 content、reasoning、toolCalls、usage 状态。
-- 停止生成由 `AiChatViewModel.stopGeneration` 控制。
-- 部分流式消息保存依赖 `ChatStreamController.snapshotPartialMessage()`。
+1. 先判断改动属于宿主入口还是 RikkaHub 内部能力。
+2. 宿主入口改动优先检查 `DrawerContent`、`SettingsActivity` 和 embedded 依赖边界。
+3. 聊天、模型、渠道、MCP、API Key、停止生成等能力应落在 `external/rikkahub`。
+4. 用户可见文案如果位于 TinaIDE 主仓库，必须走 `core/i18n`；如果位于 RikkaHub 子模块，按 RikkaHub 自身资源规则维护。
+5. 涉及帮助文档时同步检查 `feature/help/src/main/assets/help/*.md`。
 
 ## 高风险误区
 
-- 不要把明文 API key 放进普通 config、日志、测试 snapshot 或错误提示。
-- 不要绕过 `ToolExecutionCoordinator` 自行执行工具。
-- 不要新增用户可见工具文案但漏掉 `values-en`。
-- 不要把高危文件/终端/构建操作标成普通工具。
+- 不要恢复 `feature:ai` 或旧 `AiTool`、`ToolRegistry`、`AiChannelRepository` 链路。
+- 不要在 TinaIDE 主仓库保存 RikkaHub API Key 副本。
+- 不要把 RikkaHub 内部页面逻辑搬到 `app/`。
+- 不要只提交主仓库 gitlink 而忘记推送 `external/rikkahub` 子模块提交。
+- 不要把 RikkaHub Problems report 中已确认的 AGP 内部 deprecation warning 当作编译失败。
 
 ## 验证
 
 ```powershell
-./gradlew :feature:ai:testDebugUnitTest --console=plain
+./gradlew :rikkahub:embedded:compileDebugKotlin --console=plain
 ./gradlew :app:compileArm64DebugKotlin --console=plain
 ```
 
-- 只改工具 schema/i18n 时至少跑 `feature:ai` 对应单测。
-- 涉及 app callbacks 时补跑 app 编译或相关集成测试。
+- 只改主仓库文档时至少检查 `git diff`、路径是否真实存在、帮助资产是否同步。
+- 改 RikkaHub 源码时优先运行 embedded compile；涉及主 APK 宿主入口时再跑 app compile。

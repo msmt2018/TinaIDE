@@ -8,7 +8,7 @@ object GitHubRegistryConfig {
     const val BRANCH = "main"
     const val REGISTRY_SCHEMA_VERSION = 2
     const val REGISTRY_V2_INTRODUCED_APP_VERSION = "0.17.11"
-    const val REGISTRY_V1_FALLBACK_REMOVED_APP_VERSION = "0.20.0"
+    const val REGISTRY_V1_FALLBACK_REMOVED_APP_VERSION = "0.18.0"
 
     const val GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/$OWNER/$REPOSITORY/$BRANCH"
     const val JSDELIVR_BASE_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPOSITORY@$BRANCH"

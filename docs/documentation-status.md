@@ -1,6 +1,6 @@
 # TinaIDE 文档状态与生命周期
 
-> 更新日期：2026-06-11
+> 更新日期：2026-07-03
 
 本文用于说明仓库内文档的可信层级、维护边界和后续清理规则。遇到文档内容冲突时，先按这里的顺序判断，不要直接以历史设计稿或旧路线图作为当前实现依据。
 
@@ -41,6 +41,9 @@
 ### 当前事实源
 
 - 默认编译 / LSP：`native tina-toolchain + Android sysroot`，PRoot 只是可选 Linux 环境。
+- Android SDK 口径：`minSdk=28`、`targetSdk=36`、`compileSdk=37`，以 `app/build.gradle.kts` 为准。
+- RikkaHub：TinaIDE 主仓库不再维护自研 `feature:ai`；AI 聊天、模型、渠道、MCP 和 API Key 配置由内嵌 RikkaHub 维护。
+- 远程 LSP：Android 客户端保留 WebSocket remote LSP 能力；当前仓库不内置 `tools/tina-lsp-proxy.py` 或 `tools/tina-lsp-proxy-kt` PC 代理实现。
 - Release 构建：可能递增 `version.properties` 并备份 R8 mapping；mapping 文件仅由公开构建逻辑做本地归档。
 - Registry：当前 Android 主干只读取 `plugins/index.v2.json` 与 `packages/index.v2.json`。
 - MT 管理器访问：默认开启；只暴露 TinaIDE 自己的 `data`、`Android/data`、`Android/obb` 和 `user_de_data`，可在设置中关闭。
