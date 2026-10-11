@@ -1,4 +1,4 @@
-﻿package com.wuxianggujun.tinaide.ui.compose.state.editor
+package com.wuxianggujun.tinaide.ui.compose.state.editor
 
 import com.wuxianggujun.tinaide.ui.compose.state.editor.CodeEditorRuntime
 import com.wuxianggujun.tinaide.ui.compose.state.editor.CodeEditorDocumentBinding
@@ -9,9 +9,52 @@ import com.wuxianggujun.tinaide.core.editorview.EditorState
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.editor.session.DocumentSession
 import com.wuxianggujun.tinaide.editor.session.EditorViewState
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CodeEditorRuntimeTest {
+
+    @Test
+    fun dispose_shouldKeepBufferAndBindingsUntilLastPaneIsRemoved() {
+        val buffer = RopeTextBuffer("unsaved text")
+        val runtime = CodeEditorRuntime(buffer, EditorState(buffer))
+        val binding = FakeDocumentBinding(buffer)
+        runtime.getOrCreateDocumentBinding { binding }
+        runtime.acquireDocumentBinding(binding)
+        runtime.acquireUiReference()
+        runtime.acquireUiReference()
+
+        runtime.dispose()
+        runtime.dispose()
+        assertThat(buffer.isClosed).isFalse()
+        assertThat(binding.readText()).isEqualTo("unsaved text")
+        assertThat(binding.detachCount).isEqualTo(0)
+
+        runtime.releaseUiReference()
+        assertThat(buffer.isClosed).isFalse()
+        runtime.releaseUiReference()
+        assertThat(buffer.isClosed).isTrue()
+        assertThat(binding.detachCount).isEqualTo(1)
+
+        runtime.dispose()
+        runtime.releaseDocumentBinding(binding)
+        assertThat(binding.detachCount).isEqualTo(1)
+        assertThrows(IllegalStateException::class.java) { runtime.acquireUiReference() }
+    }
+
+    @Test
+    fun leavingPage_shouldPreserveCachedRuntimeUntilEviction() {
+        val buffer = RopeTextBuffer("cached text")
+        val runtime = CodeEditorRuntime(buffer, EditorState(buffer))
+        runtime.acquireUiReference()
+        runtime.releaseUiReference()
+        assertThat(buffer.isClosed).isFalse()
+        runtime.acquireUiReference()
+        assertThat(buffer.toString()).isEqualTo("cached text")
+        runtime.releaseUiReference()
+        runtime.dispose()
+        assertThat(buffer.isClosed).isTrue()
+    }
 
     @Test
     fun documentBinding_shouldAttachOnceAcrossMirroredPanes() {

@@ -113,6 +113,14 @@ private const val LSP_EDITOR_STATE_BINDING_KEY = "lsp-editor-actions"
 private const val GUTTER_EDITOR_STATE_BINDING_KEY = "gutter-actions"
 private const val GIT_GUTTER_DEBOUNCE_MS = 400L
 
+@Composable
+internal fun CodeEditorRuntimeEffect(runtime: CodeEditorRuntime) {
+    DisposableEffect(runtime) {
+        runtime.acquireUiReference()
+        onDispose { runtime.releaseUiReference() }
+    }
+}
+
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun TinaCodeEditorPage(
@@ -126,6 +134,7 @@ fun TinaCodeEditorPage(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val runtime = remember(tab.id, state, tab.file) { state.getOrCreateCodeEditorRuntime(tab) }
+    CodeEditorRuntimeEffect(runtime)
     val buffer = runtime.buffer
     val textSnapshot = remember(buffer) { VersionedBufferTextSnapshot(buffer) }
     val completionProvider = remember(tab.id, buffer, textSnapshot, tab.file) {
