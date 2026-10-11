@@ -102,9 +102,23 @@ class CodeEditorRuntime(
         var references: Int = 0,
     )
     private val stateBindings = mutableMapOf<String, StateBindingRecord>()
+    private var uiReferences = 0
+    private var disposalRequested = false
+    private var disposed = false
 
     init {
         buffer.addChangeListener(stateSyncListener)
+    }
+
+    internal fun acquireUiReference() {
+        check(!disposed) { "Cannot attach a disposed editor runtime" }
+        uiReferences++
+    }
+
+    internal fun releaseUiReference() {
+        check(uiReferences > 0) { "Editor runtime has no UI reference to release" }
+        uiReferences--
+        disposeIfUnused()
     }
 
     internal fun getOrCreateDocumentBinding(
@@ -202,6 +216,15 @@ class CodeEditorRuntime(
     }
 
     internal fun dispose() {
+        disposalRequested = true
+        disposeIfUnused()
+    }
+
+    private fun disposeIfUnused() {
+        // Tab/cache removal can precede Compose disposal, including both mirrored panes.
+        // Their effects, input callbacks and final frames still need the live buffer.
+        if (!disposalRequested || disposed || uiReferences != 0) return
+        disposed = true
         resetDocumentBinding()
         resetStateBindings()
         clearLanguageServices()

@@ -1,10 +1,14 @@
 package com.wuxianggujun.tinaide.ui.compose.editor
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -72,6 +76,7 @@ class EditorFontSizeHostIntegrationTest {
         var touchSlopPx = 0f
         var pinchDetails = "No touch input was injected"
         val publishedSizes = mutableListOf<Float>()
+        lateinit var hostView: View
         lateinit var editor: EditorState
         editor = EditorState(
             buffer,
@@ -86,6 +91,7 @@ class EditorFontSizeHostIntegrationTest {
             )
         )
         composeRule.setContent {
+            hostView = LocalView.current
             touchSlopPx = LocalViewConfiguration.current.touchSlop
             // Same live preference feedback path used by EditorContainerState/TinaCodeEditorPage.
             LaunchedEffect(editor) {
@@ -95,6 +101,19 @@ class EditorFontSizeHostIntegrationTest {
                 }
             }
             TinaEditor(editor, Modifier.fillMaxSize().testTag("font-scale-editor"))
+        }
+        composeRule.waitForIdle()
+        // Robolectric does not reliably draw the Android host before touch injection.
+        // The real Canvas draw supplies the viewport and gesture hit-test geometry.
+        composeRule.runOnIdle {
+            val bitmap = Bitmap.createBitmap(hostView.width, hostView.height, Bitmap.Config.ARGB_8888)
+            try {
+                hostView.draw(Canvas(bitmap))
+            } finally {
+                bitmap.recycle()
+            }
+            assertThat(editor.viewportWidthPx).isGreaterThan(1f)
+            assertThat(editor.viewportHeightPx).isGreaterThan(1f)
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { editor.scrollToLine(60) }
